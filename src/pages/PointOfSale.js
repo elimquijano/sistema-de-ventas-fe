@@ -35,7 +35,7 @@ import {
   ShoppingCart as ShoppingCartIcon,
   Payment as PaymentIcon,
   Receipt as ReceiptIcon,
-  CashRegister as CashRegisterIcon,
+  PointOfSale as CashRegisterIcon,
   Assessment as AssessmentIcon,
   Inventory as InventoryIcon,
   Build as BuildIcon,

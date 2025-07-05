@@ -163,4 +163,79 @@ export const notificationsAPI = {
   getUnreadCount: () => api.get('/notifications/unread-count'),
 };
 
+// NUEVAS APIs para el sistema de ventas
+export const businessAPI = {
+  getAll: (params = {}) => api.get('/businesses', { params }),
+  getById: (id) => api.get(`/businesses/${id}`),
+  create: (businessData) => api.post('/businesses', businessData),
+  update: (id, businessData) => api.put(`/businesses/${id}`, businessData),
+  delete: (id) => api.delete(`/businesses/${id}`),
+  getStats: (id) => api.get(`/businesses/${id}/stats`),
+};
+
+export const productsAPI = {
+  getAll: (params = {}) => api.get('/products', { params }),
+  getById: (id) => api.get(`/products/${id}`),
+  create: (productData) => api.post('/products', productData),
+  update: (id, productData) => api.put(`/products/${id}`, productData),
+  delete: (id) => api.delete(`/products/${id}`),
+  updateStock: (id, stock) => api.patch(`/products/${id}/stock`, { stock }),
+  getLowStock: () => api.get('/products/low-stock'),
+};
+
+export const servicesAPI = {
+  getAll: (params = {}) => api.get('/services', { params }),
+  getById: (id) => api.get(`/services/${id}`),
+  create: (serviceData) => api.post('/services', serviceData),
+  update: (id, serviceData) => api.put(`/services/${id}`, serviceData),
+  delete: (id) => api.delete(`/services/${id}`),
+};
+
+export const salesAPI = {
+  getAll: (params = {}) => api.get('/sales', { params }),
+  getById: (id) => api.get(`/sales/${id}`),
+  create: (saleData) => api.post('/sales', saleData),
+  update: (id, saleData) => api.put(`/sales/${id}`, saleData),
+  delete: (id) => api.delete(`/sales/${id}`),
+  getDailySales: (date) => api.get(`/sales/daily/${date}`),
+  getMonthlySales: (month, year) => api.get(`/sales/monthly/${year}/${month}`),
+};
+
+export const expensesAPI = {
+  getAll: (params = {}) => api.get('/expenses', { params }),
+  getById: (id) => api.get(`/expenses/${id}`),
+  create: (expenseData) => api.post('/expenses', expenseData),
+  update: (id, expenseData) => api.put(`/expenses/${id}`, expenseData),
+  delete: (id) => api.delete(`/expenses/${id}`),
+  getByCategory: (categoryId) => api.get(`/expenses/category/${categoryId}`),
+};
+
+export const creditsAPI = {
+  getAll: (params = {}) => api.get('/credits', { params }),
+  getById: (id) => api.get(`/credits/${id}`),
+  create: (creditData) => api.post('/credits', creditData),
+  update: (id, creditData) => api.put(`/credits/${id}`, creditData),
+  delete: (id) => api.delete(`/credits/${id}`),
+  processPayment: (id, paymentData) => api.post(`/credits/${id}/payment`, paymentData),
+  getPending: () => api.get('/credits/pending'),
+};
+
+export const loansAPI = {
+  getAll: (params = {}) => api.get('/loans', { params }),
+  getById: (id) => api.get(`/loans/${id}`),
+  create: (loanData) => api.post('/loans', loanData),
+  update: (id, loanData) => api.put(`/loans/${id}`, loanData),
+  delete: (id) => api.delete(`/loans/${id}`),
+  markAsReturned: (id, returnData) => api.post(`/loans/${id}/return`, returnData),
+  getPending: () => api.get('/loans/pending'),
+};
+
+export const categoriesAPI = {
+  getAll: (params = {}) => api.get('/categories', { params }),
+  getById: (id) => api.get(`/categories/${id}`),
+  create: (categoryData) => api.post('/categories', categoryData),
+  update: (id, categoryData) => api.put(`/categories/${id}`, categoryData),
+  delete: (id) => api.delete(`/categories/${id}`),
+};
+
 export default api;

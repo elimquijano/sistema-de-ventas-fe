@@ -1,6 +1,6 @@
 import React from "react";
 
-// Importar todos los componentes
+// Importar todos los componentes existentes
 import { Dashboard as DashboardPage } from "../pages/Dashboard";
 import { Analytics as AnalyticsPage } from "../pages/Analytics";
 import { Users } from "../pages/Users";
@@ -17,6 +17,16 @@ import { Calendar } from "../pages/Calendar";
 import { Modules } from "../pages/Modules";
 import { Settings as SettingsPage } from "../pages/Settings";
 
+// Importar nuevos componentes del sistema de ventas
+import { Business } from "../pages/Business";
+import { Products } from "../pages/Products";
+import { Services } from "../pages/Services";
+import { PointOfSale } from "../pages/PointOfSale";
+import { Sales } from "../pages/Sales";
+import { Expenses } from "../pages/Expenses";
+import { Credits } from "../pages/Credits";
+import { BusinessDashboard } from "../pages/BusinessDashboard";
+
 // Importar iconos de Material-UI
 import {
   Dashboard,
@@ -30,6 +40,15 @@ import {
   Mail,
   Menu,
   Article,
+  Business as BusinessIcon,
+  Inventory,
+  Build,
+  PointOfSale as PointOfSaleIcon,
+  Receipt,
+  AccountBalance,
+  CreditCard,
+  Assessment,
+  Store,
 } from "@mui/icons-material";
 
 // Mapeo de componentes - AQUÍ AGREGAS NUEVOS COMPONENTES
@@ -50,6 +69,16 @@ export const componentMap = {
   Calendar,
   Modules,
   SettingsPage,
+  
+  // Nuevos componentes del sistema de ventas
+  BusinessDashboard,
+  Business,
+  Products,
+  Services,
+  PointOfSale,
+  Sales,
+  Expenses,
+  Credits,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES
@@ -64,6 +93,15 @@ export const iconMap = {
   Home: <Home />,
   Mail: <Mail />,
   Menu: <Menu />,
+  Business: <BusinessIcon />,
+  Inventory: <Inventory />,
+  Build: <Build />,
+  PointOfSale: <PointOfSaleIcon />,
+  Receipt: <Receipt />,
+  AccountBalance: <AccountBalance />,
+  CreditCard: <CreditCard />,
+  Assessment: <Assessment />,
+  Store: <Store />,
 };
 
 // Función para obtener icono por nombre

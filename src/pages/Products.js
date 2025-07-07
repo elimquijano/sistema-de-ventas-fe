@@ -89,7 +89,7 @@ export const Products = () => {
 
   const loadCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll({ type: 'product' });
+      const response = await categoriesAPI.getAll({ type: "product" });
       setCategories(response.data);
     } catch (error) {
       console.error("Error loading categories:", error);
@@ -186,15 +186,19 @@ export const Products = () => {
   };
 
   const getStockStatus = (stock, minStock) => {
-    if (stock === 0) return { color: "error", icon: <WarningIcon />, label: "Sin Stock" };
-    if (stock <= minStock) return { color: "warning", icon: <WarningIcon />, label: "Stock Bajo" };
+    if (stock === 0)
+      return { color: "error", icon: <WarningIcon />, label: "Sin Stock" };
+    if (stock <= minStock)
+      return { color: "warning", icon: <WarningIcon />, label: "Stock Bajo" };
     return { color: "success", icon: <CheckCircleIcon />, label: "Stock OK" };
   };
 
   const filteredProducts = products.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.barcode.includes(searchTerm);
-    const matchesCategory = !categoryFilter || product.category_id.toString() === categoryFilter;
+    const matchesSearch =
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.barcode.includes(searchTerm);
+    const matchesCategory =
+      !categoryFilter || product.category_id.toString() === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -226,16 +230,18 @@ export const Products = () => {
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
           Productos
         </Typography>
-        {hasPermission("productos.create") &&(<Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{
-            background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
-          }}
-        >
-          Agregar Producto
-        </Button>)}
+        {hasPermission("productos.create") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
+            }}
+          >
+            Agregar Producto
+          </Button>
+        )}
       </Box>
 
       <Card>
@@ -291,7 +297,10 @@ export const Products = () => {
               </TableHead>
               <TableBody>
                 {filteredProducts.map((product) => {
-                  const stockStatus = getStockStatus(product.stock, product.min_stock);
+                  const stockStatus = getStockStatus(
+                    product.stock,
+                    product.min_stock
+                  );
                   return (
                     <TableRow key={product.id}>
                       <TableCell>
@@ -319,7 +328,7 @@ export const Products = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={product.category}
+                          label={product.category.name}
                           size="small"
                           variant="outlined"
                         />
@@ -335,13 +344,18 @@ export const Products = () => {
                         </Typography>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                        <Box
+                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                        >
                           <Badge
                             badgeContent={stockStatus.icon}
                             color={stockStatus.color}
                             sx={{ "& .MuiBadge-badge": { right: -3, top: 13 } }}
                           >
-                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600 }}
+                            >
                               {product.stock}
                             </Typography>
                           </Badge>
@@ -358,24 +372,31 @@ export const Products = () => {
                         />
                       </TableCell>
                       <TableCell>
-                        <Typography variant="body2" sx={{ fontFamily: "monospace" }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontFamily: "monospace" }}
+                        >
                           {product.barcode}
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        {hasPermission("productos.edit") &&(<IconButton
-                          size="small"
-                          onClick={() => handleOpenDialog(product)}
-                        >
-                          <EditIcon />
-                        </IconButton>)}
-                        {hasPermission("productos.delete") &&(<IconButton
-                          size="small"
-                          onClick={() => handleDeleteProduct(product.id)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>)}
+                        {hasPermission("productos.edit") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog(product)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        )}
+                        {hasPermission("productos.delete") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteProduct(product.id)}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -416,7 +437,10 @@ export const Products = () => {
                   value={formData.category_id}
                   label="Categoría"
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, category_id: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      category_id: e.target.value,
+                    }))
                   }
                 >
                   {categories.map((category) => (
@@ -435,7 +459,10 @@ export const Products = () => {
                 rows={2}
                 value={formData.description}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
               />
             </Grid>
@@ -484,7 +511,10 @@ export const Products = () => {
                 type="number"
                 value={formData.min_stock}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, min_stock: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    min_stock: e.target.value,
+                  }))
                 }
                 required
               />
@@ -520,7 +550,10 @@ export const Products = () => {
                 label="URL de Imagen"
                 value={formData.image_url}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, image_url: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    image_url: e.target.value,
+                  }))
                 }
                 placeholder="https://ejemplo.com/imagen.jpg"
               />

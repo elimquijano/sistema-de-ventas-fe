@@ -58,7 +58,7 @@ export const Categories = () => {
     try {
       setLoading(true);
       const response = await categoriesAPI.getAll();
-      setCategories(response.data.data);
+      setCategories(response.data);
     } catch (error) {
       console.error("Error loading categories:", error);
       notificationSwal(

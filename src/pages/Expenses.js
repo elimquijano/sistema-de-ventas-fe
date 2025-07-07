@@ -39,6 +39,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
+import { categoriesAPI, expensesAPI } from "../utils/api";
 
 export const Expenses = () => {
   const { hasPermission } = useAuth();
@@ -67,46 +68,16 @@ export const Expenses = () => {
   const loadExpenses = async () => {
     try {
       setLoading(true);
-      // Simulación de datos
-      const mockExpenses = [
-        {
-          id: 1,
-          description: "Compra de inventario",
-          amount: 150.00,
-          category: "Inventario",
-          category_id: 1,
-          expense_date: "2024-01-15T10:00:00Z",
-          receipt_number: "F-001",
-          notes: "Compra de productos para reventa",
-          created_by: "Admin",
-        },
-        {
-          id: 2,
-          description: "Pago de servicios básicos",
-          amount: 85.50,
-          category: "Servicios",
-          category_id: 2,
-          expense_date: "2024-01-14T10:00:00Z",
-          receipt_number: "F-002",
-          notes: "Electricidad y agua",
-          created_by: "Admin",
-        },
-        {
-          id: 3,
-          description: "Salario empleado",
-          amount: 800.00,
-          category: "Nómina",
-          category_id: 3,
-          expense_date: "2024-01-13T10:00:00Z",
-          receipt_number: "",
-          notes: "Pago quincenal",
-          created_by: "Admin",
-        },
-      ];
-      setExpenses(mockExpenses);
-      setTotalPages(1);
+      const response = await expensesAPI.getAll({ page, ...searchFilters });
+      setExpenses(response.data.data);
+      setTotalPages(response.data.last_page);
     } catch (error) {
       console.error("Error loading expenses:", error);
+      notificationSwal(
+        "Error",
+        "Hubo un error al cargar los gastos.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -114,15 +85,8 @@ export const Expenses = () => {
 
   const loadCategories = async () => {
     try {
-      const mockCategories = [
-        { id: 1, name: "Inventario" },
-        { id: 2, name: "Servicios" },
-        { id: 3, name: "Nómina" },
-        { id: 4, name: "Marketing" },
-        { id: 5, name: "Mantenimiento" },
-        { id: 6, name: "Otros" },
-      ];
-      setCategories(mockCategories);
+      const response = await categoriesAPI.getAll({ type: 'expense' });
+      setCategories(response.data);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -172,12 +136,14 @@ export const Expenses = () => {
   const handleSaveExpense = async () => {
     try {
       if (editingExpense) {
+        await expensesAPI.update(editingExpense.id, formData);
         notificationSwal(
           "Gasto Actualizado",
           "El gasto ha sido actualizado exitosamente.",
           "success"
         );
       } else {
+        await expensesAPI.create(formData);
         notificationSwal(
           "Gasto Registrado",
           "El nuevo gasto ha sido registrado exitosamente.",
@@ -204,6 +170,7 @@ export const Expenses = () => {
 
     if (userConfirmed) {
       try {
+        await expensesAPI.delete(expenseId);
         notificationSwal(
           "Gasto Eliminado",
           "El gasto ha sido eliminado exitosamente.",

@@ -55,6 +55,7 @@ import {
 } from "@mui/icons-material";
 import { formatCurrency } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
+import { cashRegisterAPI, productsAPI, salesAPI, servicesAPI } from "../utils/api";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -71,7 +72,6 @@ function TabPanel(props) {
       {...other}
     >
       {value === index && <Box>{children}</Box>}
-      }
     </div>
   );
 }
@@ -110,136 +110,80 @@ export const PointOfSale = () => {
     checkCashRegisterStatus();
   }, []);
 
-  const checkCashRegisterStatus = () => {
-    const isOpen = localStorage.getItem("cashRegisterOpen") === "true";
-    const storedInitial = localStorage.getItem("initialCashAmount");
-    const storedCurrent = localStorage.getItem("currentCashAmount");
-    const storedCurrency = localStorage.getItem("cashCurrency");
-    
-    setCashRegisterOpen(isOpen);
-    if (storedInitial) setInitialAmount(parseFloat(storedInitial));
-    if (storedCurrent) setCurrentCash(parseFloat(storedCurrent));
-    if (storedCurrency) setCurrency(storedCurrency);
+  const checkCashRegisterStatus = async () => {
+    try {
+      const response = await cashRegisterAPI.getCurrent();
+      if (response.data.success) {
+        const { initial_amount, currency } = response.data.data;
+        setInitialAmount(initial_amount);
+        setCurrentCash(initial_amount); // This should be calculated based on sales
+        setCurrency(currency);
+        setCashRegisterOpen(true);
+      }
+    } catch (error) {
+      // It's okay if there's no open cash register
+    }
   };
 
-  const loadProducts = () => {
-    const mockProducts = [
-      {
-        id: 1,
-        name: "Coca Cola",
-        price: 2.50,
-        stock: 45,
-        image_url: "https://images.pexels.com/photos/50593/coca-cola-cold-drink-soft-drink-coke-50593.jpeg?auto=compress&cs=tinysrgb&w=200",
-        type: "product"
-      },
-      {
-        id: 2,
-        name: "Pan Integral",
-        price: 3.00,
-        stock: 8,
-        image_url: "https://images.pexels.com/photos/209206/pexels-photo-209206.jpeg?auto=compress&cs=tinysrgb&w=200",
-        type: "product"
-      },
-      {
-        id: 3,
-        name: "Detergente",
-        price: 8.50,
-        stock: 25,
-        image_url: "https://images.pexels.com/photos/4239091/pexels-photo-4239091.jpeg?auto=compress&cs=tinysrgb&w=200",
-        type: "product"
-      },
-      {
-        id: 4,
-        name: "Leche",
-        price: 4.20,
-        stock: 15,
-        image_url: "https://images.pexels.com/photos/236010/pexels-photo-236010.jpeg?auto=compress&cs=tinysrgb&w=200",
-        type: "product"
-      },
-      {
-        id: 5,
-        name: "Galletas",
-        price: 1.80,
-        stock: 30,
-        image_url: "https://images.pexels.com/photos/230325/pexels-photo-230325.jpeg?auto=compress&cs=tinysrgb&w=200",
-        type: "product"
-      },
-      {
-        id: 6,
-        name: "Agua",
-        price: 1.00,
-        stock: 50,
-        image_url: "https://images.pexels.com/photos/327090/pexels-photo-327090.jpeg?auto=compress&cs=tinysrgb&w=200",
-        type: "product"
-      },
-    ];
-    setProducts(mockProducts);
+  const loadProducts = async () => {
+    try {
+      const response = await productsAPI.getAll();
+      setProducts(response.data.data.map(p => ({...p, type: 'product'})));
+    } catch (error) {
+      console.error("Error loading products:", error);
+    }
   };
 
-  const loadServices = () => {
-    const mockServices = [
-      {
-        id: 1,
-        name: "Corte de Cabello",
-        price: 15.00,
-        duration: 30,
-        type: "service"
-      },
-      {
-        id: 2,
-        name: "Manicure",
-        price: 25.00,
-        duration: 45,
-        type: "service"
-      },
-      {
-        id: 3,
-        name: "Reparación Celular",
-        price: 50.00,
-        duration: 120,
-        type: "service"
-      },
-    ];
-    setServices(mockServices);
+  const loadServices = async () => {
+    try {
+      const response = await servicesAPI.getAll();
+      setServices(response.data.data.map(s => ({...s, type: 'service'})));
+    } catch (error) {
+      console.error("Error loading services:", error);
+    }
   };
 
   const handleOpenCashRegister = () => {
     setOpenInitCashDialog(true);
   };
 
-  const handleInitializeCash = () => {
-    const amount = parseFloat(initCashAmount) || 0;
-    setInitialAmount(amount);
-    setCurrentCash(amount);
-    setCashRegisterOpen(true);
-    
-    localStorage.setItem("cashRegisterOpen", "true");
-    localStorage.setItem("initialCashAmount", amount.toString());
-    localStorage.setItem("currentCashAmount", amount.toString());
-    localStorage.setItem("cashCurrency", currency);
-    
-    setOpenInitCashDialog(false);
-    setInitCashAmount("");
-    
-    notificationSwal("Caja Abierta", `Caja inicializada con ${formatCurrency(amount, currency)}`, "success");
+  const handleInitializeCash = async () => {
+    try {
+      const amount = parseFloat(initCashAmount) || 0;
+      await cashRegisterAPI.create({ initial_amount: amount, currency });
+      
+      setInitialAmount(amount);
+      setCurrentCash(amount);
+      setCashRegisterOpen(true);
+      
+      setOpenInitCashDialog(false);
+      setInitCashAmount("");
+      
+      notificationSwal("Caja Abierta", `Caja inicializada con ${formatCurrency(amount, currency)}`, "success");
+    } catch (error) {
+      console.error("Error opening cash register:", error);
+      notificationSwal("Error", "Error al abrir la caja registradora.", "error");
+    }
   };
 
   const handleCloseCashRegister = async () => {
     const confirmed = await confirmSwal(
       "Cerrar Caja",
-      `¿Desea cerrar la caja registradora?\n\nInicial: ${formatCurrency(initialAmount, currency)}\nActual: ${formatCurrency(currentCash, currency)}\nDiferencia: ${formatCurrency(currentCash - initialAmount, currency)}`,
+      `¿Desea cerrar la caja registradora?`,
       { confirmButtonText: "Cerrar Caja", icon: "warning" }
     );
     
     if (confirmed) {
-      setCashRegisterOpen(false);
-      setCart([]);
-      localStorage.removeItem("cashRegisterOpen");
-      localStorage.removeItem("initialCashAmount");
-      localStorage.removeItem("currentCashAmount");
-      localStorage.removeItem("cashCurrency");
-      
-      notificationSwal("Caja Cerrada", "La caja registradora ha sido cerrada exitosamente.", "success");
+      try {
+        const currentRegister = await cashRegisterAPI.getCurrent();
+        await cashRegisterAPI.close(currentRegister.data.data.id, { final_amount: currentCash });
+        setCashRegisterOpen(false);
+        setCart([]);
+        notificationSwal("Caja Cerrada", "La caja registradora ha sido cerrada exitosamente.", "success");
+      } catch (error) {
+        console.error("Error closing cash register:", error);
+        notificationSwal("Error", "Error al cerrar la caja registradora.", "error");
+      }
     }
   };
 
@@ -309,7 +253,7 @@ export const PointOfSale = () => {
     setOpenPaymentDialog(true);
   };
 
-  const handleCompleteSale = () => {
+  const handleCompleteSale = async () => {
     const total = getTotalAmount();
     
     if (paymentType === "credit" && !customerName.trim()) {
@@ -317,51 +261,37 @@ export const PointOfSale = () => {
       return;
     }
 
-    // Simular venta completada
     const saleData = {
-      id: Date.now(),
-      items: [...cart],
-      total: total,
-      paymentType: paymentType,
-      customerName: paymentType === "credit" ? customerName : "Cliente General",
-      timestamp: new Date().toISOString(),
-      currency: currency
+      items: cart.map(item => ({ id: item.id, type: item.type, quantity: item.quantity, price: item.price })),
+      total_amount: total,
+      payment_method: paymentType === 'paid' ? 'cash' : 'credit',
+      customer_name: paymentType === "credit" ? customerName : "Cliente General",
     };
 
-    // Actualizar dinero en caja solo si es pago inmediato
-    if (paymentType === "paid") {
-      const newCashAmount = currentCash + total;
-      setCurrentCash(newCashAmount);
-      localStorage.setItem("currentCashAmount", newCashAmount.toString());
+    try {
+      await salesAPI.create(saleData);
+
+      if (paymentType === "paid") {
+        const newCashAmount = currentCash + total;
+        setCurrentCash(newCashAmount);
+      }
+
+      notificationSwal(
+        "Venta Completada", 
+        paymentType === "paid" 
+          ? `Venta procesada por ${formatCurrency(total, currency)}` 
+          : `Venta a crédito registrada para ${customerName}`,
+        "success"
+      );
+      
+      setCart([]);
+      setOpenPaymentDialog(false);
+      setCustomerName("");
+      setPaymentType("paid");
+    } catch (error) {
+      console.error("Error completing sale:", error);
+      notificationSwal("Error", "Error al completar la venta.", "error");
     }
-
-    // Agregar a ventas del día
-    const newSale = {
-      ...saleData,
-      saleNumber: `V-${String(dailySales.length + 1).padStart(3, '0')}`
-    };
-    setDailySales(prev => [...prev, newSale]);
-
-    // Actualizar resumen
-    setSalesSummary(prev => ({
-      totalSales: prev.totalSales + 1,
-      totalAmount: prev.totalAmount + total,
-      cashSales: paymentType === "paid" ? prev.cashSales + total : prev.cashSales,
-      creditSales: paymentType === "credit" ? prev.creditSales + total : prev.creditSales,
-    }));
-
-    notificationSwal(
-      "Venta Completada", 
-      paymentType === "paid" 
-        ? `Venta procesada por ${formatCurrency(total, currency)}` 
-        : `Venta a crédito registrada para ${customerName}`,
-      "success"
-    );
-    
-    setCart([]);
-    setOpenPaymentDialog(false);
-    setCustomerName("");
-    setPaymentType("paid");
   };
 
   const renderProductGrid = (items, type) => (

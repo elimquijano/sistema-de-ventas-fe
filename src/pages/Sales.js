@@ -42,6 +42,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
+import { salesAPI } from "../utils/api";
 
 export const Sales = () => {
   const { hasPermission } = useAuth();
@@ -60,57 +61,12 @@ export const Sales = () => {
   const loadSales = async () => {
     try {
       setLoading(true);
-      // Simulación de datos
-      const mockSales = [
-        {
-          id: 1,
-          sale_number: "V-001",
-          customer_name: "Cliente General",
-          total_amount: 25.50,
-          payment_method: "cash",
-          payment_status: "paid",
-          sale_date: "2024-01-15T14:30:00Z",
-          items: [
-            { name: "Coca Cola", quantity: 2, price: 2.50, total: 5.00 },
-            { name: "Pan Integral", quantity: 1, price: 3.00, total: 3.00 },
-            { name: "Corte de Cabello", quantity: 1, price: 15.00, total: 15.00 },
-          ],
-          created_by: "Juan Vendedor",
-        },
-        {
-          id: 2,
-          sale_number: "V-002",
-          customer_name: "María García",
-          total_amount: 45.75,
-          payment_method: "card",
-          payment_status: "paid",
-          sale_date: "2024-01-15T15:45:00Z",
-          items: [
-            { name: "Detergente", quantity: 2, price: 8.50, total: 17.00 },
-            { name: "Leche", quantity: 3, price: 4.20, total: 12.60 },
-            { name: "Manicure", quantity: 1, price: 25.00, total: 25.00 },
-          ],
-          created_by: "Ana Vendedora",
-        },
-        {
-          id: 3,
-          sale_number: "V-003",
-          customer_name: "Pedro López",
-          total_amount: 12.80,
-          payment_method: "credit",
-          payment_status: "pending",
-          sale_date: "2024-01-15T16:20:00Z",
-          items: [
-            { name: "Galletas", quantity: 4, price: 1.80, total: 7.20 },
-            { name: "Agua", quantity: 5, price: 1.00, total: 5.00 },
-          ],
-          created_by: "Juan Vendedor",
-        },
-      ];
-      setSales(mockSales);
-      setTotalPages(1);
+      const response = await salesAPI.getAll({ page, ...searchFilters });
+      setSales(response.data.data);
+      setTotalPages(response.data.last_page);
     } catch (error) {
       console.error("Error loading sales:", error);
+      notificationSwal("Error", "Hubo un error al cargar las ventas.", "error");
     } finally {
       setLoading(false);
     }
@@ -144,6 +100,7 @@ export const Sales = () => {
 
     if (userConfirmed) {
       try {
+        await salesAPI.delete(saleId);
         notificationSwal(
           "Venta Eliminada",
           "La venta ha sido eliminada exitosamente.",
@@ -403,7 +360,13 @@ export const Sales = () => {
         fullWidth
       >
         <DialogTitle>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <Typography variant="h6">
               Detalles de Venta - {selectedSale?.sale_number}
             </Typography>
@@ -462,7 +425,9 @@ export const Sales = () => {
                   <ListItem key={index} sx={{ px: 0 }}>
                     <ListItemText
                       primary={item.name}
-                      secondary={`${item.quantity} x ${formatCurrency(item.price)}`}
+                      secondary={`${item.quantity} x ${formatCurrency(
+                        item.price
+                      )}`}
                     />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {formatCurrency(item.total)}
@@ -483,7 +448,10 @@ export const Sales = () => {
                 }}
               >
                 <Typography variant="h6">Total:</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main" }}>
+                <Typography
+                  variant="h6"
+                  sx={{ fontWeight: 700, color: "primary.main" }}
+                >
                   {formatCurrency(selectedSale.total_amount)}
                 </Typography>
               </Box>

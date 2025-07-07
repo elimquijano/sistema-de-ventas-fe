@@ -1,19 +1,9 @@
 import React from "react";
 
 // Importar todos los componentes existentes
-import { Dashboard as DashboardPage } from "../pages/Dashboard";
-import { Analytics as AnalyticsPage } from "../pages/Analytics";
 import { Users } from "../pages/Users";
 import { UserRoles } from "../pages/UserRoles";
 import { UserPermissions } from "../pages/UserPermissions";
-import { Customers } from "../pages/Customers";
-import { Statistics } from "../pages/Statistics";
-import { DataPage } from "../pages/DataPage";
-import { ChartPage } from "../pages/ChartPage";
-import { Chat as ChatPage } from "../pages/Chat";
-import { Kanban } from "../pages/Kanban";
-import { Mail as MailPage } from "../pages/Mail";
-import { Calendar } from "../pages/Calendar";
 import { Modules } from "../pages/Modules";
 import { Settings as SettingsPage } from "../pages/Settings";
 
@@ -54,19 +44,9 @@ import {
 // Mapeo de componentes - AQUÍ AGREGAS NUEVOS COMPONENTES
 export const componentMap = {
   // Componentes existentes
-  DashboardPage,
-  AnalyticsPage,
   Users,
   UserRoles,
   UserPermissions,
-  Customers,
-  Statistics,
-  DataPage,
-  ChartPage,
-  ChatPage,
-  Kanban,
-  MailPage,
-  Calendar,
   Modules,
   SettingsPage,
   

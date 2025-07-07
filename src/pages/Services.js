@@ -39,6 +39,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
+import { categoriesAPI, servicesAPI } from "../utils/api";
 
 export const Services = () => {
   const { hasPermission } = useAuth();
@@ -66,45 +67,15 @@ export const Services = () => {
   const loadServices = async () => {
     try {
       setLoading(true);
-      // Simulación de datos
-      const mockServices = [
-        {
-          id: 1,
-          name: "Corte de Cabello",
-          description: "Corte de cabello para hombre",
-          category: "Peluquería",
-          category_id: 1,
-          price: 15.00,
-          duration: 30,
-          status: "active",
-          created_at: "2024-01-15T10:00:00Z",
-        },
-        {
-          id: 2,
-          name: "Manicure",
-          description: "Manicure completo con esmaltado",
-          category: "Belleza",
-          category_id: 2,
-          price: 25.00,
-          duration: 45,
-          status: "active",
-          created_at: "2024-01-14T10:00:00Z",
-        },
-        {
-          id: 3,
-          name: "Reparación de Celular",
-          description: "Diagnóstico y reparación de dispositivos móviles",
-          category: "Tecnología",
-          category_id: 3,
-          price: 50.00,
-          duration: 120,
-          status: "active",
-          created_at: "2024-01-13T10:00:00Z",
-        },
-      ];
-      setServices(mockServices);
+      const response = await servicesAPI.getAll();
+      setServices(response.data.data);
     } catch (error) {
       console.error("Error loading services:", error);
+      notificationSwal(
+        "Error",
+        "Hubo un error al cargar los servicios.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -112,14 +83,8 @@ export const Services = () => {
 
   const loadCategories = async () => {
     try {
-      const mockCategories = [
-        { id: 1, name: "Peluquería" },
-        { id: 2, name: "Belleza" },
-        { id: 3, name: "Tecnología" },
-        { id: 4, name: "Consultoría" },
-        { id: 5, name: "Mantenimiento" },
-      ];
-      setCategories(mockCategories);
+      const response = await categoriesAPI.getAll({ type: 'service' });
+      setCategories(response.data);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -158,12 +123,14 @@ export const Services = () => {
   const handleSaveService = async () => {
     try {
       if (editingService) {
+        await servicesAPI.update(editingService.id, formData);
         notificationSwal(
           "Servicio Actualizado",
           "El servicio ha sido actualizado exitosamente.",
           "success"
         );
       } else {
+        await servicesAPI.create(formData);
         notificationSwal(
           "Servicio Creado",
           "El nuevo servicio ha sido creado exitosamente.",
@@ -190,6 +157,7 @@ export const Services = () => {
 
     if (userConfirmed) {
       try {
+        await servicesAPI.delete(serviceId);
         notificationSwal(
           "Servicio Eliminado",
           "El servicio ha sido eliminado exitosamente.",

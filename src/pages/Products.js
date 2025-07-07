@@ -41,6 +41,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
+import { categoriesAPI, productsAPI } from "../utils/api";
 
 export const Products = () => {
   const { hasPermission } = useAuth();
@@ -72,57 +73,15 @@ export const Products = () => {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      // Simulación de datos
-      const mockProducts = [
-        {
-          id: 1,
-          name: "Coca Cola 500ml",
-          description: "Bebida gaseosa",
-          category: "Bebidas",
-          category_id: 1,
-          price: 2.50,
-          cost: 1.50,
-          stock: 45,
-          min_stock: 10,
-          barcode: "7501234567890",
-          image_url: "https://images.pexels.com/photos/50593/coca-cola-cold-drink-soft-drink-coke-50593.jpeg?auto=compress&cs=tinysrgb&w=200",
-          status: "active",
-          created_at: "2024-01-15T10:00:00Z",
-        },
-        {
-          id: 2,
-          name: "Pan Integral",
-          description: "Pan de molde integral",
-          category: "Panadería",
-          category_id: 2,
-          price: 3.00,
-          cost: 2.00,
-          stock: 8,
-          min_stock: 15,
-          barcode: "7501234567891",
-          image_url: "https://images.pexels.com/photos/209206/pexels-photo-209206.jpeg?auto=compress&cs=tinysrgb&w=200",
-          status: "active",
-          created_at: "2024-01-14T10:00:00Z",
-        },
-        {
-          id: 3,
-          name: "Detergente Ariel",
-          description: "Detergente en polvo 1kg",
-          category: "Limpieza",
-          category_id: 3,
-          price: 8.50,
-          cost: 6.00,
-          stock: 25,
-          min_stock: 5,
-          barcode: "7501234567892",
-          image_url: "https://images.pexels.com/photos/4239091/pexels-photo-4239091.jpeg?auto=compress&cs=tinysrgb&w=200",
-          status: "active",
-          created_at: "2024-01-13T10:00:00Z",
-        },
-      ];
-      setProducts(mockProducts);
+      const response = await productsAPI.getAll();
+      setProducts(response.data.data);
     } catch (error) {
       console.error("Error loading products:", error);
+      notificationSwal(
+        "Error",
+        "Hubo un error al cargar los productos.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -130,14 +89,8 @@ export const Products = () => {
 
   const loadCategories = async () => {
     try {
-      const mockCategories = [
-        { id: 1, name: "Bebidas" },
-        { id: 2, name: "Panadería" },
-        { id: 3, name: "Limpieza" },
-        { id: 4, name: "Lácteos" },
-        { id: 5, name: "Snacks" },
-      ];
-      setCategories(mockCategories);
+      const response = await categoriesAPI.getAll({ type: 'product' });
+      setCategories(response.data);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -184,12 +137,14 @@ export const Products = () => {
   const handleSaveProduct = async () => {
     try {
       if (editingProduct) {
+        await productsAPI.update(editingProduct.id, formData);
         notificationSwal(
           "Producto Actualizado",
           "El producto ha sido actualizado exitosamente.",
           "success"
         );
       } else {
+        await productsAPI.create(formData);
         notificationSwal(
           "Producto Creado",
           "El nuevo producto ha sido creado exitosamente.",
@@ -216,6 +171,7 @@ export const Products = () => {
 
     if (userConfirmed) {
       try {
+        await productsAPI.delete(productId);
         notificationSwal(
           "Producto Eliminado",
           "El producto ha sido eliminado exitosamente.",

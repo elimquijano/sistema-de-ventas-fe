@@ -55,7 +55,7 @@ export const Business = () => {
     phone: "",
     email: "",
     tax_id: "",
-    currency: "USD",
+    currency: "PEN",
     status: "active",
   });
 
@@ -66,27 +66,15 @@ export const Business = () => {
   const loadBusinesses = async () => {
     try {
       setLoading(true);
-      // Simulación de datos
-      const mockBusinesses = [
-        {
-          id: 1,
-          name: "Mi Tienda Principal",
-          description: "Venta de productos varios",
-          address: "Calle 123, Ciudad",
-          phone: "+1234567890",
-          email: "tienda@email.com",
-          tax_id: "123456789",
-          currency: "USD",
-          status: "active",
-          created_at: "2024-01-15T10:00:00Z",
-          products_count: 45,
-          services_count: 12,
-          sales_count: 156,
-        },
-      ];
-      setBusinesses(mockBusinesses);
+      const response = await businessAPI.getAll();
+      setBusinesses(response.data.data);
     } catch (error) {
       console.error("Error loading businesses:", error);
+      notificationSwal(
+        "Error",
+        "Hubo un error al cargar los negocios.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -114,7 +102,7 @@ export const Business = () => {
         phone: "",
         email: "",
         tax_id: "",
-        currency: "USD",
+        currency: "PEN",
         status: "active",
       });
     }
@@ -129,12 +117,14 @@ export const Business = () => {
   const handleSaveBusiness = async () => {
     try {
       if (editingBusiness) {
+        await businessAPI.update(editingBusiness.id, formData);
         notificationSwal(
           "Negocio Actualizado",
           "El negocio ha sido actualizado exitosamente.",
           "success"
         );
       } else {
+        await businessAPI.create(formData);
         notificationSwal(
           "Negocio Creado",
           "El nuevo negocio ha sido creado exitosamente.",
@@ -161,6 +151,7 @@ export const Business = () => {
 
     if (userConfirmed) {
       try {
+        await businessAPI.delete(businessId);
         notificationSwal(
           "Negocio Eliminado",
           "El negocio ha sido eliminado exitosamente.",
@@ -366,10 +357,8 @@ export const Business = () => {
                     setFormData((prev) => ({ ...prev, currency: e.target.value }))
                   }
                 >
+                  <MenuItem value="PEN">PEN - Soles</MenuItem>
                   <MenuItem value="USD">USD - Dólar</MenuItem>
-                  <MenuItem value="EUR">EUR - Euro</MenuItem>
-                  <MenuItem value="MXN">MXN - Peso Mexicano</MenuItem>
-                  <MenuItem value="COP">COP - Peso Colombiano</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

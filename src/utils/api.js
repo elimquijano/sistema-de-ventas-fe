@@ -170,7 +170,7 @@ export const businessAPI = {
   create: (businessData) => api.post('/businesses', businessData),
   update: (id, businessData) => api.put(`/businesses/${id}`, businessData),
   delete: (id) => api.delete(`/businesses/${id}`),
-  getStats: (id) => api.get(`/businesses/${id}/stats`),
+  getStats: (id) => api.get(`/businesses/${id}/dashboard`),
 };
 
 export const productsAPI = {
@@ -236,6 +236,13 @@ export const categoriesAPI = {
   create: (categoryData) => api.post('/categories', categoryData),
   update: (id, categoryData) => api.put(`/categories/${id}`, categoryData),
   delete: (id) => api.delete(`/categories/${id}`),
+};
+
+export const cashRegisterAPI = {
+  getCurrent: () => api.get('/cash-registers/current'),
+  create: (data) => api.post('/cash-registers', data),
+  close: (id, data) => api.post(`/cash-registers/${id}/close`, data),
+  getReport: (id) => api.get(`/cash-registers/${id}/report`),
 };
 
 export default api;

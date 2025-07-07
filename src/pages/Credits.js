@@ -43,6 +43,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
+import { creditsAPI, loansAPI } from "../utils/api";
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -55,7 +56,6 @@ function TabPanel(props) {
       {...other}
     >
       {value === index && <Box>{children}</Box>}
-      }
     </div>
   );
 }
@@ -80,72 +80,22 @@ export const Credits = () => {
   const loadCredits = async () => {
     try {
       setLoading(true);
-      
-      // Simulación de datos de ventas a crédito
-      const mockSalesCredits = [
-        {
-          id: 1,
-          customer_name: "María García",
-          sale_number: "V-003",
-          total_amount: 125.50,
-          paid_amount: 50.00,
-          pending_amount: 75.50,
-          due_date: "2024-02-15T00:00:00Z",
-          status: "pending",
-          created_at: "2024-01-15T10:00:00Z",
-          items: [
-            { name: "Detergente", quantity: 2, price: 8.50 },
-            { name: "Leche", quantity: 5, price: 4.20 },
-          ],
-        },
-        {
-          id: 2,
-          customer_name: "Pedro López",
-          sale_number: "V-005",
-          total_amount: 85.00,
-          paid_amount: 85.00,
-          pending_amount: 0.00,
-          due_date: "2024-02-10T00:00:00Z",
-          status: "paid",
-          created_at: "2024-01-12T10:00:00Z",
-          items: [
-            { name: "Corte de Cabello", quantity: 1, price: 15.00 },
-            { name: "Productos varios", quantity: 1, price: 70.00 },
-          ],
-        },
-      ];
-
-      // Simulación de datos de préstamos de artículos
-      const mockItemLoans = [
-        {
-          id: 1,
-          customer_name: "Ana Rodríguez",
-          item_name: "Taladro Eléctrico",
-          loan_date: "2024-01-10T10:00:00Z",
-          due_date: "2024-01-20T00:00:00Z",
-          return_date: null,
-          status: "pending",
-          deposit_amount: 50.00,
-          notes: "Préstamo por 10 días",
-        },
-        {
-          id: 2,
-          customer_name: "Carlos Mendez",
-          item_name: "Escalera de Aluminio",
-          loan_date: "2024-01-08T10:00:00Z",
-          due_date: "2024-01-15T00:00:00Z",
-          return_date: "2024-01-14T16:00:00Z",
-          status: "returned",
-          deposit_amount: 30.00,
-          notes: "Devuelto en buen estado",
-        },
-      ];
-
-      setSalesCredits(mockSalesCredits);
-      setItemLoans(mockItemLoans);
-      setTotalPages(1);
+      if (tabValue === 0) {
+        const response = await creditsAPI.getAll({ page, ...searchFilters });
+        setSalesCredits(response.data.data);
+        setTotalPages(response.data.last_page);
+      } else {
+        const response = await loansAPI.getAll({ page, ...searchFilters });
+        setItemLoans(response.data.data);
+        setTotalPages(response.data.last_page);
+      }
     } catch (error) {
       console.error("Error loading credits:", error);
+      notificationSwal(
+        "Error",
+        "Hubo un error al cargar los créditos.",
+        "error"
+      );
     } finally {
       setLoading(false);
     }
@@ -176,6 +126,8 @@ export const Credits = () => {
         return;
       }
 
+      await creditsAPI.processPayment(selectedCredit.id, { amount });
+
       notificationSwal(
         "Pago Registrado",
         `Se ha registrado un pago de ${formatCurrency(amount)}.`,
@@ -204,6 +156,7 @@ export const Credits = () => {
 
     if (userConfirmed) {
       try {
+        await loansAPI.markAsReturned(loanId);
         notificationSwal(
           "Artículo Devuelto",
           "El artículo ha sido marcado como devuelto.",

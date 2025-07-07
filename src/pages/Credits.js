@@ -45,26 +45,10 @@ import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { creditsAPI, loansAPI } from "../utils/api";
 
-function TabPanel(props) {
-  const { children, value, index, ...other } = props;
-  return (
-    <div
-      role="tabpanel"
-      hidden={value !== index}
-      id={`credits-tabpanel-${index}`}
-      aria-labelledby={`credits-tab-${index}`}
-      {...other}
-    >
-      {value === index && <Box>{children}</Box>}
-    </div>
-  );
-}
-
 export const Credits = () => {
   const { hasPermission } = useAuth();
-  const [tabValue, setTabValue] = useState(0);
+
   const [salesCredits, setSalesCredits] = useState([]);
-  const [itemLoans, setItemLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
@@ -75,20 +59,14 @@ export const Credits = () => {
 
   useEffect(() => {
     loadCredits();
-  }, [tabValue, page, searchFilters]);
+  }, [page, searchFilters]);
 
   const loadCredits = async () => {
     try {
       setLoading(true);
-      if (tabValue === 0) {
-        const response = await creditsAPI.getAll({ page, ...searchFilters });
-        setSalesCredits(response.data.data);
-        setTotalPages(response.data.last_page);
-      } else {
-        const response = await loansAPI.getAll({ page, ...searchFilters });
-        setItemLoans(response.data.data);
-        setTotalPages(response.data.last_page);
-      }
+      const response = await creditsAPI.getAll({ page, ...searchFilters });
+      setSalesCredits(response.data.data);
+      setTotalPages(response.data.last_page);
     } catch (error) {
       console.error("Error loading credits:", error);
       notificationSwal(
@@ -133,7 +111,7 @@ export const Credits = () => {
         `Se ha registrado un pago de ${formatCurrency(amount)}.`,
         "success"
       );
-      
+
       setOpenPaymentDialog(false);
       setSelectedCredit(null);
       setPaymentAmount("");
@@ -141,32 +119,6 @@ export const Credits = () => {
     } catch (error) {
       console.error("Error processing payment:", error);
       notificationSwal("Error", "Error al procesar el pago.", "error");
-    }
-  };
-
-  const handleMarkAsReturned = async (loanId) => {
-    const userConfirmed = await confirmSwal(
-      "Marcar como Devuelto",
-      "¿Confirma que el artículo ha sido devuelto?",
-      {
-        confirmButtonText: "Sí, marcar como devuelto",
-        icon: "question",
-      }
-    );
-
-    if (userConfirmed) {
-      try {
-        await loansAPI.markAsReturned(loanId);
-        notificationSwal(
-          "Artículo Devuelto",
-          "El artículo ha sido marcado como devuelto.",
-          "success"
-        );
-        loadCredits();
-      } catch (error) {
-        console.error("Error marking as returned:", error);
-        notificationSwal("Error", "Error al marcar como devuelto.", "error");
-      }
     }
   };
 
@@ -184,22 +136,13 @@ export const Credits = () => {
     }
   };
 
-  const getStatusLabel = (status, type) => {
-    if (type === "sales") {
-      const labels = {
-        paid: "Pagado",
-        pending: "Pendiente",
-        overdue: "Vencido",
-      };
-      return labels[status] || status;
-    } else {
-      const labels = {
-        returned: "Devuelto",
-        pending: "Pendiente",
-        overdue: "Vencido",
-      };
-      return labels[status] || status;
-    }
+  const getStatusLabel = (status) => {
+    const labels = {
+      paid: "Pagado",
+      pending: "Pendiente",
+      overdue: "Vencido",
+    };
+    return labels[status] || status;
   };
 
   if (loading) {
@@ -220,28 +163,11 @@ export const Credits = () => {
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-        Créditos y Préstamos
+        Créditos de Ventas
       </Typography>
 
       <Card>
         <CardContent>
-          <Tabs
-            value={tabValue}
-            onChange={(e, newValue) => setTabValue(newValue)}
-            sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}
-          >
-            <Tab
-              label="Ventas a Crédito"
-              icon={<ShoppingCartIcon />}
-              iconPosition="start"
-            />
-            <Tab
-              label="Préstamos de Artículos"
-              icon={<BuildIcon />}
-              iconPosition="start"
-            />
-          </Tabs>
-
           {/* Filtros */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid item xs={12} md={4}>
@@ -272,67 +198,69 @@ export const Credits = () => {
                   <MenuItem value="">Todos</MenuItem>
                   <MenuItem value="pending">Pendiente</MenuItem>
                   <MenuItem value="paid">Pagado</MenuItem>
-                  <MenuItem value="returned">Devuelto</MenuItem>
                   <MenuItem value="overdue">Vencido</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
           </Grid>
 
-          {/* Ventas a Crédito */}
-          <TabPanel value={tabValue} index={0}>
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Cliente</TableCell>
-                    <TableCell>Venta</TableCell>
-                    <TableCell>Total</TableCell>
-                    <TableCell>Pagado</TableCell>
-                    <TableCell>Pendiente</TableCell>
-                    <TableCell>Vencimiento</TableCell>
-                    <TableCell>Estado</TableCell>
-                    <TableCell align="right">Acciones</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {salesCredits.map((credit) => (
-                    <TableRow key={credit.id}>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {credit.customer_name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {credit.sale_number}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(credit.total_amount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="success.main">
-                          {formatCurrency(credit.paid_amount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" color="error.main" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(credit.pending_amount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>{formatDate(credit.due_date)}</TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getStatusLabel(credit.status, "sales")}
-                          size="small"
-                          color={getStatusColor(credit.status)}
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        {credit.status === "pending" && (
+          <TableContainer component={Paper} variant="outlined">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Cliente</TableCell>
+                  <TableCell>Venta</TableCell>
+                  <TableCell>Total</TableCell>
+                  <TableCell>Pagado</TableCell>
+                  <TableCell>Pendiente</TableCell>
+                  <TableCell>Vencimiento</TableCell>
+                  <TableCell>Estado</TableCell>
+                  <TableCell align="right">Acciones</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {salesCredits.map((credit) => (
+                  <TableRow key={credit.id}>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {credit.customer_name}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {credit.sale_number}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {formatCurrency(credit.total_amount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="success.main">
+                        {formatCurrency(credit.paid_amount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography
+                        variant="body2"
+                        color="error.main"
+                        sx={{ fontWeight: 600 }}
+                      >
+                        {formatCurrency(credit.pending_amount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>{formatDate(credit.due_date)}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={getStatusLabel(credit.status)}
+                        size="small"
+                        color={getStatusColor(credit.status)}
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      {hasPermission("creditos.view") &&
+                        credit.status === "pending" && (
                           <IconButton
                             size="small"
                             onClick={() => handleOpenPaymentDialog(credit)}
@@ -341,95 +269,17 @@ export const Credits = () => {
                             <PaymentIcon />
                           </IconButton>
                         )}
+                      {hasPermission("creditos.edit") && (
                         <IconButton size="small">
                           <EditIcon />
                         </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </TabPanel>
-
-          {/* Préstamos de Artículos */}
-          <TabPanel value={tabValue} index={1}>
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Cliente</TableCell>
-                    <TableCell>Artículo</TableCell>
-                    <TableCell>Fecha Préstamo</TableCell>
-                    <TableCell>Fecha Vencimiento</TableCell>
-                    <TableCell>Fecha Devolución</TableCell>
-                    <TableCell>Depósito</TableCell>
-                    <TableCell>Estado</TableCell>
-                    <TableCell align="right">Acciones</TableCell>
+                      )}
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {itemLoans.map((loan) => (
-                    <TableRow key={loan.id}>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {loan.customer_name}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">
-                          {loan.item_name}
-                        </Typography>
-                        {loan.notes && (
-                          <Typography variant="caption" color="text.secondary">
-                            {loan.notes}
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>{formatDate(loan.loan_date)}</TableCell>
-                      <TableCell>{formatDate(loan.due_date)}</TableCell>
-                      <TableCell>
-                        {loan.return_date ? (
-                          formatDate(loan.return_date)
-                        ) : (
-                          <Typography variant="body2" color="text.secondary">
-                            No devuelto
-                          </Typography>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                          {formatCurrency(loan.deposit_amount)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={getStatusLabel(loan.status, "loans")}
-                          size="small"
-                          color={getStatusColor(loan.status)}
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        {loan.status === "pending" && (
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => handleMarkAsReturned(loan.id)}
-                            sx={{ mr: 1 }}
-                          >
-                            Marcar Devuelto
-                          </Button>
-                        )}
-                        <IconButton size="small">
-                          <EditIcon />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </TabPanel>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
 
           <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
             <Pagination
@@ -462,7 +312,7 @@ export const Credits = () => {
               <Typography variant="body1" sx={{ mb: 3 }}>
                 Monto Pendiente: {formatCurrency(selectedCredit.pending_amount)}
               </Typography>
-              
+
               <TextField
                 fullWidth
                 label="Monto a Pagar"

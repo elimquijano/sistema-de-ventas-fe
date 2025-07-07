@@ -55,7 +55,13 @@ import {
 } from "@mui/icons-material";
 import { formatCurrency } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
-import { cashRegisterAPI, productsAPI, salesAPI, servicesAPI } from "../utils/api";
+import {
+  cashRegisterAPI,
+  productsAPI,
+  salesAPI,
+  servicesAPI,
+} from "../utils/api";
+import { useAuth } from "../contexts/AuthContext";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -78,6 +84,7 @@ function TabPanel(props) {
 
 export const PointOfSale = () => {
   const theme = useTheme();
+  const { hasPermission } = useAuth();
   const [tabValue, setTabValue] = useState(0);
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
@@ -128,7 +135,7 @@ export const PointOfSale = () => {
   const loadProducts = async () => {
     try {
       const response = await productsAPI.getAll();
-      setProducts(response.data.data.map(p => ({...p, type: 'product'})));
+      setProducts(response.data.data.map((p) => ({ ...p, type: "product" })));
     } catch (error) {
       console.error("Error loading products:", error);
     }
@@ -137,13 +144,16 @@ export const PointOfSale = () => {
   const loadServices = async () => {
     try {
       const response = await servicesAPI.getAll();
-      setServices(response.data.data.map(s => ({...s, type: 'service'})));
+      setServices(response.data.data.map((s) => ({ ...s, type: "service" })));
     } catch (error) {
       console.error("Error loading services:", error);
     }
   };
 
   const handleOpenCashRegister = () => {
+    if (!hasPermission("pos.create")) {
+      return;
+    }
     setOpenInitCashDialog(true);
   };
 
@@ -151,50 +161,79 @@ export const PointOfSale = () => {
     try {
       const amount = parseFloat(initCashAmount) || 0;
       await cashRegisterAPI.create({ initial_amount: amount, currency });
-      
+
       setInitialAmount(amount);
       setCurrentCash(amount);
       setCashRegisterOpen(true);
-      
+
       setOpenInitCashDialog(false);
       setInitCashAmount("");
-      
-      notificationSwal("Caja Abierta", `Caja inicializada con ${formatCurrency(amount, currency)}`, "success");
+
+      notificationSwal(
+        "Caja Abierta",
+        `Caja inicializada con ${formatCurrency(amount, currency)}`,
+        "success"
+      );
     } catch (error) {
       console.error("Error opening cash register:", error);
-      notificationSwal("Error", "Error al abrir la caja registradora.", "error");
+      notificationSwal(
+        "Error",
+        "Error al abrir la caja registradora.",
+        "error"
+      );
     }
   };
 
   const handleCloseCashRegister = async () => {
+    if (!hasPermission("pos.edit")) {
+      return;
+    }
     const confirmed = await confirmSwal(
       "Cerrar Caja",
       `¿Desea cerrar la caja registradora?`,
       { confirmButtonText: "Cerrar Caja", icon: "warning" }
     );
-    
+
     if (confirmed) {
       try {
         const currentRegister = await cashRegisterAPI.getCurrent();
-        await cashRegisterAPI.close(currentRegister.data.data.id, { final_amount: currentCash });
+        await cashRegisterAPI.close(currentRegister.data.data.id, {
+          final_amount: currentCash,
+        });
         setCashRegisterOpen(false);
         setCart([]);
-        notificationSwal("Caja Cerrada", "La caja registradora ha sido cerrada exitosamente.", "success");
+        notificationSwal(
+          "Caja Cerrada",
+          "La caja registradora ha sido cerrada exitosamente.",
+          "success"
+        );
       } catch (error) {
         console.error("Error closing cash register:", error);
-        notificationSwal("Error", "Error al cerrar la caja registradora.", "error");
+        notificationSwal(
+          "Error",
+          "Error al cerrar la caja registradora.",
+          "error"
+        );
       }
     }
   };
 
   const handleItemClick = (item) => {
     if (!cashRegisterOpen) {
-      notificationSwal("Caja Cerrada", "Debe abrir la caja registradora primero.", "warning");
+      notificationSwal(
+        "Caja Cerrada",
+        "Debe abrir la caja registradora primero.",
+        "warning"
+      );
       return;
     }
 
     if (item.type === "product" && item.stock <= 0) {
-      notificationSwal("Sin Stock", "Este producto no tiene stock disponible.", "error");
+      notificationSwal(
+        "Sin Stock",
+        "Este producto no tiene stock disponible.",
+        "error"
+      );
       return;
     }
 
@@ -204,24 +243,28 @@ export const PointOfSale = () => {
   };
 
   const handleAddToCart = () => {
-    const existingItem = cart.find(item => item.id === selectedItem.id && item.type === selectedItem.type);
-    
+    const existingItem = cart.find(
+      (item) => item.id === selectedItem.id && item.type === selectedItem.type
+    );
+
     if (existingItem) {
-      setCart(cart.map(item => 
-        item.id === selectedItem.id && item.type === selectedItem.type
-          ? { ...item, quantity: item.quantity + quantity }
-          : item
-      ));
+      setCart(
+        cart.map((item) =>
+          item.id === selectedItem.id && item.type === selectedItem.type
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        )
+      );
     } else {
       setCart([...cart, { ...selectedItem, quantity }]);
     }
-    
+
     setOpenQuantityDialog(false);
     setSelectedItem(null);
   };
 
   const handleRemoveFromCart = (itemId, type) => {
-    setCart(cart.filter(item => !(item.id === itemId && item.type === type)));
+    setCart(cart.filter((item) => !(item.id === itemId && item.type === type)));
   };
 
   const handleUpdateQuantity = (itemId, type, newQuantity) => {
@@ -229,16 +272,18 @@ export const PointOfSale = () => {
       handleRemoveFromCart(itemId, type);
       return;
     }
-    
-    setCart(cart.map(item => 
-      item.id === itemId && item.type === type
-        ? { ...item, quantity: newQuantity }
-        : item
-    ));
+
+    setCart(
+      cart.map((item) =>
+        item.id === itemId && item.type === type
+          ? { ...item, quantity: newQuantity }
+          : item
+      )
+    );
   };
 
   const getTotalAmount = () => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cart.reduce((total, item) => total + item.price * item.quantity, 0);
   };
 
   const getTotalItems = () => {
@@ -246,8 +291,15 @@ export const PointOfSale = () => {
   };
 
   const handleProcessSale = () => {
+    if (!hasPermission("pos.create")) {
+      return;
+    }
     if (cart.length === 0) {
-      notificationSwal("Carrito Vacío", "Agregue productos o servicios al carrito.", "warning");
+      notificationSwal(
+        "Carrito Vacío",
+        "Agregue productos o servicios al carrito.",
+        "warning"
+      );
       return;
     }
     setOpenPaymentDialog(true);
@@ -255,17 +307,27 @@ export const PointOfSale = () => {
 
   const handleCompleteSale = async () => {
     const total = getTotalAmount();
-    
+
     if (paymentType === "credit" && !customerName.trim()) {
-      notificationSwal("Datos Incompletos", "Ingrese el nombre del cliente para ventas a crédito.", "error");
+      notificationSwal(
+        "Datos Incompletos",
+        "Ingrese el nombre del cliente para ventas a crédito.",
+        "error"
+      );
       return;
     }
 
     const saleData = {
-      items: cart.map(item => ({ id: item.id, type: item.type, quantity: item.quantity, price: item.price })),
+      items: cart.map((item) => ({
+        id: item.id,
+        type: item.type,
+        quantity: item.quantity,
+        price: item.price,
+      })),
       total_amount: total,
-      payment_method: paymentType === 'paid' ? 'cash' : 'credit',
-      customer_name: paymentType === "credit" ? customerName : "Cliente General",
+      payment_method: paymentType === "paid" ? "cash" : "credit",
+      customer_name:
+        paymentType === "credit" ? customerName : "Cliente General",
     };
 
     try {
@@ -277,13 +339,13 @@ export const PointOfSale = () => {
       }
 
       notificationSwal(
-        "Venta Completada", 
-        paymentType === "paid" 
-          ? `Venta procesada por ${formatCurrency(total, currency)}` 
+        "Venta Completada",
+        paymentType === "paid"
+          ? `Venta procesada por ${formatCurrency(total, currency)}`
           : `Venta a crédito registrada para ${customerName}`,
         "success"
       );
-      
+
       setCart([]);
       setOpenPaymentDialog(false);
       setCustomerName("");
@@ -316,7 +378,14 @@ export const PointOfSale = () => {
             }}
             onClick={() => handleItemClick(item)}
           >
-            <CardContent sx={{ p: 1, height: "100%", display: "flex", flexDirection: "column" }}>
+            <CardContent
+              sx={{
+                p: 1,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               {/* Stock Badge */}
               {item.type === "product" && (
                 <Chip
@@ -335,7 +404,15 @@ export const PointOfSale = () => {
               )}
 
               {/* Image */}
-              <Box sx={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", mb: 1 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  mb: 1,
+                }}
+              >
                 {item.type === "product" ? (
                   <Avatar
                     src={item.image_url}
@@ -356,27 +433,27 @@ export const PointOfSale = () => {
 
               {/* Product Info */}
               <Box sx={{ textAlign: "center" }}>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    fontWeight: 700, 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
                     fontSize: "0.9rem",
                     lineHeight: 1.2,
                     mb: 0.5,
                     minHeight: 32,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center"
+                    justifyContent: "center",
                   }}
                 >
                   {item.name}
                 </Typography>
-                <Typography 
-                  variant="h6" 
-                  color="primary" 
-                  sx={{ 
+                <Typography
+                  variant="h6"
+                  color="primary"
+                  sx={{
                     fontWeight: 900,
-                    fontSize: "1.1rem"
+                    fontSize: "1.1rem",
                   }}
                 >
                   {formatCurrency(item.price, currency)}
@@ -413,21 +490,28 @@ export const PointOfSale = () => {
   const expectedCash = initialAmount + salesSummary.cashSales;
 
   return (
-    <Box sx={{ height: "100vh", display: "flex", flexDirection: "column", bgcolor: "background.default" }}>
+    <Box
+      sx={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        bgcolor: "background.default",
+      }}
+    >
       {/* Header */}
       <AppBar position="static" sx={{ bgcolor: "primary.main" }}>
         <Toolbar>
           <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
             Punto de Venta
           </Typography>
-          
+
           <Chip
             label={cashRegisterOpen ? "Caja Abierta" : "Caja Cerrada"}
             color={cashRegisterOpen ? "success" : "error"}
             icon={<CashRegisterIcon />}
             sx={{ mr: 2, color: "white", fontWeight: 600 }}
           />
-          
+
           {cashRegisterOpen && (
             <Chip
               label={`${formatCurrency(currentCash, currency)}`}
@@ -442,10 +526,10 @@ export const PointOfSale = () => {
               variant="contained"
               startIcon={<CashRegisterIcon />}
               onClick={handleOpenCashRegister}
-              sx={{ 
+              sx={{
                 bgcolor: "success.main",
                 "&:hover": { bgcolor: "success.dark" },
-                fontWeight: 600
+                fontWeight: 600,
               }}
             >
               Abrir Caja
@@ -456,11 +540,14 @@ export const PointOfSale = () => {
                 variant="outlined"
                 startIcon={<AssessmentIcon />}
                 onClick={() => setOpenReportsDialog(true)}
-                sx={{ 
+                sx={{
                   mr: 1,
                   color: "white",
                   borderColor: "white",
-                  "&:hover": { borderColor: "white", bgcolor: "rgba(255,255,255,0.1)" }
+                  "&:hover": {
+                    borderColor: "white",
+                    bgcolor: "rgba(255,255,255,0.1)",
+                  },
                 }}
               >
                 Reportes
@@ -469,9 +556,9 @@ export const PointOfSale = () => {
                 variant="contained"
                 startIcon={<CashRegisterIcon />}
                 onClick={handleCloseCashRegister}
-                sx={{ 
+                sx={{
                   bgcolor: "error.main",
-                  "&:hover": { bgcolor: "error.dark" }
+                  "&:hover": { bgcolor: "error.dark" },
                 }}
               >
                 Cerrar Caja
@@ -485,29 +572,31 @@ export const PointOfSale = () => {
         <Grid container spacing={2} sx={{ height: "100%" }}>
           {/* Products/Services Panel */}
           <Grid item xs={12} md={8}>
-            <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <Card
+              sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+            >
               <Tabs
                 value={tabValue}
                 onChange={(e, newValue) => setTabValue(newValue)}
-                sx={{ 
-                  borderBottom: 1, 
+                sx={{
+                  borderBottom: 1,
                   borderColor: "divider",
-                  "& .MuiTab-root": { 
-                    fontSize: "1.1rem", 
+                  "& .MuiTab-root": {
+                    fontSize: "1.1rem",
                     fontWeight: 600,
-                    minHeight: 60
-                  }
+                    minHeight: 60,
+                  },
                 }}
               >
                 <Tab label={`Productos (${products.length})`} />
                 <Tab label={`Servicios (${services.length})`} />
               </Tabs>
-              
+
               <Box sx={{ flex: 1, overflow: "auto" }}>
                 <TabPanel value={tabValue} index={0}>
                   {renderProductGrid(products, "product")}
                 </TabPanel>
-                
+
                 <TabPanel value={tabValue} index={1}>
                   {renderProductGrid(services, "service")}
                 </TabPanel>
@@ -517,13 +606,26 @@ export const PointOfSale = () => {
 
           {/* Shopping Cart */}
           <Grid item xs={12} md={4}>
-            <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+            <Card
+              sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+            >
               <CardContent sx={{ pb: 1 }}>
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                  }}
+                >
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     Carrito de Compras
                   </Typography>
-                  <Badge badgeContent={getTotalItems()} color="primary" max={99}>
+                  <Badge
+                    badgeContent={getTotalItems()}
+                    color="primary"
+                    max={99}
+                  >
                     <ShoppingCartIcon sx={{ fontSize: 28 }} />
                   </Badge>
                 </Box>
@@ -534,7 +636,9 @@ export const PointOfSale = () => {
               <Box sx={{ flex: 1, overflow: "auto", px: 2 }}>
                 {cart.length === 0 ? (
                   <Box sx={{ textAlign: "center", py: 6 }}>
-                    <ShoppingCartIcon sx={{ fontSize: 64, color: "text.secondary", mb: 2 }} />
+                    <ShoppingCartIcon
+                      sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
+                    />
                     <Typography variant="h6" color="text.secondary">
                       Carrito vacío
                     </Typography>
@@ -545,43 +649,95 @@ export const PointOfSale = () => {
                 ) : (
                   <List sx={{ py: 1 }}>
                     {cart.map((item, index) => (
-                      <ListItem key={`${item.type}-${item.id}-${index}`} sx={{ px: 0, py: 1 }}>
+                      <ListItem
+                        key={`${item.type}-${item.id}-${index}`}
+                        sx={{ px: 0, py: 1 }}
+                      >
                         <Box sx={{ width: "100%" }}>
-                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 1 }}>
-                            <Typography variant="body2" sx={{ fontWeight: 600, flex: 1 }}>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "flex-start",
+                              mb: 1,
+                            }}
+                          >
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 600, flex: 1 }}
+                            >
                               {item.name}
                             </Typography>
                             <IconButton
                               size="small"
                               color="error"
-                              onClick={() => handleRemoveFromCart(item.id, item.type)}
+                              onClick={() =>
+                                handleRemoveFromCart(item.id, item.type)
+                              }
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </Box>
-                          
-                          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              alignItems: "center",
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                              }}
+                            >
                               <IconButton
                                 size="small"
-                                onClick={() => handleUpdateQuantity(item.id, item.type, item.quantity - 1)}
+                                onClick={() =>
+                                  handleUpdateQuantity(
+                                    item.id,
+                                    item.type,
+                                    item.quantity - 1
+                                  )
+                                }
                                 disabled={item.quantity <= 1}
                               >
                                 <RemoveIcon />
                               </IconButton>
-                              <Typography variant="body2" sx={{ minWidth: 30, textAlign: "center", fontWeight: 600 }}>
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  minWidth: 30,
+                                  textAlign: "center",
+                                  fontWeight: 600,
+                                }}
+                              >
                                 {item.quantity}
                               </Typography>
                               <IconButton
                                 size="small"
-                                onClick={() => handleUpdateQuantity(item.id, item.type, item.quantity + 1)}
+                                onClick={() =>
+                                  handleUpdateQuantity(
+                                    item.id,
+                                    item.type,
+                                    item.quantity + 1
+                                  )
+                                }
                               >
                                 <AddIcon />
                               </IconButton>
                             </Box>
-                            
-                            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                              {formatCurrency(item.price * item.quantity, currency)}
+
+                            <Typography
+                              variant="body2"
+                              sx={{ fontWeight: 700 }}
+                            >
+                              {formatCurrency(
+                                item.price * item.quantity,
+                                currency
+                              )}
                             </Typography>
                           </Box>
                         </Box>
@@ -594,11 +750,20 @@ export const PointOfSale = () => {
               <Divider />
 
               <CardContent>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    mb: 3,
+                  }}
+                >
                   <Typography variant="h5" sx={{ fontWeight: 700 }}>
                     Total:
                   </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: "primary.main" }}>
+                  <Typography
+                    variant="h5"
+                    sx={{ fontWeight: 900, color: "primary.main" }}
+                  >
                     {formatCurrency(getTotalAmount(), currency)}
                   </Typography>
                 </Box>
@@ -620,11 +785,12 @@ export const PointOfSale = () => {
                     startIcon={<PaymentIcon />}
                     onClick={handleProcessSale}
                     disabled={cart.length === 0 || !cashRegisterOpen}
-                    sx={{ 
+                    sx={{
                       height: 56,
                       fontSize: "1.1rem",
                       fontWeight: 700,
-                      background: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)"
+                      background:
+                        "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
                     }}
                   >
                     Cobrar
@@ -637,14 +803,16 @@ export const PointOfSale = () => {
       </Container>
 
       {/* Initialize Cash Dialog */}
-      <Dialog 
-        open={openInitCashDialog} 
+      <Dialog
+        open={openInitCashDialog}
         onClose={() => setOpenInitCashDialog(false)}
-        maxWidth="sm" 
+        maxWidth="sm"
         fullWidth
       >
         <DialogTitle sx={{ textAlign: "center", pb: 1 }}>
-          <CashRegisterIcon sx={{ fontSize: 48, color: "primary.main", mb: 1 }} />
+          <CashRegisterIcon
+            sx={{ fontSize: 48, color: "primary.main", mb: 1 }}
+          />
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             Inicializar Caja
           </Typography>
@@ -674,7 +842,9 @@ export const PointOfSale = () => {
                 onChange={(e) => setInitCashAmount(e.target.value)}
                 placeholder="0.00"
                 InputProps={{
-                  startAdornment: <MoneyIcon sx={{ mr: 1, color: "text.secondary" }} />
+                  startAdornment: (
+                    <MoneyIcon sx={{ mr: 1, color: "text.secondary" }} />
+                  ),
                 }}
               />
             </Grid>
@@ -690,7 +860,7 @@ export const PointOfSale = () => {
             size="large"
             sx={{
               background: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
-              px: 4
+              px: 4,
             }}
           >
             Abrir Caja
@@ -699,8 +869,8 @@ export const PointOfSale = () => {
       </Dialog>
 
       {/* Quantity Dialog */}
-      <Dialog 
-        open={openQuantityDialog} 
+      <Dialog
+        open={openQuantityDialog}
         onClose={() => setOpenQuantityDialog(false)}
         TransitionComponent={Transition}
         maxWidth="sm"
@@ -717,17 +887,33 @@ export const PointOfSale = () => {
                 sx={{ width: 100, height: 100, mx: "auto", mb: 2 }}
                 variant="rounded"
               >
-                {selectedItem.type === "product" ? <InventoryIcon sx={{ fontSize: 50 }} /> : <BuildIcon sx={{ fontSize: 50 }} />}
+                {selectedItem.type === "product" ? (
+                  <InventoryIcon sx={{ fontSize: 50 }} />
+                ) : (
+                  <BuildIcon sx={{ fontSize: 50 }} />
+                )}
               </Avatar>
-              
+
               <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
                 {selectedItem.name}
               </Typography>
-              <Typography variant="h4" color="primary" sx={{ mb: 3, fontWeight: 700 }}>
+              <Typography
+                variant="h4"
+                color="primary"
+                sx={{ mb: 3, fontWeight: 700 }}
+              >
                 {formatCurrency(selectedItem.price, currency)}
               </Typography>
-              
-              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2, mb: 3 }}>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 2,
+                  mb: 3,
+                }}
+              >
                 <IconButton
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
                   disabled={quantity <= 1}
@@ -739,11 +925,17 @@ export const PointOfSale = () => {
                 <TextField
                   type="number"
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) =>
+                    setQuantity(Math.max(1, parseInt(e.target.value) || 1))
+                  }
                   sx={{ width: 100 }}
-                  inputProps={{ 
-                    min: 1, 
-                    style: { textAlign: "center", fontSize: "1.5rem", fontWeight: "bold" } 
+                  inputProps={{
+                    min: 1,
+                    style: {
+                      textAlign: "center",
+                      fontSize: "1.5rem",
+                      fontWeight: "bold",
+                    },
                   }}
                 />
                 <IconButton
@@ -754,10 +946,11 @@ export const PointOfSale = () => {
                   <AddIcon />
                 </IconButton>
               </Box>
-              
+
               <Paper sx={{ p: 2, bgcolor: "primary.light", color: "white" }}>
                 <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  Subtotal: {formatCurrency(selectedItem.price * quantity, currency)}
+                  Subtotal:{" "}
+                  {formatCurrency(selectedItem.price * quantity, currency)}
                 </Typography>
               </Paper>
             </Box>
@@ -767,9 +960,9 @@ export const PointOfSale = () => {
           <Button onClick={() => setOpenQuantityDialog(false)} size="large">
             Cancelar
           </Button>
-          <Button 
-            onClick={handleAddToCart} 
-            variant="contained" 
+          <Button
+            onClick={handleAddToCart}
+            variant="contained"
             size="large"
             sx={{ px: 4 }}
           >
@@ -779,10 +972,10 @@ export const PointOfSale = () => {
       </Dialog>
 
       {/* Payment Dialog */}
-      <Dialog 
-        open={openPaymentDialog} 
-        onClose={() => setOpenPaymentDialog(false)} 
-        maxWidth="sm" 
+      <Dialog
+        open={openPaymentDialog}
+        onClose={() => setOpenPaymentDialog(false)}
+        maxWidth="sm"
         fullWidth
         TransitionComponent={Transition}
       >
@@ -794,31 +987,37 @@ export const PointOfSale = () => {
         </DialogTitle>
         <DialogContent>
           <Box sx={{ py: 2 }}>
-            <Paper sx={{ p: 3, mb: 3, bgcolor: "primary.light", color: "white", textAlign: "center" }}>
+            <Paper
+              sx={{
+                p: 3,
+                mb: 3,
+                bgcolor: "primary.light",
+                color: "white",
+                textAlign: "center",
+              }}
+            >
               <Typography variant="h4" sx={{ fontWeight: 900 }}>
                 {formatCurrency(getTotalAmount(), currency)}
               </Typography>
-              <Typography variant="body1">
-                Total a Procesar
-              </Typography>
+              <Typography variant="body1">Total a Procesar</Typography>
             </Paper>
-            
+
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
               Tipo de Pago:
             </Typography>
-            
+
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={6}>
                 <Button
                   fullWidth
                   variant={paymentType === "paid" ? "contained" : "outlined"}
                   onClick={() => setPaymentType("paid")}
-                  sx={{ 
+                  sx={{
                     height: 80,
                     flexDirection: "column",
                     gap: 1,
                     fontSize: "1rem",
-                    fontWeight: 600
+                    fontWeight: 600,
                   }}
                   startIcon={<CheckCircleIcon />}
                 >
@@ -830,12 +1029,12 @@ export const PointOfSale = () => {
                   fullWidth
                   variant={paymentType === "credit" ? "contained" : "outlined"}
                   onClick={() => setPaymentType("credit")}
-                  sx={{ 
+                  sx={{
                     height: 80,
                     flexDirection: "column",
                     gap: 1,
                     fontSize: "1rem",
-                    fontWeight: 600
+                    fontWeight: 600,
                   }}
                   startIcon={<ScheduleIcon />}
                   color="warning"
@@ -870,7 +1069,7 @@ export const PointOfSale = () => {
               background: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
               px: 4,
               fontSize: "1.1rem",
-              fontWeight: 700
+              fontWeight: 700,
             }}
           >
             {paymentType === "paid" ? "Completar Venta" : "Registrar Crédito"}
@@ -879,15 +1078,21 @@ export const PointOfSale = () => {
       </Dialog>
 
       {/* Reports Dialog */}
-      <Dialog 
-        open={openReportsDialog} 
-        onClose={() => setOpenReportsDialog(false)} 
-        maxWidth="md" 
+      <Dialog
+        open={openReportsDialog}
+        onClose={() => setOpenReportsDialog(false)}
+        maxWidth="md"
         fullWidth
         TransitionComponent={Transition}
       >
         <DialogTitle>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
               Reportes del Día
             </Typography>
@@ -899,7 +1104,14 @@ export const PointOfSale = () => {
         <DialogContent>
           <Grid container spacing={3} sx={{ mb: 3 }}>
             <Grid item xs={6} md={3}>
-              <Paper sx={{ p: 2, textAlign: "center", bgcolor: "primary.light", color: "white" }}>
+              <Paper
+                sx={{
+                  p: 2,
+                  textAlign: "center",
+                  bgcolor: "primary.light",
+                  color: "white",
+                }}
+              >
                 <Typography variant="h4" sx={{ fontWeight: 700 }}>
                   {salesSummary.totalSales}
                 </Typography>
@@ -907,7 +1119,14 @@ export const PointOfSale = () => {
               </Paper>
             </Grid>
             <Grid item xs={6} md={3}>
-              <Paper sx={{ p: 2, textAlign: "center", bgcolor: "success.light", color: "white" }}>
+              <Paper
+                sx={{
+                  p: 2,
+                  textAlign: "center",
+                  bgcolor: "success.light",
+                  color: "white",
+                }}
+              >
                 <Typography variant="h4" sx={{ fontWeight: 700 }}>
                   {formatCurrency(initialAmount, currency)}
                 </Typography>
@@ -915,7 +1134,14 @@ export const PointOfSale = () => {
               </Paper>
             </Grid>
             <Grid item xs={6} md={3}>
-              <Paper sx={{ p: 2, textAlign: "center", bgcolor: "info.light", color: "white" }}>
+              <Paper
+                sx={{
+                  p: 2,
+                  textAlign: "center",
+                  bgcolor: "info.light",
+                  color: "white",
+                }}
+              >
                 <Typography variant="h4" sx={{ fontWeight: 700 }}>
                   {formatCurrency(currentCash, currency)}
                 </Typography>
@@ -923,7 +1149,14 @@ export const PointOfSale = () => {
               </Paper>
             </Grid>
             <Grid item xs={6} md={3}>
-              <Paper sx={{ p: 2, textAlign: "center", bgcolor: "warning.light", color: "white" }}>
+              <Paper
+                sx={{
+                  p: 2,
+                  textAlign: "center",
+                  bgcolor: "warning.light",
+                  color: "white",
+                }}
+              >
                 <Typography variant="h4" sx={{ fontWeight: 700 }}>
                   {formatCurrency(expectedCash, currency)}
                 </Typography>
@@ -949,10 +1182,20 @@ export const PointOfSale = () => {
               {dailySales.length > 0 ? (
                 <List>
                   {dailySales.map((sale) => (
-                    <ListItem key={sale.id} sx={{ border: 1, borderColor: "divider", borderRadius: 1, mb: 1 }}>
+                    <ListItem
+                      key={sale.id}
+                      sx={{
+                        border: 1,
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        mb: 1,
+                      }}
+                    >
                       <ListItemText
                         primary={`${sale.saleNumber} - ${sale.customerName}`}
-                        secondary={`${sale.items.length} productos - ${sale.paymentType === "paid" ? "Pagado" : "Por cobrar"}`}
+                        secondary={`${sale.items.length} productos - ${
+                          sale.paymentType === "paid" ? "Pagado" : "Por cobrar"
+                        }`}
                       />
                       <Typography variant="h6" sx={{ fontWeight: 700 }}>
                         {formatCurrency(sale.total, currency)}
@@ -961,7 +1204,11 @@ export const PointOfSale = () => {
                   ))}
                 </List>
               ) : (
-                <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 4 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ textAlign: "center", py: 4 }}
+                >
                   No hay ventas registradas hoy
                 </Typography>
               )}
@@ -973,7 +1220,11 @@ export const PointOfSale = () => {
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
                 Productos Más Vendidos
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ textAlign: "center", py: 4 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ textAlign: "center", py: 4 }}
+              >
                 Funcionalidad disponible próximamente
               </Typography>
             </Box>

@@ -43,6 +43,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { salesAPI } from "../utils/api";
+import { exportToExcel } from "../utils/excelExport";
 
 export const Sales = () => {
   const { hasPermission } = useAuth();
@@ -146,12 +147,17 @@ export const Sales = () => {
     return statuses[status] || status;
   };
 
-  const exportToExcel = () => {
-    notificationSwal(
-      "Exportando...",
-      "El reporte se está generando y se descargará automáticamente.",
-      "info"
-    );
+  const handleExportToExcel = () => {
+    const dataToExport = sales.map(sale => ({
+      'Número de Venta': sale.sale_number,
+      'Cliente': sale.customer_name,
+      'Total': sale.total_amount,
+      'Método de Pago': getPaymentMethodLabel(sale.payment_method),
+      'Estado de Pago': getPaymentStatusLabel(sale.payment_status),
+      'Fecha': formatDate(sale.sale_date),
+      'Vendedor': sale.created_by,
+    }));
+    exportToExcel(dataToExport, "ventas_reporte", "Ventas");
   };
 
   if (loading) {
@@ -185,7 +191,7 @@ export const Sales = () => {
         <Button
           variant="contained"
           startIcon={<ExportIcon />}
-          onClick={exportToExcel}
+          onClick={handleExportToExcel}
           sx={{
             background: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
           }}
@@ -320,12 +326,12 @@ export const Sales = () => {
                       >
                         <ViewIcon />
                       </IconButton>
-                      {hasPermission("sales.edit") && (
+                      {hasPermission("ventas.edit") && (
                         <IconButton size="small">
                           <EditIcon />
                         </IconButton>
                       )}
-                      {hasPermission("sales.delete") && (
+                      {hasPermission("ventas.delete") && (
                         <IconButton
                           size="small"
                           onClick={() => handleDeleteSale(sale.id)}

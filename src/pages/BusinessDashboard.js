@@ -45,22 +45,26 @@ import {
 import { formatCurrency } from "../utils/formatters";
 import { businessAPI } from "../utils/api";
 import { notificationSwal } from "../utils/swal-helpers";
+import { useAuth } from "../contexts/AuthContext";
 
 export const BusinessDashboard = () => {
   const theme = useTheme();
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [salesData, setSalesData] = useState([]);
   const [expensesData, setExpensesData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadDashboardData();
+    if (user.business_id) {
+      loadDashboardData();
+    }
   }, []);
 
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const response = await businessAPI.getStats(1); // Assuming business ID 1 for now
+      const response = await businessAPI.getStats(user.business_id);
       const dashboardData = response.data;
 
       setStats(dashboardData.stats);

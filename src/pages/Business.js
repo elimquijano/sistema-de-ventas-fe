@@ -197,16 +197,18 @@ export const Business = () => {
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
           Mi Negocio
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{
-            background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
-          }}
-        >
-          Crear Negocio
-        </Button>
+        {hasPermission("negocios.create") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
+            }}
+          >
+            Crear Negocio
+          </Button>
+        )}
       </Box>
 
       <Card>
@@ -296,25 +298,31 @@ export const Business = () => {
                       <Chip
                         label={business.status}
                         size="small"
-                        color={business.status === "active" ? "success" : "default"}
+                        color={
+                          business.status === "active" ? "success" : "default"
+                        }
                         sx={{ textTransform: "capitalize" }}
                       />
                     </TableCell>
                     <TableCell>{formatDate(business.created_at)}</TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDialog(business)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteBusiness(business.id)}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {hasPermission("negocios.edit") && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenDialog(business)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      )}
+                      {hasPermission("negocios.delete") && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteBusiness(business.id)}
+                          color="error"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -354,7 +362,10 @@ export const Business = () => {
                   value={formData.currency}
                   label="Moneda"
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, currency: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      currency: e.target.value,
+                    }))
                   }
                 >
                   <MenuItem value="PEN">PEN - Soles</MenuItem>
@@ -370,7 +381,10 @@ export const Business = () => {
                 rows={2}
                 value={formData.description}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
               />
             </Grid>

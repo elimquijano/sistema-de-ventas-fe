@@ -83,7 +83,7 @@ export const Services = () => {
 
   const loadCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll({ type: 'service' });
+      const response = await categoriesAPI.getAll({ type: "service" });
       setCategories(response.data);
     } catch (error) {
       console.error("Error loading categories:", error);
@@ -177,12 +177,17 @@ export const Services = () => {
     }
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}min` : `${hours}h`;
+    return remainingMinutes > 0
+      ? `${hours}h ${remainingMinutes}min`
+      : `${hours}h`;
   };
 
   const filteredServices = services.filter((service) => {
-    const matchesSearch = service.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = !categoryFilter || service.category_id.toString() === categoryFilter;
+    const matchesSearch = service.name
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase());
+    const matchesCategory =
+      !categoryFilter || service.category_id.toString() === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
@@ -214,16 +219,18 @@ export const Services = () => {
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
           Servicios
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{
-            background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
-          }}
-        >
-          Agregar Servicio
-        </Button>
+        {hasPermission("servicios.create") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
+            sx={{
+              background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
+            }}
+          >
+            Agregar Servicio
+          </Button>
+        )}
       </Box>
 
       <Card>
@@ -312,7 +319,9 @@ export const Services = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box
+                        sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                      >
                         <AccessTimeIcon fontSize="small" color="action" />
                         <Typography variant="body2">
                           {formatDuration(service.duration)}
@@ -321,25 +330,33 @@ export const Services = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={service.status === "active" ? "Activo" : "Inactivo"}
+                        label={
+                          service.status === "active" ? "Activo" : "Inactivo"
+                        }
                         size="small"
-                        color={service.status === "active" ? "success" : "default"}
+                        color={
+                          service.status === "active" ? "success" : "default"
+                        }
                       />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDialog(service)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteService(service.id)}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {hasPermission("servicios.edit") && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenDialog(service)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      )}
+                      {hasPermission("servicios.delete") && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteService(service.id)}
+                          color="error"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -379,7 +396,10 @@ export const Services = () => {
                   value={formData.category_id}
                   label="Categoría"
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, category_id: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      category_id: e.target.value,
+                    }))
                   }
                 >
                   {categories.map((category) => (
@@ -398,7 +418,10 @@ export const Services = () => {
                 rows={3}
                 value={formData.description}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
               />
             </Grid>

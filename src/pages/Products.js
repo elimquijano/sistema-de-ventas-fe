@@ -226,7 +226,7 @@ export const Products = () => {
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
           Productos
         </Typography>
-        <Button
+        {hasPermission("productos.create") &&(<Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={() => handleOpenDialog()}
@@ -235,7 +235,7 @@ export const Products = () => {
           }}
         >
           Agregar Producto
-        </Button>
+        </Button>)}
       </Box>
 
       <Card>
@@ -363,19 +363,19 @@ export const Products = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        <IconButton
+                        {hasPermission("productos.edit") &&(<IconButton
                           size="small"
                           onClick={() => handleOpenDialog(product)}
                         >
                           <EditIcon />
-                        </IconButton>
-                        <IconButton
+                        </IconButton>)}
+                        {hasPermission("productos.delete") &&(<IconButton
                           size="small"
                           onClick={() => handleDeleteProduct(product.id)}
                           color="error"
                         >
                           <DeleteIcon />
-                        </IconButton>
+                        </IconButton>)}
                       </TableCell>
                     </TableRow>
                   );

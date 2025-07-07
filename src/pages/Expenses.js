@@ -40,6 +40,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { categoriesAPI, expensesAPI } from "../utils/api";
+import { exportToExcel } from "../utils/excelExport";
 
 export const Expenses = () => {
   const { hasPermission } = useAuth();
@@ -55,7 +56,7 @@ export const Expenses = () => {
     description: "",
     amount: "",
     category_id: "",
-    expense_date: new Date().toISOString().split('T')[0],
+    expense_date: new Date().toISOString().split("T")[0],
     receipt_number: "",
     notes: "",
   });
@@ -73,11 +74,7 @@ export const Expenses = () => {
       setTotalPages(response.data.last_page);
     } catch (error) {
       console.error("Error loading expenses:", error);
-      notificationSwal(
-        "Error",
-        "Hubo un error al cargar los gastos.",
-        "error"
-      );
+      notificationSwal("Error", "Hubo un error al cargar los gastos.", "error");
     } finally {
       setLoading(false);
     }
@@ -85,7 +82,7 @@ export const Expenses = () => {
 
   const loadCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll({ type: 'expense' });
+      const response = await categoriesAPI.getAll({ type: "expense" });
       setCategories(response.data);
     } catch (error) {
       console.error("Error loading categories:", error);
@@ -110,7 +107,7 @@ export const Expenses = () => {
         description: expense.description,
         amount: expense.amount.toString(),
         category_id: expense.category_id,
-        expense_date: expense.expense_date.split('T')[0],
+        expense_date: expense.expense_date.split("T")[0],
         receipt_number: expense.receipt_number,
         notes: expense.notes,
       });
@@ -120,7 +117,7 @@ export const Expenses = () => {
         description: "",
         amount: "",
         category_id: "",
-        expense_date: new Date().toISOString().split('T')[0],
+        expense_date: new Date().toISOString().split("T")[0],
         receipt_number: "",
         notes: "",
       });
@@ -184,12 +181,16 @@ export const Expenses = () => {
     }
   };
 
-  const exportToExcel = () => {
-    notificationSwal(
-      "Exportando...",
-      "El reporte se está generando y se descargará automáticamente.",
-      "info"
-    );
+  const handleExportToExcel = () => {
+    const dataToExport = expenses.map((expense) => ({
+      Descripción: expense.description,
+      Categoría: expense.category,
+      Monto: expense.amount,
+      Fecha: formatDate(expense.expense_date),
+      Factura: expense.receipt_number || "N/A",
+      "Registrado por": expense.created_by,
+    }));
+    exportToExcel(dataToExport, "gastos_reporte", "Gastos");
   };
 
   if (loading) {
@@ -224,20 +225,22 @@ export const Expenses = () => {
           <Button
             variant="outlined"
             startIcon={<ExportIcon />}
-            onClick={exportToExcel}
+            onClick={handleExportToExcel}
           >
             Exportar Excel
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-            sx={{
-              background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
-            }}
-          >
-            Registrar Gasto
-          </Button>
+          {hasPermission("merma.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog()}
+              sx={{
+                background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
+              }}
+            >
+              Registrar Gasto
+            </Button>
+          )}
         </Box>
       </Box>
 
@@ -340,7 +343,10 @@ export const Expenses = () => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: "error.main" }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, color: "error.main" }}
+                      >
                         -{formatCurrency(expense.amount)}
                       </Typography>
                     </TableCell>
@@ -365,19 +371,23 @@ export const Expenses = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDialog(expense)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleDeleteExpense(expense.id)}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {hasPermission("merma.edit") && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenDialog(expense)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      )}
+                      {hasPermission("merma.delete") && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDeleteExpense(expense.id)}
+                          color="error"
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -414,7 +424,10 @@ export const Expenses = () => {
                 label="Descripción"
                 value={formData.description}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, description: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    description: e.target.value,
+                  }))
                 }
                 required
               />
@@ -439,7 +452,10 @@ export const Expenses = () => {
                   value={formData.category_id}
                   label="Categoría"
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, category_id: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      category_id: e.target.value,
+                    }))
                   }
                 >
                   {categories.map((category) => (
@@ -457,7 +473,10 @@ export const Expenses = () => {
                 type="date"
                 value={formData.expense_date}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, expense_date: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    expense_date: e.target.value,
+                  }))
                 }
                 InputLabelProps={{
                   shrink: true,
@@ -471,7 +490,10 @@ export const Expenses = () => {
                 label="Número de Factura"
                 value={formData.receipt_number}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, receipt_number: e.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    receipt_number: e.target.value,
+                  }))
                 }
               />
             </Grid>
@@ -494,7 +516,9 @@ export const Expenses = () => {
           <Button
             onClick={handleSaveExpense}
             variant="contained"
-            disabled={!formData.description || !formData.amount || !formData.category_id}
+            disabled={
+              !formData.description || !formData.amount || !formData.category_id
+            }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}

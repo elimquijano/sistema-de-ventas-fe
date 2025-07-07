@@ -16,6 +16,8 @@ import { Sales } from "../pages/Sales";
 import { Expenses } from "../pages/Expenses";
 import { Credits } from "../pages/Credits";
 import { BusinessDashboard } from "../pages/BusinessDashboard";
+import { Categories } from "../pages/Categories";
+import { Loans } from "../pages/Loans";
 
 // Importar iconos de Material-UI
 import {
@@ -59,6 +61,8 @@ export const componentMap = {
   Sales,
   Expenses,
   Credits,
+  Categories,
+  Loans,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES

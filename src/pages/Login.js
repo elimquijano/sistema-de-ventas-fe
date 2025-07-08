@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -14,49 +14,47 @@ import {
   Alert,
   CircularProgress,
   useTheme,
-} from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-} from '@mui/icons-material';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+} from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import Logo from "../components/Logo";
 
 export const Login = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const { login } = useAuth();
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
     rememberMe: false,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'rememberMe' ? checked : value,
+      [name]: name === "rememberMe" ? checked : value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const success = await login(formData.email, formData.password);
       if (success) {
-        navigate('/dashboard');
+        navigate("/dashboard");
       } else {
-        setError('Invalid email or password');
+        setError("Invalid email or password");
       }
     } catch (err) {
-      setError('An error occurred during login');
+      setError("An error occurred during login");
     } finally {
       setLoading(false);
     }
@@ -65,41 +63,44 @@ export const Login = () => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        minHeight: "100vh",
         background: theme.palette.background.default,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         p: 2,
       }}
     >
       <Card
         sx={{
           maxWidth: 475,
-          width: '100%',
-          boxShadow: 'none',
+          width: "100%",
+          boxShadow: "none",
           border: `1px solid ${theme.palette.divider}`,
         }}
       >
         <CardContent sx={{ p: 4 }}>
           {/* Logo */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 3,
+              }}
+            >
               <Box
                 sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
+                  borderRadius: "50%",
                   background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   mr: 1,
                 }}
               >
-                <Typography variant="body2" sx={{ color: 'white', fontWeight: 700 }}>
-                  🍇
-                </Typography>
+                <Logo height={32} />
               </Box>
               <Typography
                 variant="h5"
@@ -108,10 +109,13 @@ export const Login = () => {
                   color: theme.palette.primary.main,
                 }}
               >
-                BERRY
+                STOCK MASTER
               </Typography>
             </Box>
-            <Typography variant="h4" sx={{ color: theme.palette.primary.main, mb: 1, fontWeight: 600 }}>
+            <Typography
+              variant="h4"
+              sx={{ color: theme.palette.primary.main, mb: 1, fontWeight: 600 }}
+            >
               Hi, Welcome Back
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -128,7 +132,10 @@ export const Login = () => {
             )}
 
             <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ mb: 1, color: theme.palette.text.secondary }}>
+              <Typography
+                variant="body2"
+                sx={{ mb: 1, color: theme.palette.text.secondary }}
+              >
                 Email Address / Username
               </Typography>
               <TextField
@@ -140,30 +147,33 @@ export const Login = () => {
                 placeholder="info@codedthemes.com"
                 variant="outlined"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 1,
-                  }
+                  },
                 }}
                 required
               />
             </Box>
 
             <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ mb: 1, color: theme.palette.text.secondary }}>
+              <Typography
+                variant="body2"
+                sx={{ mb: 1, color: theme.palette.text.secondary }}
+              >
                 Password
               </Typography>
               <TextField
                 fullWidth
                 name="password"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="••••••"
                 variant="outlined"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 1,
-                  }
+                  },
                 }}
                 required
                 InputProps={{
@@ -181,7 +191,14 @@ export const Login = () => {
               />
             </Box>
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                mb: 3,
+              }}
+            >
               <FormControlLabel
                 control={
                   <Checkbox
@@ -193,9 +210,7 @@ export const Login = () => {
                   />
                 }
                 label={
-                  <Typography variant="body2">
-                    Keep me logged in
-                  </Typography>
+                  <Typography variant="body2">Keep me logged in</Typography>
                 }
               />
               <Link
@@ -203,10 +218,10 @@ export const Login = () => {
                 to="/forgot-password"
                 sx={{
                   color: theme.palette.primary.main,
-                  textDecoration: 'none',
-                  fontSize: '0.875rem',
-                  '&:hover': {
-                    textDecoration: 'underline',
+                  textDecoration: "none",
+                  fontSize: "0.875rem",
+                  "&:hover": {
+                    textDecoration: "underline",
                   },
                 }}
               >
@@ -224,31 +239,35 @@ export const Login = () => {
                 background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                 py: 1.5,
                 mb: 3,
-                textTransform: 'none',
-                fontSize: '1rem',
+                textTransform: "none",
+                fontSize: "1rem",
                 fontWeight: 600,
                 borderRadius: 1,
-                boxShadow: 'none',
-                '&:hover': {
-                  boxShadow: 'none',
+                boxShadow: "none",
+                "&:hover": {
+                  boxShadow: "none",
                 },
               }}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign In'}
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                "Sign In"
+              )}
             </Button>
 
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary">
-                Don't have an account?{' '}
+                Don't have an account?{" "}
                 <Link
                   component={RouterLink}
                   to="/signup"
                   sx={{
                     color: theme.palette.primary.main,
-                    textDecoration: 'none',
+                    textDecoration: "none",
                     fontWeight: 600,
-                    '&:hover': {
-                      textDecoration: 'underline',
+                    "&:hover": {
+                      textDecoration: "underline",
                     },
                   }}
                 >

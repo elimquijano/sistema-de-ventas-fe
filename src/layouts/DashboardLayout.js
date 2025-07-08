@@ -49,6 +49,7 @@ import { notificationsAPI, modulesAPI } from "../utils/api";
 import { getIcon } from "../config/moduleConfig";
 import { DynamicRoutes } from "../routes/DynamicRouteGenerator";
 import { findFirstValidRoute } from "../utils/navigationUtils";
+import Logo from "../components/Logo";
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 64;
@@ -352,8 +353,6 @@ export const DashboardLayout = () => {
       >
         <Box
           sx={{
-            width: 28,
-            height: 28,
             borderRadius: "50%",
             background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
             display: "flex",
@@ -362,16 +361,20 @@ export const DashboardLayout = () => {
             mr: sidebarCollapsed ? 0 : 1,
           }}
         >
-          <Typography variant="body2" sx={{ color: "white", fontWeight: 700 }}>
-            🍇
-          </Typography>
+          <Logo height={32}/>
         </Box>
         {!sidebarCollapsed && (
           <Typography
             variant="h6"
-            sx={{ fontWeight: 700, color: theme.palette.primary.main }}
+            sx={{
+              fontWeight: 700,
+              color: theme.palette.primary.main,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
-            BERRY
+            STOCK MASTER
           </Typography>
         )}
       </Box>

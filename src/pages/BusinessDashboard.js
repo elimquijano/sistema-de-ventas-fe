@@ -42,7 +42,7 @@ import {
   Pie,
   Cell,
 } from "recharts";
-import { formatCurrency } from "../utils/formatters";
+import { formatCurrency, formatPercentage } from "../utils/formatters";
 import { businessAPI } from "../utils/api";
 import { notificationSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
@@ -82,6 +82,22 @@ export const BusinessDashboard = () => {
     }
   };
 
+  function calcularPorcentaje(total, fraccion) {
+    // Convertir las cadenas a números
+    const totalValue = parseFloat(total);
+    const fraccionValue = parseFloat(fraccion);
+
+    // Verificar que totalValue no sea cero para evitar división por cero
+    if (totalValue === 0) {
+      return 0; // O puedes lanzar un error si prefieres
+    }
+
+    // Calcular el porcentaje
+    const porcentaje = (fraccionValue / totalValue) * 100;
+
+    return porcentaje;
+  }
+
   if (loading) {
     return (
       <Box
@@ -102,7 +118,9 @@ export const BusinessDashboard = () => {
       title: "Ventas del Día",
       value: formatCurrency(stats?.daily_sales || 0),
       icon: <ShoppingCart />,
-      trend: `+${stats?.sales_growth || 0}%`,
+      trend: `+${formatPercentage(
+        calcularPorcentaje(stats?.monthly_expenses, stats?.daily_expenses) || 0
+      )}`,
       color: "primary",
       gradient: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
     },
@@ -110,7 +128,9 @@ export const BusinessDashboard = () => {
       title: "Ventas del Mes",
       value: formatCurrency(stats?.monthly_sales || 0),
       icon: <AttachMoney />,
-      trend: "+8.2%",
+      trend: `+${formatPercentage(
+        calcularPorcentaje(stats?.monthly_expenses, stats?.monthly_expenses) || 0
+      )}`,
       color: "success",
       gradient: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
     },
@@ -118,7 +138,9 @@ export const BusinessDashboard = () => {
       title: "Gastos del Día",
       value: formatCurrency(stats?.daily_expenses || 0),
       icon: <TrendingDown />,
-      trend: "-5.1%",
+      trend: formatPercentage(
+        -calcularPorcentaje(stats?.monthly_expenses, stats?.daily_expenses) || 0
+      ),
       color: "error",
       gradient: "linear-gradient(135deg, #f44336 0%, #ef5350 100%)",
     },
@@ -336,7 +358,7 @@ export const BusinessDashboard = () => {
                 Productos Más Vendidos
               </Typography>
               <List>
-                {stats?.top_selling_products?.map((product, index) => (
+                {expensesData?.map((product, index) => (
                   <ListItem key={index}>
                     <ListItemIcon>
                       <Inventory color="primary" />
@@ -346,7 +368,7 @@ export const BusinessDashboard = () => {
                       secondary={`${product.quantity} unidades vendidas`}
                     />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(product.revenue)}
+                      {formatCurrency(product?.revenue)}
                     </Typography>
                   </ListItem>
                 ))}

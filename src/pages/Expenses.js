@@ -46,7 +46,6 @@ export const Expenses = () => {
   const { hasPermission } = useAuth();
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -68,7 +67,6 @@ export const Expenses = () => {
 
   const loadExpenses = async () => {
     try {
-      setLoading(true);
       const response = await expensesAPI.getAll({ page, ...searchFilters });
       setExpenses(response.data.data);
       setTotalPages(response.data.last_page);
@@ -76,7 +74,6 @@ export const Expenses = () => {
       console.error("Error loading expenses:", error);
       notificationSwal("Error", "Hubo un error al cargar los gastos.", "error");
     } finally {
-      setLoading(false);
     }
   };
 
@@ -192,21 +189,6 @@ export const Expenses = () => {
     }));
     exportToExcel(dataToExport, "gastos_reporte", "Gastos");
   };
-
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 400,
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   return (
     <Box>
@@ -337,7 +319,7 @@ export const Expenses = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={expense.category}
+                        label={expense.category.name}
                         size="small"
                         variant="outlined"
                       />

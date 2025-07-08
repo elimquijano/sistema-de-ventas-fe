@@ -52,7 +52,7 @@ export const formatNumber = (number, decimals = 0) => {
 };
 
 // Formateador de moneda
-export const formatCurrency = (amount, currency = 'USD') => {
+export const formatCurrency = (amount, currency = 'PEN') => {
   if (amount === null || amount === undefined) return '';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

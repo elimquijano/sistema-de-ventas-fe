@@ -35,6 +35,7 @@ import {
   Delete as DeleteIcon,
   Build as BuildIcon,
   AccessTime as AccessTimeIcon,
+  CloudUpload as CloudUploadIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
@@ -50,12 +51,14 @@ export const Services = () => {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingService, setEditingService] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     category_id: "",
     price: "",
     duration: "",
+    image: null,
     status: "active",
   });
 
@@ -84,7 +87,7 @@ export const Services = () => {
   const loadCategories = async () => {
     try {
       const response = await categoriesAPI.getAll({ type: "service" });
-      setCategories(response.data);
+      setCategories(response.data || []);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -99,8 +102,10 @@ export const Services = () => {
         category_id: service.category_id,
         price: service.price.toString(),
         duration: service.duration.toString(),
+        image: null,
         status: service.status,
       });
+      setImagePreview(service.image_path ? `${process.env.REACT_APP_API_URL}/storage/${service.image_path}` : null);
     } else {
       setEditingService(null);
       setFormData({
@@ -109,8 +114,10 @@ export const Services = () => {
         category_id: "",
         price: "",
         duration: "",
+        image: null,
         status: "active",
       });
+      setImagePreview(null);
     }
     setOpenDialog(true);
   };
@@ -118,19 +125,35 @@ export const Services = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingService(null);
+    setImagePreview(null);
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setFormData((prev) => ({ ...prev, image: file }));
+      setImagePreview(URL.createObjectURL(file));
+    }
   };
 
   const handleSaveService = async () => {
+    const data = new FormData();
+    Object.keys(formData).forEach((key) => {
+      if (formData[key] !== null) {
+        data.append(key, formData[key]);
+      }
+    });
+
     try {
       if (editingService) {
-        await servicesAPI.update(editingService.id, formData);
+        await servicesAPI.update(editingService.id, data);
         notificationSwal(
           "Servicio Actualizado",
           "El servicio ha sido actualizado exitosamente.",
           "success"
         );
       } else {
-        await servicesAPI.create(formData);
+        await servicesAPI.create(data);
         notificationSwal(
           "Servicio Creado",
           "El nuevo servicio ha sido creado exitosamente.",
@@ -187,7 +210,7 @@ export const Services = () => {
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const matchesCategory =
-      !categoryFilter || service.category_id.toString() === categoryFilter;
+      !categoryFilter || (service.category && service.category.id.toString() === categoryFilter);
     return matchesSearch && matchesCategory;
   });
 
@@ -289,8 +312,10 @@ export const Services = () => {
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
                       >
-                        <Avatar sx={{ bgcolor: "secondary.main" }}>
-                          <BuildIcon />
+                        <Avatar 
+                          src={service.image_path ? `http://localhost:8000/storage/${service.image_path}` : null}
+                          sx={{ bgcolor: "secondary.main" }}>
+                          {!service.image_path && <BuildIcon />}
                         </Avatar>
                         <Box>
                           <Typography
@@ -307,7 +332,7 @@ export const Services = () => {
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={service.category}
+                        label={service.category?.name || "N/A"}
                         size="small"
                         variant="outlined"
                         color="secondary"
@@ -464,6 +489,34 @@ export const Services = () => {
                   <MenuItem value="inactive">Inactivo</MenuItem>
                 </Select>
               </FormControl>
+            </Grid>
+            <Grid item xs={12}>
+              <Box
+                sx={{
+                  border: "1px dashed grey",
+                  borderRadius: 1,
+                  p: 2,
+                  textAlign: "center",
+                }}
+              >
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<CloudUploadIcon />}
+                >
+                  Subir Imagen
+                  <input type="file" hidden onChange={handleFileChange} />
+                </Button>
+                {imagePreview && (
+                  <Box sx={{ mt: 2 }}>
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      style={{ width: "100px", height: "100px" }}
+                    />
+                  </Box>
+                )}
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

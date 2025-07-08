@@ -37,6 +37,7 @@ import {
   Inventory as InventoryIcon,
   Warning as WarningIcon,
   CheckCircle as CheckCircleIcon,
+  CloudUpload as CloudUploadIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
@@ -52,6 +53,7 @@ export const Products = () => {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -61,7 +63,7 @@ export const Products = () => {
     stock: "",
     min_stock: "",
     barcode: "",
-    image_url: "",
+    image: null,
     status: "active",
   });
 
@@ -90,7 +92,7 @@ export const Products = () => {
   const loadCategories = async () => {
     try {
       const response = await categoriesAPI.getAll({ type: "product" });
-      setCategories(response.data);
+      setCategories(response.data || []);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -108,9 +110,10 @@ export const Products = () => {
         stock: product.stock.toString(),
         min_stock: product.min_stock.toString(),
         barcode: product.barcode,
-        image_url: product.image_url,
+        image: null,
         status: product.status,
       });
+      setImagePreview(product.image_url);
     } else {
       setEditingProduct(null);
       setFormData({
@@ -122,9 +125,10 @@ export const Products = () => {
         stock: "",
         min_stock: "",
         barcode: "",
-        image_url: "",
+        image: null,
         status: "active",
       });
+      setImagePreview(null);
     }
     setOpenDialog(true);
   };
@@ -132,19 +136,35 @@ export const Products = () => {
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingProduct(null);
+    setImagePreview(null);
+  };
+
+  const handleFileChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setFormData((prev) => ({ ...prev, image: file }));
+      setImagePreview(URL.createObjectURL(file));
+    }
   };
 
   const handleSaveProduct = async () => {
+    const data = new FormData();
+    Object.keys(formData).forEach((key) => {
+      if (formData[key] !== null) {
+        data.append(key, formData[key]);
+      }
+    });
+
     try {
       if (editingProduct) {
-        await productsAPI.update(editingProduct.id, formData);
+        await productsAPI.update(editingProduct.id, data);
         notificationSwal(
           "Producto Actualizado",
           "El producto ha sido actualizado exitosamente.",
           "success"
         );
       } else {
-        await productsAPI.create(formData);
+        await productsAPI.create(data);
         notificationSwal(
           "Producto Creado",
           "El nuevo producto ha sido creado exitosamente.",
@@ -186,19 +206,23 @@ export const Products = () => {
   };
 
   const getStockStatus = (stock, minStock) => {
-    if (stock === 0)
-      return { color: "error", icon: <WarningIcon />, label: "Sin Stock" };
-    if (stock <= minStock)
-      return { color: "warning", icon: <WarningIcon />, label: "Stock Bajo" };
-    return { color: "success", icon: <CheckCircleIcon />, label: "Stock OK" };
+    if (stock === 0) return { color: "error", label: "Sin Stock" };
+    if (stock <= minStock) return { color: "warning", label: "Stock Bajo" };
+    return { color: "success", label: "En Stock" };
   };
 
   const filteredProducts = products.filter((product) => {
+    const searchTermLower = searchTerm.toLowerCase();
     const matchesSearch =
-      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.barcode.includes(searchTerm);
+      (product.name &&
+        product.name.toLowerCase().includes(searchTermLower)) ||
+      (product.barcode &&
+        product.barcode.toLowerCase().includes(searchTermLower));
+
     const matchesCategory =
-      !categoryFilter || product.category_id.toString() === categoryFilter;
+      !categoryFilter ||
+      (product.category && product.category.id.toString() === categoryFilter);
+
     return matchesSearch && matchesCategory;
   });
 
@@ -308,10 +332,10 @@ export const Products = () => {
                           sx={{ display: "flex", alignItems: "center", gap: 2 }}
                         >
                           <Avatar
-                            src={product.image_url}
+                            src={product.image_path ? `http://localhost:8000/storage/${product.image_path}` : null}
                             sx={{ width: 50, height: 50 }}
                           >
-                            <InventoryIcon />
+                            {!product.image_path && <InventoryIcon />}
                           </Avatar>
                           <Box>
                             <Typography
@@ -328,7 +352,7 @@ export const Products = () => {
                       </TableCell>
                       <TableCell>
                         <Chip
-                          label={product.category.name}
+                          label={product.category?.name || "N/A"}
                           size="small"
                           variant="outlined"
                         />
@@ -345,20 +369,18 @@ export const Products = () => {
                       </TableCell>
                       <TableCell>
                         <Box
-                          sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                          }}
                         >
-                          <Badge
-                            badgeContent={stockStatus.icon}
-                            color={stockStatus.color}
-                            sx={{ "& .MuiBadge-badge": { right: -3, top: 13 } }}
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, color: `${stockStatus.color}.main` }}
                           >
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600 }}
-                            >
-                              {product.stock}
-                            </Typography>
-                          </Badge>
+                            {product.stock}
+                          </Typography>
                           <Typography variant="caption" color="text.secondary">
                             / {product.min_stock} mín
                           </Typography>
@@ -369,6 +391,7 @@ export const Products = () => {
                           label={stockStatus.label}
                           size="small"
                           color={stockStatus.color}
+                          icon={stockStatus.icon}
                         />
                       </TableCell>
                       <TableCell>
@@ -545,18 +568,32 @@ export const Products = () => {
               </FormControl>
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="URL de Imagen"
-                value={formData.image_url}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    image_url: e.target.value,
-                  }))
-                }
-                placeholder="https://ejemplo.com/imagen.jpg"
-              />
+              <Box
+                sx={{
+                  border: "1px dashed grey",
+                  borderRadius: 1,
+                  p: 2,
+                  textAlign: "center",
+                }}
+              >
+                <Button
+                  component="label"
+                  variant="outlined"
+                  startIcon={<CloudUploadIcon />}
+                >
+                  Subir Imagen
+                  <input type="file" hidden onChange={handleFileChange} />
+                </Button>
+                {imagePreview && (
+                  <Box sx={{ mt: 2 }}>
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      style={{ width: "100px", height: "100px" }}
+                    />
+                  </Box>
+                )}
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

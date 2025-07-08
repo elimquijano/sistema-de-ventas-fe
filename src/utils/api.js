@@ -174,20 +174,45 @@ export const businessAPI = {
 };
 
 export const productsAPI = {
-  getAll: (params = {}) => api.get('/products', { params }),
+  getAll: (params = {}) => api.get("/products", { params }),
   getById: (id) => api.get(`/products/${id}`),
-  create: (productData) => api.post('/products', productData),
-  update: (id, productData) => api.put(`/products/${id}`, productData),
+  create: (productData) =>
+    api.post("/products", productData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+  update: (id, productData) => {
+    // FormData should be sent with a POST request, but we can spoof the method
+    productData.append("_method", "PUT");
+    return api.post(`/products/${id}`, productData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
   delete: (id) => api.delete(`/products/${id}`),
   updateStock: (id, stock) => api.patch(`/products/${id}/stock`, { stock }),
-  getLowStock: () => api.get('/products/low-stock'),
+  getLowStock: () => api.get("/products/low-stock"),
 };
 
 export const servicesAPI = {
-  getAll: (params = {}) => api.get('/services', { params }),
+  getAll: (params = {}) => api.get("/services", { params }),
   getById: (id) => api.get(`/services/${id}`),
-  create: (serviceData) => api.post('/services', serviceData),
-  update: (id, serviceData) => api.put(`/services/${id}`, serviceData),
+  create: (serviceData) =>
+    api.post("/services", serviceData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+  update: (id, serviceData) => {
+    serviceData.append("_method", "PUT");
+    return api.post(`/services/${id}`, serviceData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+  },
   delete: (id) => api.delete(`/services/${id}`),
 };
 

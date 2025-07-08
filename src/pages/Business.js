@@ -37,13 +37,14 @@ import {
   Store as StoreIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import { businessAPI } from "../utils/api";
+import { businessAPI, usersAPI } from "../utils/api";
 import { formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 
 export const Business = () => {
   const { hasPermission, user } = useAuth();
   const [businesses, setBusinesses] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
@@ -57,10 +58,12 @@ export const Business = () => {
     tax_id: "",
     currency: "PEN",
     status: "active",
+    user_id: "",
   });
 
   useEffect(() => {
     loadBusinesses();
+    loadUsers();
   }, []);
 
   const loadBusinesses = async () => {
@@ -80,6 +83,15 @@ export const Business = () => {
     }
   };
 
+  const loadUsers = async () => {
+    try {
+      const response = await usersAPI.getAll();
+      setUsers(response.data.data || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+    }
+  };
+
   const handleOpenDialog = (business) => {
     if (business) {
       setEditingBusiness(business);
@@ -92,6 +104,7 @@ export const Business = () => {
         tax_id: business.tax_id,
         currency: business.currency,
         status: business.status,
+        user_id: business.user_id || "",
       });
     } else {
       setEditingBusiness(null);
@@ -104,6 +117,7 @@ export const Business = () => {
         tax_id: "",
         currency: "PEN",
         status: "active",
+        user_id: "",
       });
     }
     setOpenDialog(true);
@@ -444,6 +458,32 @@ export const Business = () => {
                 </Select>
               </FormControl>
             </Grid>
+            {hasPermission("negocios.create") && (
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Propietario</InputLabel>
+                  <Select
+                    value={formData.user_id}
+                    label="Propietario"
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        user_id: e.target.value,
+                      }))
+                    }
+                  >
+                    <MenuItem value="">
+                      <em>Ninguno</em>
+                    </MenuItem>
+                    {users.map((user) => (
+                      <MenuItem key={user.id} value={user.id}>
+                        {user.first_name} {user.last_name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>

@@ -37,7 +37,7 @@ import {
   Visibility as ViewIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import { usersAPI, rolesAPI } from "../utils/api";
+import { usersAPI, rolesAPI, businessAPI } from "../utils/api";
 import { formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 
@@ -45,6 +45,7 @@ export const Users = () => {
   const { hasPermission } = useAuth();
   const [users, setUsers] = useState([]);
   const [roles, setRoles] = useState([]);
+  const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
@@ -58,11 +59,13 @@ export const Users = () => {
     password: "",
     status: "active",
     role_ids: [],
+    business_id: "",
   });
 
   useEffect(() => {
     loadUsers();
     loadRoles();
+    loadBusinesses();
   }, [page, searchFilters]);
 
   const loadUsers = async () => {
@@ -93,6 +96,15 @@ export const Users = () => {
     }
   };
 
+  const loadBusinesses = async () => {
+    try {
+      const response = await businessAPI.getAll();
+      setBusinesses(response.data.data || []);
+    } catch (error) {
+      console.error("Error loading businesses:", error);
+    }
+  };
+
   const handleChangeFilter = (event) => {
     const { name, value } = event.target;
 
@@ -102,7 +114,6 @@ export const Users = () => {
         return newFilters;
       }
 
-      // Si no es vacío, devuelve el estado actualizado
       return { ...prevFilters, [name]: value };
     });
   };
@@ -117,6 +128,7 @@ export const Users = () => {
         password: "",
         status: user.status,
         role_ids: user.roles?.map((role) => role.id) || [],
+        business_id: user.business_id || "",
       });
     } else {
       setEditingUser(null);
@@ -127,6 +139,7 @@ export const Users = () => {
         password: "",
         status: "active",
         role_ids: [],
+        business_id: "",
       });
     }
     setOpenDialog(true);
@@ -172,7 +185,6 @@ export const Users = () => {
       "¿Estás seguro?",
       "Esta acción no se puede deshacer.",
       {
-        // Opciones personalizadas
         confirmButtonText: "Sí, eliminar",
         icon: "warning",
       }
@@ -534,6 +546,32 @@ export const Users = () => {
                 </Select>
               </FormControl>
             </Grid>
+            {hasPermission("users.create") && (
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Negocio</InputLabel>
+                  <Select
+                    value={formData.business_id}
+                    label="Negocio"
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        business_id: e.target.value,
+                      }))
+                    }
+                  >
+                    <MenuItem value="">
+                      <em>Ninguno</em>
+                    </MenuItem>
+                    {businesses.map((business) => (
+                      <MenuItem key={business.id} value={business.id}>
+                        {business.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
           </Grid>
         </DialogContent>
         <DialogActions>

@@ -7,6 +7,7 @@ import {
   Typography,
   Button,
   IconButton,
+  Drawer,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -18,7 +19,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction,
   Badge,
   FormControl,
   InputLabel,
@@ -28,11 +28,11 @@ import {
   Tabs,
   useTheme,
   Paper,
-  Fab,
   Slide,
   AppBar,
   Toolbar,
   Container,
+  useMediaQuery,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -90,18 +90,19 @@ export const PointOfSale = () => {
   const [services, setServices] = useState([]);
   const [cart, setCart] = useState([]);
   const [cashRegister, setCashRegister] = useState(null);
-  
   const [currency, setCurrency] = useState("PEN");
-  
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
-  const [paymentType, setPaymentType] = useState("paid"); // "paid" o "credit"
+  const [paymentType, setPaymentType] = useState("paid");
   const [customerName, setCustomerName] = useState("");
   const [openReportsDialog, setOpenReportsDialog] = useState(false);
   const [reportType, setReportType] = useState("sales");
   const [openInitCashDialog, setOpenInitCashDialog] = useState(false);
   const [initCashAmount, setInitCashAmount] = useState("");
   const [reportData, setReportData] = useState(null);
+  const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Mantener todas las funciones originales sin cambios
   useEffect(() => {
     loadProducts();
     loadServices();
@@ -151,13 +152,9 @@ export const PointOfSale = () => {
     try {
       const amount = parseFloat(initCashAmount) || 0;
       await cashRegisterAPI.create({ initial_amount: amount, currency });
-
-      // Recargar estado de la caja desde el backend
       checkCashRegisterStatus();
-
       setOpenInitCashDialog(false);
       setInitCashAmount("");
-
       notificationSwal(
         "Caja Abierta",
         `Caja inicializada con ${formatCurrency(amount, currency)}`,
@@ -175,19 +172,15 @@ export const PointOfSale = () => {
 
   const handleOpenReports = async () => {
     if (!cashRegister) return;
-
     try {
       const response = await cashRegisterAPI.getReport(cashRegister.id);
       const report = response.data;
-
       const sales = report.sales || [];
       const totalSales = sales.length;
       const cashSalesAmount = sales
         .filter((s) => s.payment_method === "cash")
         .reduce((sum, s) => sum + parseFloat(s.total_amount), 0);
-
       const expectedCash = parseFloat(report.expected_amount);
-
       const productSummary = sales
         .flatMap((s) => s.items)
         .filter((i) => i.item_type.includes("Product"))
@@ -199,18 +192,16 @@ export const PointOfSale = () => {
           }
           return summary;
         }, {});
-
       setReportData({
         ...report,
         sales,
         totalSales,
         cashSalesAmount,
         expectedCash: report.expected_amount,
-        total_in_cash: report.report_current_cash, // Usar el nuevo campo calculado
-        reportDifference: report.report_difference, // Nuevo campo
+        total_in_cash: report.report_current_cash,
+        reportDifference: report.report_difference,
         productSummary: Object.values(productSummary),
       });
-
       setOpenReportsDialog(true);
     } catch (error) {
       console.error("Error loading report:", error);
@@ -227,11 +218,10 @@ export const PointOfSale = () => {
       `¿Desea cerrar la caja registradora?`,
       { confirmButtonText: "Cerrar Caja", icon: "warning" }
     );
-
     if (confirmed) {
       try {
         await cashRegisterAPI.close(cashRegister.id, {
-          final_amount: cashRegister.total_in_cash, // Usar el total calculado por el backend
+          final_amount: cashRegister.total_in_cash,
         });
         setCashRegister(null);
         setCart([]);
@@ -260,7 +250,6 @@ export const PointOfSale = () => {
       );
       return;
     }
-
     if (itemToAdd.type === "product" && itemToAdd.stock <= 0) {
       notificationSwal(
         "Sin Stock",
@@ -269,12 +258,10 @@ export const PointOfSale = () => {
       );
       return;
     }
-
     setCart((prevCart) => {
       const existingItem = prevCart.find(
         (item) => item.id === itemToAdd.id && item.type === itemToAdd.type
       );
-
       if (existingItem) {
         return prevCart.map((item) =>
           item.id === itemToAdd.id && item.type === itemToAdd.type
@@ -296,7 +283,6 @@ export const PointOfSale = () => {
       handleRemoveFromCart(itemId, type);
       return;
     }
-
     setCart(
       cart.map((item) =>
         item.id === itemId && item.type === type
@@ -331,7 +317,6 @@ export const PointOfSale = () => {
 
   const handleCompleteSale = async () => {
     const total = getTotalAmount();
-
     if (paymentType === "credit" && !customerName.trim()) {
       notificationSwal(
         "Datos Incompletos",
@@ -340,7 +325,6 @@ export const PointOfSale = () => {
       );
       return;
     }
-
     const saleData = {
       items: cart.map((item) => ({
         id: item.id,
@@ -353,10 +337,8 @@ export const PointOfSale = () => {
       customer_name:
         paymentType === "credit" ? customerName : "Cliente General",
     };
-
     try {
       await salesAPI.create(saleData);
-
       notificationSwal(
         "Venta Completada",
         paymentType === "paid"
@@ -364,13 +346,10 @@ export const PointOfSale = () => {
           : `Venta a crédito registrada para ${customerName}`,
         "success"
       );
-
       setCart([]);
       setOpenPaymentDialog(false);
       setCustomerName("");
       setPaymentType("paid");
-
-      // Recargar estado de la caja y productos desde el backend
       checkCashRegisterStatus();
       loadProducts();
     } catch (error) {
@@ -387,13 +366,11 @@ export const PointOfSale = () => {
             sx={{
               cursor: "pointer",
               height: 200,
-              transition: "all 0.3s ease",
               "&:hover": {
-                transform: "scale(1.05)",
                 boxShadow: 6,
               },
               "&:active": {
-                transform: "scale(0.95)",
+                transform: "scale(0.98)",
               },
               opacity: item.type === "product" && item.stock <= 0 ? 0.5 : 1,
               position: "relative",
@@ -409,7 +386,6 @@ export const PointOfSale = () => {
                 flexDirection: "column",
               }}
             >
-              {/* Stock Badge */}
               {item.type === "product" && (
                 <Chip
                   label={`Stock: ${item.stock}`}
@@ -425,8 +401,6 @@ export const PointOfSale = () => {
                   }}
                 />
               )}
-
-              {/* Image */}
               <Box
                 sx={{
                   flex: 1,
@@ -453,8 +427,6 @@ export const PointOfSale = () => {
                   </Avatar>
                 )}
               </Box>
-
-              {/* Product Info */}
               <Box sx={{ textAlign: "center" }}>
                 <Typography
                   variant="body2"
@@ -482,8 +454,6 @@ export const PointOfSale = () => {
                   {formatCurrency(item.price, currency)}
                 </Typography>
               </Box>
-
-              {/* Out of Stock Overlay */}
               {item.type === "product" && item.stock <= 0 && (
                 <Box
                   sx={{
@@ -510,8 +480,6 @@ export const PointOfSale = () => {
     </Grid>
   );
 
-  
-
   return (
     <Box
       sx={{
@@ -521,311 +489,647 @@ export const PointOfSale = () => {
         bgcolor: "background.default",
       }}
     >
-      {/* Header */}
-      <AppBar position="static" sx={{ bgcolor: "primary.main" }}>
+      {/* AppBar - Versión para PC y móvil */}
+      <AppBar position="static" sx={{ bgcolor: "primary.main", padding: 1 }}>
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-            Punto de Venta
-          </Typography>
-
-          <Chip
-            label={cashRegister ? "Caja Abierta" : "Caja Cerrada"}
-            color={cashRegister ? "success" : "error"}
-            icon={<CashRegisterIcon />}
-            sx={{ mr: 2, color: "white", fontWeight: 600 }}
-          />
-
-          {cashRegister && (
-            <Chip
-              label={`${formatCurrency(cashRegister.total_in_cash, currency)}`}
-              color="info"
-              icon={<MoneyIcon />}
-              sx={{ mr: 2, color: "white", fontWeight: 600 }}
-            />
+          {!isMobile && (
+            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
+              Punto de Venta
+            </Typography>
           )}
 
-          {!cashRegister ? (
-            <Button
-              variant="contained"
-              startIcon={<CashRegisterIcon />}
-              onClick={handleOpenCashRegister}
-              sx={{
-                bgcolor: "success.main",
-                "&:hover": { bgcolor: "success.dark" },
-                fontWeight: 600,
-              }}
+          {/* Versión para móvil */}
+          {isMobile ? (
+            <Grid
+              container
+              spacing={1}
+              justifyContent="center"
+              alignItems="center"
             >
-              Abrir Caja
-            </Button>
+              <Grid item xs={12} sm="auto">
+                <Grid container spacing={1} justifyContent="center">
+                  <Grid item>
+                    {!cashRegister ? (
+                      <Button
+                        variant="contained"
+                        startIcon={<CashRegisterIcon />}
+                        onClick={handleOpenCashRegister}
+                        sx={{
+                          bgcolor: "success.main",
+                          "&:hover": { bgcolor: "success.dark" },
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Abrir Caja
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="outlined"
+                          startIcon={<AssessmentIcon />}
+                          onClick={handleOpenReports}
+                          sx={{
+                            color: "white",
+                            borderColor: "white",
+                            "&:hover": {
+                              borderColor: "white",
+                              bgcolor: "rgba(255,255,255,0.1)",
+                            },
+                            fontWeight: 600,
+                            mr: 1,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Reportes
+                        </Button>
+                        <Button
+                          variant="contained"
+                          startIcon={<CashRegisterIcon />}
+                          onClick={handleCloseCashRegister}
+                          sx={{
+                            bgcolor: "error.main",
+                            "&:hover": { bgcolor: "error.dark" },
+                            fontWeight: 600,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          Cerrar Caja
+                        </Button>
+                      </>
+                    )}
+                  </Grid>
+                </Grid>
+              </Grid>
+              <Grid item xs={12} sm="auto">
+                <Grid container spacing={1} justifyContent="center">
+                  <Grid item>
+                    <Chip
+                      label={cashRegister ? "Caja Abierta" : "Caja Cerrada"}
+                      color={cashRegister ? "success" : "error"}
+                      icon={<CashRegisterIcon />}
+                      sx={{ color: "white", fontWeight: 600 }}
+                    />
+                  </Grid>
+                  {cashRegister && (
+                    <Grid item>
+                      <Chip
+                        label={`${formatCurrency(
+                          cashRegister.total_in_cash,
+                          currency
+                        )}`}
+                        color="info"
+                        icon={<MoneyIcon />}
+                        sx={{ color: "white", fontWeight: 600 }}
+                      />
+                    </Grid>
+                  )}
+                  <Grid item>
+                    <IconButton
+                      color="inherit"
+                      onClick={() => setCartDrawerOpen(true)}
+                    >
+                      <Badge badgeContent={getTotalItems()} color="error">
+                        <ShoppingCartIcon />
+                      </Badge>
+                    </IconButton>
+                  </Grid>
+                </Grid>
+              </Grid>
+            </Grid>
           ) : (
+            // Versión original para PC
             <>
-              <Button
-                variant="outlined"
-                startIcon={<AssessmentIcon />}
-                onClick={handleOpenReports}
-                sx={{
-                  mr: 1,
-                  color: "white",
-                  borderColor: "white",
-                  "&:hover": {
-                    borderColor: "white",
-                    bgcolor: "rgba(255,255,255,0.1)",
-                  },
-                }}
-              >
-                Reportes
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<CashRegisterIcon />}
-                onClick={handleCloseCashRegister}
-                sx={{
-                  bgcolor: "error.main",
-                  "&:hover": { bgcolor: "error.dark" },
-                }}
-              >
-                Cerrar Caja
-              </Button>
+              <Chip
+                label={cashRegister ? "Caja Abierta" : "Caja Cerrada"}
+                color={cashRegister ? "success" : "error"}
+                icon={<CashRegisterIcon />}
+                sx={{ mr: 2, color: "white", fontWeight: 600 }}
+              />
+              {cashRegister && (
+                <Chip
+                  label={`${formatCurrency(
+                    cashRegister.total_in_cash,
+                    currency
+                  )}`}
+                  color="info"
+                  icon={<MoneyIcon />}
+                  sx={{ mr: 2, color: "white", fontWeight: 600 }}
+                />
+              )}
+              {!cashRegister ? (
+                <Button
+                  variant="contained"
+                  startIcon={<CashRegisterIcon />}
+                  onClick={handleOpenCashRegister}
+                  sx={{
+                    bgcolor: "success.main",
+                    "&:hover": { bgcolor: "success.dark" },
+                    fontWeight: 600,
+                  }}
+                >
+                  Abrir Caja
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    variant="outlined"
+                    startIcon={<AssessmentIcon />}
+                    onClick={handleOpenReports}
+                    sx={{
+                      mr: 1,
+                      color: "white",
+                      borderColor: "white",
+                      "&:hover": {
+                        borderColor: "white",
+                        bgcolor: "rgba(255,255,255,0.1)",
+                      },
+                    }}
+                  >
+                    Reportes
+                  </Button>
+                  <Button
+                    variant="contained"
+                    startIcon={<CashRegisterIcon />}
+                    onClick={handleCloseCashRegister}
+                    sx={{
+                      bgcolor: "error.main",
+                      "&:hover": { bgcolor: "error.dark" },
+                    }}
+                  >
+                    Cerrar Caja
+                  </Button>
+                </>
+              )}
             </>
           )}
         </Toolbar>
       </AppBar>
 
-      <Container maxWidth="xl" sx={{ flex: 1, display: "flex", py: 2 }}>
-        <Grid container spacing={2} sx={{ height: "100%" }}>
-          {/* Products/Services Panel */}
-          <Grid item xs={12} md={8}>
-            <Card
-              sx={{ height: "100%", display: "flex", flexDirection: "column" }}
-            >
-              <Tabs
-                value={tabValue}
-                onChange={(e, newValue) => setTabValue(newValue)}
+      {/* Contenido principal - Versión para PC y móvil */}
+      {!isMobile ? (
+        // Versión original para PC
+        <Container maxWidth="xl" sx={{ flex: 1, display: "flex", py: 2 }}>
+          <Grid container spacing={2} sx={{ height: "100%" }}>
+            {/* Products/Services Panel */}
+            <Grid item xs={12} md={8}>
+              <Card
                 sx={{
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  "& .MuiTab-root": {
-                    fontSize: "1.1rem",
-                    fontWeight: 600,
-                    minHeight: 60,
-                  },
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
                 }}
               >
-                <Tab label={`Productos (${products.length})`} />
-                <Tab label={`Servicios (${services.length})`} />
-              </Tabs>
-
-              <Box sx={{ flex: 1, overflow: "auto" }}>
-                <TabPanel value={tabValue} index={0}>
-                  {renderProductGrid(products, "product")}
-                </TabPanel>
-
-                <TabPanel value={tabValue} index={1}>
-                  {renderProductGrid(services, "service")}
-                </TabPanel>
-              </Box>
-            </Card>
-          </Grid>
-
-          {/* Shopping Cart */}
-          <Grid item xs={12} md={4}>
-            <Card
-              sx={{ height: "100%", display: "flex", flexDirection: "column" }}
-            >
-              <CardContent sx={{ pb: 1 }}>
-                <Box
+                <Tabs
+                  value={tabValue}
+                  onChange={(e, newValue) => setTabValue(newValue)}
                   sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 2,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    "& .MuiTab-root": {
+                      fontSize: "1.1rem",
+                      fontWeight: 600,
+                      minHeight: 60,
+                    },
                   }}
                 >
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                    Carrito de Compras
-                  </Typography>
-                  <Badge
-                    badgeContent={getTotalItems()}
-                    color="primary"
-                    max={99}
-                  >
-                    <ShoppingCartIcon sx={{ fontSize: 28 }} />
-                  </Badge>
+                  <Tab label={`Productos (${products.length})`} />
+                  <Tab label={`Servicios (${services.length})`} />
+                </Tabs>
+                <Box sx={{ flex: 1, overflow: "auto" }}>
+                  <TabPanel value={tabValue} index={0}>
+                    {renderProductGrid(products, "product")}
+                  </TabPanel>
+                  <TabPanel value={tabValue} index={1}>
+                    {renderProductGrid(services, "service")}
+                  </TabPanel>
                 </Box>
-              </CardContent>
+              </Card>
+            </Grid>
 
-              <Divider />
-
-              <Box sx={{ flex: 1, overflow: "auto", px: 2 }}>
-                {cart.length === 0 ? (
-                  <Box sx={{ textAlign: "center", py: 6 }}>
-                    <ShoppingCartIcon
-                      sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
-                    />
-                    <Typography variant="h6" color="text.secondary">
-                      Carrito vacío
+            {/* Shopping Cart - Solo para PC */}
+            <Grid item xs={12} md={4}>
+              <Card
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <CardContent sx={{ pb: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                      Carrito de Compras
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Selecciona productos para agregar
-                    </Typography>
+                    <Badge
+                      badgeContent={getTotalItems()}
+                      color="primary"
+                      max={99}
+                    >
+                      <ShoppingCartIcon sx={{ fontSize: 28 }} />
+                    </Badge>
                   </Box>
-                ) : (
-                  <List sx={{ py: 1 }}>
-                    {cart.map((item, index) => (
-                      <ListItem
-                        key={`${item.type}-${item.id}-${index}`}
-                        sx={{ px: 0, py: 1 }}
-                      >
-                        <Box sx={{ width: "100%" }}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "flex-start",
-                              mb: 1,
-                            }}
-                          >
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 600, flex: 1 }}
-                            >
-                              {item.name}
-                            </Typography>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() =>
-                                handleRemoveFromCart(item.id, item.type)
-                              }
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Box>
-
-                          <Box
-                            sx={{
-                              display: "flex",
-                              justifyContent: "space-between",
-                              alignItems: "center",
-                            }}
-                          >
+                </CardContent>
+                <Divider />
+                <Box sx={{ flex: 1, overflow: "auto", px: 2 }}>
+                  {cart.length === 0 ? (
+                    <Box sx={{ textAlign: "center", py: 6 }}>
+                      <ShoppingCartIcon
+                        sx={{ fontSize: 64, color: "text.secondary", mb: 2 }}
+                      />
+                      <Typography variant="h6" color="text.secondary">
+                        Carrito vacío
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        Selecciona productos para agregar
+                      </Typography>
+                    </Box>
+                  ) : (
+                    <List sx={{ py: 1 }}>
+                      {cart.map((item, index) => (
+                        <ListItem
+                          key={`${item.type}-${item.id}-${index}`}
+                          sx={{ px: 0, py: 1 }}
+                        >
+                          <Box sx={{ width: "100%" }}>
                             <Box
                               sx={{
                                 display: "flex",
-                                alignItems: "center",
-                                gap: 1,
+                                justifyContent: "space-between",
+                                alignItems: "flex-start",
+                                mb: 1,
                               }}
                             >
-                              <IconButton
-                                size="small"
-                                onClick={() =>
-                                  handleUpdateQuantity(
-                                    item.id,
-                                    item.type,
-                                    item.quantity - 1
-                                  )
-                                }
-                                disabled={item.quantity <= 1}
-                              >
-                                <RemoveIcon />
-                              </IconButton>
                               <Typography
                                 variant="body2"
-                                sx={{
-                                  minWidth: 30,
-                                  textAlign: "center",
-                                  fontWeight: 600,
-                                }}
+                                sx={{ fontWeight: 600, flex: 1 }}
                               >
-                                {item.quantity}
+                                {item.name}
                               </Typography>
                               <IconButton
                                 size="small"
+                                color="error"
                                 onClick={() =>
-                                  handleUpdateQuantity(
-                                    item.id,
-                                    item.type,
-                                    item.quantity + 1
-                                  )
+                                  handleRemoveFromCart(item.id, item.type)
                                 }
                               >
-                                <AddIcon />
+                                <DeleteIcon fontSize="small" />
                               </IconButton>
                             </Box>
-
-                            <Typography
-                              variant="body2"
-                              sx={{ fontWeight: 700 }}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}
                             >
-                              {formatCurrency(
-                                item.price * item.quantity,
-                                currency
-                              )}
-                            </Typography>
+                              <Box
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                }}
+                              >
+                                <IconButton
+                                  size="small"
+                                  onClick={() =>
+                                    handleUpdateQuantity(
+                                      item.id,
+                                      item.type,
+                                      item.quantity - 1
+                                    )
+                                  }
+                                  disabled={item.quantity <= 1}
+                                >
+                                  <RemoveIcon />
+                                </IconButton>
+                                <Typography
+                                  variant="body2"
+                                  sx={{
+                                    minWidth: 30,
+                                    textAlign: "center",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {item.quantity}
+                                </Typography>
+                                <IconButton
+                                  size="small"
+                                  onClick={() =>
+                                    handleUpdateQuantity(
+                                      item.id,
+                                      item.type,
+                                      item.quantity + 1
+                                    )
+                                  }
+                                >
+                                  <AddIcon />
+                                </IconButton>
+                              </Box>
+                              <Typography
+                                variant="body2"
+                                sx={{ fontWeight: 700 }}
+                              >
+                                {formatCurrency(
+                                  item.price * item.quantity,
+                                  currency
+                                )}
+                              </Typography>
+                            </Box>
                           </Box>
-                        </Box>
-                      </ListItem>
-                    ))}
-                  </List>
-                )}
-              </Box>
-
-              <Divider />
-
-              <CardContent>
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    mb: 3,
-                  }}
-                >
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                    Total:
-                  </Typography>
-                  <Typography
-                    variant="h5"
-                    sx={{ fontWeight: 900, color: "primary.main" }}
-                  >
-                    {formatCurrency(getTotalAmount(), currency)}
-                  </Typography>
+                        </ListItem>
+                      ))}
+                    </List>
+                  )}
                 </Box>
-
-                <Box sx={{ display: "flex", gap: 1 }}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    startIcon={<ClearIcon />}
-                    onClick={() => setCart([])}
-                    disabled={cart.length === 0}
-                    sx={{ height: 56 }}
-                  >
-                    Limpiar
-                  </Button>
-                  <Button
-                    fullWidth
-                    variant="contained"
-                    startIcon={<PaymentIcon />}
-                    onClick={handleProcessSale}
-                    disabled={cart.length === 0 || !cashRegister}
+                <Divider />
+                <CardContent>
+                  <Box
                     sx={{
-                      height: 56,
-                      fontSize: "1.1rem",
-                      fontWeight: 700,
-                      background:
-                        "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      mb: 3,
                     }}
                   >
-                    Cobrar
-                  </Button>
-                </Box>
-              </CardContent>
-            </Card>
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      Total:
+                    </Typography>
+                    <Typography
+                      variant="h5"
+                      sx={{ fontWeight: 900, color: "primary.main" }}
+                    >
+                      {formatCurrency(getTotalAmount(), currency)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<ClearIcon />}
+                      onClick={() => setCart([])}
+                      disabled={cart.length === 0}
+                      sx={{ height: 56 }}
+                    >
+                      Limpiar
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={<PaymentIcon />}
+                      onClick={handleProcessSale}
+                      disabled={cart.length === 0 || !cashRegister}
+                      sx={{
+                        height: 56,
+                        fontSize: "1.1rem",
+                        fontWeight: 700,
+                        background:
+                          "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
+                      }}
+                    >
+                      Cobrar
+                    </Button>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
-      </Container>
+        </Container>
+      ) : (
+        // Versión para móvil
+        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", p: 1 }}>
+          {/* Tabs para productos/servicios */}
+          <Card
+            sx={{ flex: 1, display: "flex", flexDirection: "column", mb: 1 }}
+          >
+            <Tabs
+              value={tabValue}
+              onChange={(e, newValue) => setTabValue(newValue)}
+              variant="fullWidth"
+              sx={{
+                "& .MuiTab-root": {
+                  fontSize: "0.9rem",
+                  fontWeight: 600,
+                },
+              }}
+            >
+              <Tab label={`Productos (${products.length})`} />
+              <Tab label={`Servicios (${services.length})`} />
+            </Tabs>
+            <Box sx={{ flex: 1, overflow: "auto" }}>
+              <TabPanel value={tabValue} index={0}>
+                {renderProductGrid(products, "product")}
+              </TabPanel>
+              <TabPanel value={tabValue} index={1}>
+                {renderProductGrid(services, "service")}
+              </TabPanel>
+            </Box>
+          </Card>
+        </Box>
+      )}
 
-      {/* Initialize Cash Dialog */}
+      {/* Drawer del carrito - Solo para móvil */}
+      {isMobile && (
+        <Drawer
+          anchor="right"
+          open={cartDrawerOpen}
+          onClose={() => setCartDrawerOpen(false)}
+          sx={{
+            "& .MuiDrawer-paper": {
+              width: "80%",
+              maxWidth: 400,
+            },
+          }}
+        >
+          <Box
+            sx={{
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              p: 1,
+            }}
+          >
+            <Box
+              sx={{
+                p: 1,
+                borderBottom: 1,
+                borderColor: "divider",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Carrito ({getTotalItems()})
+              </Typography>
+              <IconButton onClick={() => setCartDrawerOpen(false)}>
+                <CloseIcon />
+              </IconButton>
+            </Box>
+
+            <Box sx={{ flex: 1, overflow: "auto", p: 1 }}>
+              {cart.length === 0 ? (
+                <Box sx={{ textAlign: "center", py: 4 }}>
+                  <ShoppingCartIcon
+                    sx={{ fontSize: 48, color: "text.secondary", mb: 1 }}
+                  />
+                  <Typography variant="body1" color="text.secondary">
+                    Carrito vacío
+                  </Typography>
+                </Box>
+              ) : (
+                <List sx={{ py: 0 }}>
+                  {cart.map((item, index) => (
+                    <ListItem
+                      key={`${item.type}-${item.id}-${index}`}
+                      sx={{ px: 0, py: 0.5 }}
+                    >
+                      <Box sx={{ width: "100%" }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 600, flex: 1 }}
+                          >
+                            {item.name}
+                          </Typography>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() =>
+                              handleRemoveFromCart(item.id, item.type)
+                            }
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Box>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                handleUpdateQuantity(
+                                  item.id,
+                                  item.type,
+                                  item.quantity - 1
+                                )
+                              }
+                              disabled={item.quantity <= 1}
+                            >
+                              <RemoveIcon fontSize="small" />
+                            </IconButton>
+                            <Typography
+                              variant="body2"
+                              sx={{ minWidth: 20, textAlign: "center" }}
+                            >
+                              {item.quantity}
+                            </Typography>
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                handleUpdateQuantity(
+                                  item.id,
+                                  item.type,
+                                  item.quantity + 1
+                                )
+                              }
+                            >
+                              <AddIcon fontSize="small" />
+                            </IconButton>
+                          </Box>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {formatCurrency(
+                              item.price * item.quantity,
+                              currency
+                            )}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </Box>
+
+            {cart.length > 0 && (
+              <>
+                <Divider />
+                <Box sx={{ p: 1 }}>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      mb: 1,
+                    }}
+                  >
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                      Total:
+                    </Typography>
+                    <Typography
+                      variant="subtitle1"
+                      sx={{ fontWeight: 900, color: "primary.main" }}
+                    >
+                      {formatCurrency(getTotalAmount(), currency)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: "flex", gap: 1 }}>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      size="small"
+                      startIcon={<ClearIcon />}
+                      onClick={() => setCart([])}
+                    >
+                      Limpiar
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      size="small"
+                      startIcon={<PaymentIcon />}
+                      onClick={() => {
+                        setCartDrawerOpen(false);
+                        handleProcessSale();
+                      }}
+                      sx={{
+                        background:
+                          "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
+                      }}
+                    >
+                      Cobrar
+                    </Button>
+                  </Box>
+                </Box>
+              </>
+            )}
+          </Box>
+        </Drawer>
+      )}
+
+      {/* Diálogos - Mantener los originales */}
       <Dialog
         open={openInitCashDialog}
         onClose={() => setOpenInitCashDialog(false)}
@@ -891,9 +1195,6 @@ export const PointOfSale = () => {
         </DialogActions>
       </Dialog>
 
-      
-
-      {/* Payment Dialog */}
       <Dialog
         open={openPaymentDialog}
         onClose={() => setOpenPaymentDialog(false)}
@@ -923,11 +1224,9 @@ export const PointOfSale = () => {
               </Typography>
               <Typography variant="body1">Total a Procesar</Typography>
             </Paper>
-
             <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
               Tipo de Pago:
             </Typography>
-
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid item xs={6}>
                 <Button
@@ -965,7 +1264,6 @@ export const PointOfSale = () => {
                 </Button>
               </Grid>
             </Grid>
-
             {paymentType === "credit" && (
               <TextField
                 fullWidth
@@ -999,7 +1297,6 @@ export const PointOfSale = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Reports Dialog */}
       <Dialog
         open={openReportsDialog}
         onClose={() => setOpenReportsDialog(false)}
@@ -1118,7 +1415,9 @@ export const PointOfSale = () => {
                           <ListItemText
                             primary={`${sale.sale_number} - ${sale.customer_name}`}
                             secondary={`${sale.items.length} productos - ${
-                              sale.payment_method === "cash" ? "Pagado" : "Por cobrar"
+                              sale.payment_method === "cash"
+                                ? "Pagado"
+                                : "Por cobrar"
                             }`}
                           />
                           <Typography variant="h6" sx={{ fontWeight: 700 }}>

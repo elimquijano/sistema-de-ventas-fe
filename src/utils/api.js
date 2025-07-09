@@ -251,7 +251,7 @@ export const loansAPI = {
   create: (loanData) => api.post('/loans', loanData),
   update: (id, loanData) => api.put(`/loans/${id}`, loanData),
   delete: (id) => api.delete(`/loans/${id}`),
-  markAsReturned: (id, returnData) => api.post(`/loans/${id}/return`, returnData),
+  addPayment: (id, paymentData) => api.post(`/loans/${id}/payment`, paymentData),
   getPending: () => api.get('/loans/pending'),
 };
 

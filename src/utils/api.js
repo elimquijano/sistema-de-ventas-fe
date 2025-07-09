@@ -222,7 +222,7 @@ export const salesAPI = {
   create: (saleData) => api.post('/sales', saleData),
   update: (id, saleData) => api.put(`/sales/${id}`, saleData),
   delete: (id) => api.delete(`/sales/${id}`),
-  getDailySales: (date) => api.get(`/sales/daily/${date}`),
+  getDaily: (date) => api.get(`/sales/daily?date=${date}`),
   getMonthlySales: (month, year) => api.get(`/sales/monthly/${year}/${month}`),
 };
 

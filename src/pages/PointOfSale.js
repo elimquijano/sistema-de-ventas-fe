@@ -89,13 +89,10 @@ export const PointOfSale = () => {
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [cart, setCart] = useState([]);
-  const [cashRegisterOpen, setCashRegisterOpen] = useState(false);
-  const [initialAmount, setInitialAmount] = useState(0);
-  const [currentCash, setCurrentCash] = useState(0);
+  const [cashRegister, setCashRegister] = useState(null);
+  
   const [currency, setCurrency] = useState("PEN");
-  const [openQuantityDialog, setOpenQuantityDialog] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [quantity, setQuantity] = useState(1);
+  
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [paymentType, setPaymentType] = useState("paid"); // "paid" o "credit"
   const [customerName, setCustomerName] = useState("");
@@ -103,13 +100,7 @@ export const PointOfSale = () => {
   const [reportType, setReportType] = useState("sales");
   const [openInitCashDialog, setOpenInitCashDialog] = useState(false);
   const [initCashAmount, setInitCashAmount] = useState("");
-  const [dailySales, setDailySales] = useState([]);
-  const [salesSummary, setSalesSummary] = useState({
-    totalSales: 0,
-    totalAmount: 0,
-    cashSales: 0,
-    creditSales: 0,
-  });
+  const [reportData, setReportData] = useState(null);
 
   useEffect(() => {
     loadProducts();
@@ -121,14 +112,13 @@ export const PointOfSale = () => {
     try {
       const response = await cashRegisterAPI.getCurrent();
       if (response.data.success) {
-        const { initial_amount, currency } = response.data.data;
-        setInitialAmount(initial_amount);
-        setCurrentCash(initial_amount); // This should be calculated based on sales
-        setCurrency(currency);
-        setCashRegisterOpen(true);
+        setCashRegister(response.data.data);
+        setCurrency(response.data.data.currency);
+      } else {
+        setCashRegister(null);
       }
     } catch (error) {
-      // It's okay if there's no open cash register
+      setCashRegister(null);
     }
   };
 
@@ -162,9 +152,8 @@ export const PointOfSale = () => {
       const amount = parseFloat(initCashAmount) || 0;
       await cashRegisterAPI.create({ initial_amount: amount, currency });
 
-      setInitialAmount(amount);
-      setCurrentCash(amount);
-      setCashRegisterOpen(true);
+      // Recargar estado de la caja desde el backend
+      checkCashRegisterStatus();
 
       setOpenInitCashDialog(false);
       setInitCashAmount("");
@@ -184,6 +173,51 @@ export const PointOfSale = () => {
     }
   };
 
+  const handleOpenReports = async () => {
+    if (!cashRegister) return;
+
+    try {
+      const response = await cashRegisterAPI.getReport(cashRegister.id);
+      const report = response.data;
+
+      const sales = report.sales || [];
+      const totalSales = sales.length;
+      const cashSalesAmount = sales
+        .filter((s) => s.payment_method === "cash")
+        .reduce((sum, s) => sum + parseFloat(s.total_amount), 0);
+
+      const expectedCash = parseFloat(report.expected_amount);
+
+      const productSummary = sales
+        .flatMap((s) => s.items)
+        .filter((i) => i.item_type.includes("Product"))
+        .reduce((summary, item) => {
+          if (summary[item.item_name]) {
+            summary[item.item_name].quantity += item.quantity;
+          } else {
+            summary[item.item_name] = { ...item };
+          }
+          return summary;
+        }, {});
+
+      setReportData({
+        ...report,
+        sales,
+        totalSales,
+        cashSalesAmount,
+        expectedCash: report.expected_amount,
+        total_in_cash: report.report_current_cash, // Usar el nuevo campo calculado
+        reportDifference: report.report_difference, // Nuevo campo
+        productSummary: Object.values(productSummary),
+      });
+
+      setOpenReportsDialog(true);
+    } catch (error) {
+      console.error("Error loading report:", error);
+      notificationSwal("Error", "No se pudo cargar el reporte.", "error");
+    }
+  };
+
   const handleCloseCashRegister = async () => {
     if (!hasPermission("pos.edit")) {
       return;
@@ -196,11 +230,10 @@ export const PointOfSale = () => {
 
     if (confirmed) {
       try {
-        const currentRegister = await cashRegisterAPI.getCurrent();
-        await cashRegisterAPI.close(currentRegister.data.data.id, {
-          final_amount: currentCash,
+        await cashRegisterAPI.close(cashRegister.id, {
+          final_amount: cashRegister.total_in_cash, // Usar el total calculado por el backend
         });
-        setCashRegisterOpen(false);
+        setCashRegister(null);
         setCart([]);
         notificationSwal(
           "Caja Cerrada",
@@ -218,8 +251,8 @@ export const PointOfSale = () => {
     }
   };
 
-  const handleItemClick = (item) => {
-    if (!cashRegisterOpen) {
+  const handleItemClick = (itemToAdd) => {
+    if (!cashRegister) {
       notificationSwal(
         "Caja Cerrada",
         "Debe abrir la caja registradora primero.",
@@ -228,7 +261,7 @@ export const PointOfSale = () => {
       return;
     }
 
-    if (item.type === "product" && item.stock <= 0) {
+    if (itemToAdd.type === "product" && itemToAdd.stock <= 0) {
       notificationSwal(
         "Sin Stock",
         "Este producto no tiene stock disponible.",
@@ -237,30 +270,21 @@ export const PointOfSale = () => {
       return;
     }
 
-    setSelectedItem(item);
-    setQuantity(1);
-    setOpenQuantityDialog(true);
-  };
-
-  const handleAddToCart = () => {
-    const existingItem = cart.find(
-      (item) => item.id === selectedItem.id && item.type === selectedItem.type
-    );
-
-    if (existingItem) {
-      setCart(
-        cart.map((item) =>
-          item.id === selectedItem.id && item.type === selectedItem.type
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        )
+    setCart((prevCart) => {
+      const existingItem = prevCart.find(
+        (item) => item.id === itemToAdd.id && item.type === itemToAdd.type
       );
-    } else {
-      setCart([...cart, { ...selectedItem, quantity }]);
-    }
 
-    setOpenQuantityDialog(false);
-    setSelectedItem(null);
+      if (existingItem) {
+        return prevCart.map((item) =>
+          item.id === itemToAdd.id && item.type === itemToAdd.type
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        return [...prevCart, { ...itemToAdd, quantity: 1 }];
+      }
+    });
   };
 
   const handleRemoveFromCart = (itemId, type) => {
@@ -333,11 +357,6 @@ export const PointOfSale = () => {
     try {
       await salesAPI.create(saleData);
 
-      if (paymentType === "paid") {
-        const newCashAmount = currentCash + total;
-        setCurrentCash(newCashAmount);
-      }
-
       notificationSwal(
         "Venta Completada",
         paymentType === "paid"
@@ -350,6 +369,10 @@ export const PointOfSale = () => {
       setOpenPaymentDialog(false);
       setCustomerName("");
       setPaymentType("paid");
+
+      // Recargar estado de la caja y productos desde el backend
+      checkCashRegisterStatus();
+      loadProducts();
     } catch (error) {
       console.error("Error completing sale:", error);
       notificationSwal("Error", "Error al completar la venta.", "error");
@@ -487,7 +510,7 @@ export const PointOfSale = () => {
     </Grid>
   );
 
-  const expectedCash = initialAmount + salesSummary.cashSales;
+  
 
   return (
     <Box
@@ -506,22 +529,22 @@ export const PointOfSale = () => {
           </Typography>
 
           <Chip
-            label={cashRegisterOpen ? "Caja Abierta" : "Caja Cerrada"}
-            color={cashRegisterOpen ? "success" : "error"}
+            label={cashRegister ? "Caja Abierta" : "Caja Cerrada"}
+            color={cashRegister ? "success" : "error"}
             icon={<CashRegisterIcon />}
             sx={{ mr: 2, color: "white", fontWeight: 600 }}
           />
 
-          {cashRegisterOpen && (
+          {cashRegister && (
             <Chip
-              label={`${formatCurrency(currentCash, currency)}`}
+              label={`${formatCurrency(cashRegister.total_in_cash, currency)}`}
               color="info"
               icon={<MoneyIcon />}
               sx={{ mr: 2, color: "white", fontWeight: 600 }}
             />
           )}
 
-          {!cashRegisterOpen ? (
+          {!cashRegister ? (
             <Button
               variant="contained"
               startIcon={<CashRegisterIcon />}
@@ -539,7 +562,7 @@ export const PointOfSale = () => {
               <Button
                 variant="outlined"
                 startIcon={<AssessmentIcon />}
-                onClick={() => setOpenReportsDialog(true)}
+                onClick={handleOpenReports}
                 sx={{
                   mr: 1,
                   color: "white",
@@ -784,7 +807,7 @@ export const PointOfSale = () => {
                     variant="contained"
                     startIcon={<PaymentIcon />}
                     onClick={handleProcessSale}
-                    disabled={cart.length === 0 || !cashRegisterOpen}
+                    disabled={cart.length === 0 || !cashRegister}
                     sx={{
                       height: 56,
                       fontSize: "1.1rem",
@@ -868,108 +891,7 @@ export const PointOfSale = () => {
         </DialogActions>
       </Dialog>
 
-      {/* Quantity Dialog */}
-      <Dialog
-        open={openQuantityDialog}
-        onClose={() => setOpenQuantityDialog(false)}
-        TransitionComponent={Transition}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ textAlign: "center" }}>
-          Agregar al Carrito
-        </DialogTitle>
-        <DialogContent>
-          {selectedItem && (
-            <Box sx={{ textAlign: "center", py: 2 }}>
-              <Avatar
-                src={selectedItem.image_url}
-                sx={{ width: 100, height: 100, mx: "auto", mb: 2 }}
-                variant="rounded"
-              >
-                {selectedItem.type === "product" ? (
-                  <InventoryIcon sx={{ fontSize: 50 }} />
-                ) : (
-                  <BuildIcon sx={{ fontSize: 50 }} />
-                )}
-              </Avatar>
-
-              <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
-                {selectedItem.name}
-              </Typography>
-              <Typography
-                variant="h4"
-                color="primary"
-                sx={{ mb: 3, fontWeight: 700 }}
-              >
-                {formatCurrency(selectedItem.price, currency)}
-              </Typography>
-
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 2,
-                  mb: 3,
-                }}
-              >
-                <IconButton
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                  size="large"
-                  sx={{ bgcolor: "grey.100" }}
-                >
-                  <RemoveIcon />
-                </IconButton>
-                <TextField
-                  type="number"
-                  value={quantity}
-                  onChange={(e) =>
-                    setQuantity(Math.max(1, parseInt(e.target.value) || 1))
-                  }
-                  sx={{ width: 100 }}
-                  inputProps={{
-                    min: 1,
-                    style: {
-                      textAlign: "center",
-                      fontSize: "1.5rem",
-                      fontWeight: "bold",
-                    },
-                  }}
-                />
-                <IconButton
-                  onClick={() => setQuantity(quantity + 1)}
-                  size="large"
-                  sx={{ bgcolor: "grey.100" }}
-                >
-                  <AddIcon />
-                </IconButton>
-              </Box>
-
-              <Paper sx={{ p: 2, bgcolor: "primary.light", color: "white" }}>
-                <Typography variant="h5" sx={{ fontWeight: 700 }}>
-                  Subtotal:{" "}
-                  {formatCurrency(selectedItem.price * quantity, currency)}
-                </Typography>
-              </Paper>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setOpenQuantityDialog(false)} size="large">
-            Cancelar
-          </Button>
-          <Button
-            onClick={handleAddToCart}
-            variant="contained"
-            size="large"
-            sx={{ px: 4 }}
-          >
-            Agregar al Carrito
-          </Button>
-        </DialogActions>
-      </Dialog>
+      
 
       {/* Payment Dialog */}
       <Dialog
@@ -1102,132 +1024,149 @@ export const PointOfSale = () => {
           </Box>
         </DialogTitle>
         <DialogContent>
-          <Grid container spacing={3} sx={{ mb: 3 }}>
-            <Grid item xs={6} md={3}>
-              <Paper
-                sx={{
-                  p: 2,
-                  textAlign: "center",
-                  bgcolor: "primary.light",
-                  color: "white",
-                }}
-              >
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                  {salesSummary.totalSales}
-                </Typography>
-                <Typography variant="body2">Ventas Totales</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={6} md={3}>
-              <Paper
-                sx={{
-                  p: 2,
-                  textAlign: "center",
-                  bgcolor: "success.light",
-                  color: "white",
-                }}
-              >
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                  {formatCurrency(initialAmount, currency)}
-                </Typography>
-                <Typography variant="body2">Dinero Inicial</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={6} md={3}>
-              <Paper
-                sx={{
-                  p: 2,
-                  textAlign: "center",
-                  bgcolor: "info.light",
-                  color: "white",
-                }}
-              >
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                  {formatCurrency(currentCash, currency)}
-                </Typography>
-                <Typography variant="body2">Dinero Actual</Typography>
-              </Paper>
-            </Grid>
-            <Grid item xs={6} md={3}>
-              <Paper
-                sx={{
-                  p: 2,
-                  textAlign: "center",
-                  bgcolor: "warning.light",
-                  color: "white",
-                }}
-              >
-                <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                  {formatCurrency(expectedCash, currency)}
-                </Typography>
-                <Typography variant="body2">Dinero Esperado</Typography>
-              </Paper>
-            </Grid>
-          </Grid>
+          {reportData && (
+            <>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "primary.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {reportData.sales.length}
+                    </Typography>
+                    <Typography variant="body2">Ventas Totales</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "success.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(reportData.initial_amount, currency)}
+                    </Typography>
+                    <Typography variant="body2">Dinero Inicial</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "info.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(reportData.total_in_cash, currency)}
+                    </Typography>
+                    <Typography variant="body2">Dinero Actual</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "warning.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(reportData.expected_amount, currency)}
+                    </Typography>
+                    <Typography variant="body2">Dinero Esperado</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
 
-          <Tabs
-            value={reportType}
-            onChange={(e, newValue) => setReportType(newValue)}
-            sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}
-          >
-            <Tab label="Ventas del Día" value="sales" />
-            <Tab label="Resumen de Productos" value="products" />
-          </Tabs>
+              <Tabs
+                value={reportType}
+                onChange={(e, newValue) => setReportType(newValue)}
+                sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}
+              >
+                <Tab label="Ventas del Día" value="sales" />
+                <Tab label="Resumen de Productos" value="products" />
+              </Tabs>
 
-          {reportType === "sales" && (
-            <Box>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                Ventas Realizadas ({dailySales.length})
-              </Typography>
-              {dailySales.length > 0 ? (
-                <List>
-                  {dailySales.map((sale) => (
-                    <ListItem
-                      key={sale.id}
-                      sx={{
-                        border: 1,
-                        borderColor: "divider",
-                        borderRadius: 1,
-                        mb: 1,
-                      }}
+              {reportType === "sales" && (
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Ventas Realizadas ({reportData.sales.length})
+                  </Typography>
+                  {reportData.sales.length > 0 ? (
+                    <List>
+                      {reportData.sales.map((sale) => (
+                        <ListItem
+                          key={sale.id}
+                          sx={{
+                            border: 1,
+                            borderColor: "divider",
+                            borderRadius: 1,
+                            mb: 1,
+                          }}
+                        >
+                          <ListItemText
+                            primary={`${sale.sale_number} - ${sale.customer_name}`}
+                            secondary={`${sale.items.length} productos - ${
+                              sale.payment_method === "cash" ? "Pagado" : "Por cobrar"
+                            }`}
+                          />
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            {formatCurrency(sale.total_amount, currency)}
+                          </Typography>
+                        </ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ textAlign: "center", py: 4 }}
                     >
-                      <ListItemText
-                        primary={`${sale.saleNumber} - ${sale.customerName}`}
-                        secondary={`${sale.items.length} productos - ${
-                          sale.paymentType === "paid" ? "Pagado" : "Por cobrar"
-                        }`}
-                      />
-                      <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                        {formatCurrency(sale.total, currency)}
-                      </Typography>
-                    </ListItem>
-                  ))}
-                </List>
-              ) : (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ textAlign: "center", py: 4 }}
-                >
-                  No hay ventas registradas hoy
-                </Typography>
+                      No hay ventas registradas hoy
+                    </Typography>
+                  )}
+                </Box>
               )}
-            </Box>
-          )}
 
-          {reportType === "products" && (
-            <Box>
-              <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                Productos Más Vendidos
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ textAlign: "center", py: 4 }}
-              >
-                Funcionalidad disponible próximamente
-              </Typography>
-            </Box>
+              {reportType === "products" && (
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Productos Más Vendidos
+                  </Typography>
+                  {reportData.productSummary.length > 0 ? (
+                    <List>
+                      {reportData.productSummary.map((product) => (
+                        <ListItem key={product.item_name}>
+                          <ListItemText
+                            primary={product.item_name}
+                            secondary={`Cantidad vendida: ${product.quantity}`}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ textAlign: "center", py: 4 }}
+                    >
+                      No se han vendido productos hoy.
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>

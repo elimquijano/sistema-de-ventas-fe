@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Card,
@@ -26,7 +26,6 @@ import {
   MenuItem,
   Grid,
   Pagination,
-  CircularProgress,
   List,
   ListItem,
   ListItemText,
@@ -36,8 +35,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Visibility as ViewIcon,
-  Receipt as ReceiptIcon,
   GetApp as ExportIcon,
+  Receipt as ReceiptIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
@@ -48,7 +47,6 @@ import { exportToExcel } from "../utils/excelExport";
 export const Sales = () => {
   const { hasPermission } = useAuth();
   const [sales, setSales] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -61,27 +59,27 @@ export const Sales = () => {
 
   const loadSales = async () => {
     try {
-      setLoading(true);
       const response = await salesAPI.getAll({ page, ...searchFilters });
       setSales(response.data.data);
       setTotalPages(response.data.last_page);
     } catch (error) {
       console.error("Error loading sales:", error);
       notificationSwal("Error", "Hubo un error al cargar las ventas.", "error");
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleChangeFilter = (event) => {
     const { name, value } = event.target;
     setSearchFilters((prevFilters) => {
+      const newFilters = { ...prevFilters };
       if (value === "") {
-        const { [name]: _, ...newFilters } = prevFilters;
-        return newFilters;
+        delete newFilters[name];
+      } else {
+        newFilters[name] = value;
       }
-      return { ...prevFilters, [name]: value };
+      return newFilters;
     });
+    setPage(1);
   };
 
   const handleViewSale = (sale) => {
@@ -93,10 +91,7 @@ export const Sales = () => {
     const userConfirmed = await confirmSwal(
       "¿Estás seguro?",
       "Esta acción eliminará la venta permanentemente.",
-      {
-        confirmButtonText: "Sí, eliminar",
-        icon: "warning",
-      }
+      { confirmButtonText: "Sí, eliminar", icon: "warning" }
     );
 
     if (userConfirmed) {
@@ -115,19 +110,6 @@ export const Sales = () => {
     }
   };
 
-  const getPaymentStatusColor = (status) => {
-    switch (status) {
-      case "paid":
-        return "success";
-      case "pending":
-        return "warning";
-      case "overdue":
-        return "error";
-      default:
-        return "default";
-    }
-  };
-
   const getPaymentMethodLabel = (method) => {
     const methods = {
       cash: "Efectivo",
@@ -138,42 +120,28 @@ export const Sales = () => {
     return methods[method] || method;
   };
 
+  const getPaymentStatusColor = (status) => {
+    const colors = { paid: "success", pending: "warning", overdue: "error" };
+    return colors[status] || "default";
+  };
+
   const getPaymentStatusLabel = (status) => {
-    const statuses = {
-      paid: "Pagado",
-      pending: "Pendiente",
-      overdue: "Vencido",
-    };
+    const statuses = { paid: "Pagado", pending: "Pendiente", overdue: "Vencido" };
     return statuses[status] || status;
   };
 
   const handleExportToExcel = () => {
-    const dataToExport = sales.map(sale => ({
-      'Número de Venta': sale.sale_number,
-      'Cliente': sale.customer_name,
-      'Total': sale.total_amount,
-      'Método de Pago': getPaymentMethodLabel(sale.payment_method),
-      'Estado de Pago': getPaymentStatusLabel(sale.payment_status),
-      'Fecha': formatDate(sale.sale_date),
-      'Vendedor': sale.created_by,
+    const dataToExport = sales.map((sale) => ({
+      "Número de Venta": sale.sale_number,
+      Cliente: sale.customer_name,
+      Total: sale.total_amount,
+      "Método de Pago": getPaymentMethodLabel(sale.payment_method),
+      "Estado de Pago": getPaymentStatusLabel(sale.payment_status),
+      Fecha: formatDate(sale.created_at),
+      Vendedor: sale.creator.full_name,
     }));
     exportToExcel(dataToExport, "ventas_reporte", "Ventas");
   };
-
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          minHeight: 400,
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
 
   return (
     <Box>
@@ -260,9 +228,7 @@ export const Sales = () => {
                 name="date"
                 value={searchFilters.date || ""}
                 onChange={handleChangeFilter}
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
           </Grid>
@@ -313,10 +279,10 @@ export const Sales = () => {
                         color={getPaymentStatusColor(sale.payment_status)}
                       />
                     </TableCell>
-                    <TableCell>{formatDate(sale.sale_date)}</TableCell>
+                    <TableCell>{formatDate(sale.created_at)}</TableCell>
                     <TableCell>
                       <Typography variant="body2" color="text.secondary">
-                        {sale.created_by}
+                        {sale.creator.full_name}
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
@@ -398,7 +364,7 @@ export const Sales = () => {
                     Fecha
                   </Typography>
                   <Typography variant="body1">
-                    {formatDate(selectedSale.sale_date)}
+                    {formatDate(selectedSale.created_at)}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>
@@ -426,17 +392,17 @@ export const Sales = () => {
               <Typography variant="h6" sx={{ mb: 2 }}>
                 Productos y Servicios
               </Typography>
-              <List>
+              <List dense>
                 {selectedSale.items.map((item, index) => (
                   <ListItem key={index} sx={{ px: 0 }}>
                     <ListItemText
-                      primary={item.name}
+                      primary={item.item_name}
                       secondary={`${item.quantity} x ${formatCurrency(
-                        item.price
+                        item.unit_price
                       )}`}
                     />
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(item.total)}
+                      {formatCurrency(item.total_price)}
                     </Typography>
                   </ListItem>
                 ))}

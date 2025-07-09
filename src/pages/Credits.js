@@ -43,7 +43,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { creditsAPI, loansAPI } from "../utils/api";
+import { creditsAPI } from "../utils/api";
 
 export const Credits = () => {
   const { hasPermission } = useAuth();
@@ -56,6 +56,11 @@ export const Credits = () => {
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [selectedCredit, setSelectedCredit] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+
+  // Edit Dialog State
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingCredit, setEditingCredit] = useState(null);
+  const [editFormData, setEditFormData] = useState({ due_date: "", status: "", paid_amount: "" });
 
   useEffect(() => {
     loadCredits();
@@ -81,6 +86,7 @@ export const Credits = () => {
 
   const handleChangeFilter = (event) => {
     const { name, value } = event.target;
+    setPage(1);
     setSearchFilters((prevFilters) => {
       if (value === "") {
         const { [name]: _, ...newFilters } = prevFilters;
@@ -119,6 +125,39 @@ export const Credits = () => {
     } catch (error) {
       console.error("Error processing payment:", error);
       notificationSwal("Error", "Error al procesar el pago.", "error");
+    }
+  };
+
+  // --- Edit Functions ---
+  const handleOpenEditDialog = (credit) => {
+    setEditingCredit(credit);
+    setEditFormData({
+      due_date: credit.due_date ? credit.due_date.split("T")[0] : "",
+      status: credit.status,
+      paid_amount: credit.paid_amount.toString(),
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setEditingCredit(null);
+  };
+
+  const handleUpdateCredit = async () => {
+    if (!editingCredit) return;
+    try {
+      const dataToUpdate = {
+        ...editFormData,
+        paid_amount: parseFloat(editFormData.paid_amount)
+      };
+      await creditsAPI.update(editingCredit.id, dataToUpdate);
+      notificationSwal("Crédito Actualizado", "El crédito ha sido actualizado.", "success");
+      handleCloseEditDialog();
+      loadCredits();
+    } catch (error) {
+      console.error("Error updating credit:", error);
+      notificationSwal("Error", "No se pudo actualizar el crédito.", "error");
     }
   };
 
@@ -173,7 +212,7 @@ export const Credits = () => {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                placeholder="Buscar por cliente..."
+                placeholder="Buscar por cliente o venta..."
                 name="search"
                 value={searchFilters.search || ""}
                 onChange={handleChangeFilter}
@@ -228,7 +267,7 @@ export const Credits = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">
-                        {credit.sale_number}
+                        {credit.sale.sale_number}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -270,7 +309,7 @@ export const Credits = () => {
                           </IconButton>
                         )}
                       {hasPermission("creditos.edit") && (
-                        <IconButton size="small">
+                        <IconButton size="small" onClick={() => handleOpenEditDialog(credit)}>
                           <EditIcon />
                         </IconButton>
                       )}
@@ -340,6 +379,53 @@ export const Credits = () => {
           >
             Registrar Pago
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onClose={handleCloseEditDialog} maxWidth="xs" fullWidth>
+        <DialogTitle>Editar Crédito</DialogTitle>
+        <DialogContent>
+          {editingCredit && (
+            <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Fecha de Vencimiento"
+                  type="date"
+                  value={editFormData.due_date}
+                  onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Monto Pagado"
+                  type="number"
+                  value={editFormData.paid_amount}
+                  onChange={(e) => setEditFormData({ ...editFormData, paid_amount: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                  error={parseFloat(editFormData.paid_amount) > editingCredit?.total_amount}
+                  helperText={parseFloat(editFormData.paid_amount) > editingCredit?.total_amount ? "No puede ser mayor al total." : ""}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl fullWidth>
+                  <InputLabel>Estado</InputLabel>
+                  <Select value={editFormData.status} label="Estado" onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}>
+                    <MenuItem value="pending">Pendiente</MenuItem>
+                    <MenuItem value="paid">Pagado</MenuItem>
+                    <MenuItem value="overdue">Vencido</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEditDialog}>Cancelar</Button>
+          <Button onClick={handleUpdateCredit} variant="contained">Guardar Cambios</Button>
         </DialogActions>
       </Dialog>
     </Box>

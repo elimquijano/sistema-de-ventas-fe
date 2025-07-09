@@ -238,9 +238,7 @@ export const expensesAPI = {
 export const creditsAPI = {
   getAll: (params = {}) => api.get('/credits', { params }),
   getById: (id) => api.get(`/credits/${id}`),
-  create: (creditData) => api.post('/credits', creditData),
   update: (id, creditData) => api.put(`/credits/${id}`, creditData),
-  delete: (id) => api.delete(`/credits/${id}`),
   processPayment: (id, paymentData) => api.post(`/credits/${id}/payment`, paymentData),
   getPending: () => api.get('/credits/pending'),
 };

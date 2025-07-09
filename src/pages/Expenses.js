@@ -26,6 +26,7 @@ import {
   MenuItem,
   Grid,
   Pagination,
+  Link,
   CircularProgress,
 } from "@mui/material";
 import {
@@ -35,11 +36,13 @@ import {
   Delete as DeleteIcon,
   Receipt as ReceiptIcon,
   GetApp as ExportIcon,
+  CloudUpload as UploadIcon,
+  Clear as ClearIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { categoriesAPI, expensesAPI } from "../utils/api";
+import api, { categoriesAPI, expensesAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
 
 export const Expenses = () => {
@@ -49,14 +52,16 @@ export const Expenses = () => {
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
+  const [receiptFile, setReceiptFile] = useState(null);
   const [formData, setFormData] = useState({
     description: "",
     amount: "",
     category_id: "",
     expense_date: new Date().toISOString().split("T")[0],
-    receipt_number: "",
+    receipt_path: "",
     notes: "",
   });
 
@@ -66,6 +71,7 @@ export const Expenses = () => {
   }, [page, searchFilters]);
 
   const loadExpenses = async () => {
+    setLoading(true);
     try {
       const response = await expensesAPI.getAll({ page, ...searchFilters });
       setExpenses(response.data.data);
@@ -74,6 +80,7 @@ export const Expenses = () => {
       console.error("Error loading expenses:", error);
       notificationSwal("Error", "Hubo un error al cargar los gastos.", "error");
     } finally {
+      setLoading(false);
     }
   };
 
@@ -88,6 +95,7 @@ export const Expenses = () => {
 
   const handleChangeFilter = (event) => {
     const { name, value } = event.target;
+    setPage(1); // Reset page when filters change
     setSearchFilters((prevFilters) => {
       if (value === "") {
         const { [name]: _, ...newFilters } = prevFilters;
@@ -97,7 +105,7 @@ export const Expenses = () => {
     });
   };
 
-  const handleOpenDialog = (expense) => {
+  const handleOpenDialog = (expense = null) => {
     if (expense) {
       setEditingExpense(expense);
       setFormData({
@@ -105,8 +113,8 @@ export const Expenses = () => {
         amount: expense.amount.toString(),
         category_id: expense.category_id,
         expense_date: expense.expense_date.split("T")[0],
-        receipt_number: expense.receipt_number,
-        notes: expense.notes,
+        receipt_path: expense.receipt_path || "",
+        notes: expense.notes || "",
       });
     } else {
       setEditingExpense(null);
@@ -115,29 +123,47 @@ export const Expenses = () => {
         amount: "",
         category_id: "",
         expense_date: new Date().toISOString().split("T")[0],
-        receipt_number: "",
+        receipt_path: "",
         notes: "",
       });
     }
+    setReceiptFile(null);
     setOpenDialog(true);
   };
 
   const handleCloseDialog = () => {
     setOpenDialog(false);
     setEditingExpense(null);
+    setReceiptFile(null);
+  };
+
+  const handleFileChange = (event) => {
+    setReceiptFile(event.target.files[0]);
   };
 
   const handleSaveExpense = async () => {
     try {
+      let payload = { ...formData };
+
+      if (receiptFile) {
+        const uploadData = new FormData();
+        uploadData.append("file", receiptFile);
+        uploadData.append("path", "receipts");
+        const response = await api.post("/files/upload", uploadData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        payload.receipt_path = response.data.path;
+      }
+
       if (editingExpense) {
-        await expensesAPI.update(editingExpense.id, formData);
+        await expensesAPI.update(editingExpense.id, payload);
         notificationSwal(
           "Gasto Actualizado",
           "El gasto ha sido actualizado exitosamente.",
           "success"
         );
       } else {
-        await expensesAPI.create(formData);
+        await expensesAPI.create(payload);
         notificationSwal(
           "Gasto Registrado",
           "El nuevo gasto ha sido registrado exitosamente.",
@@ -148,7 +174,9 @@ export const Expenses = () => {
       loadExpenses();
     } catch (error) {
       console.error("Error saving expense:", error);
-      notificationSwal("Error", "Error al guardar el gasto.", "error");
+      const errorMessage =
+        error.response?.data?.message || "Error al guardar el gasto.";
+      notificationSwal("Error", errorMessage, "error");
     }
   };
 
@@ -156,10 +184,7 @@ export const Expenses = () => {
     const userConfirmed = await confirmSwal(
       "¿Estás seguro?",
       "Esta acción eliminará el gasto permanentemente.",
-      {
-        confirmButtonText: "Sí, eliminar",
-        icon: "warning",
-      }
+      { confirmButtonText: "Sí, eliminar", icon: "warning" }
     );
 
     if (userConfirmed) {
@@ -181,11 +206,12 @@ export const Expenses = () => {
   const handleExportToExcel = () => {
     const dataToExport = expenses.map((expense) => ({
       Descripción: expense.description,
-      Categoría: expense.category,
+      Categoría: expense.category?.name || "N/A",
       Monto: expense.amount,
       Fecha: formatDate(expense.expense_date),
-      Factura: expense.receipt_number || "N/A",
-      "Registrado por": expense.created_by,
+      Factura: expense.receipt_url ? "Sí" : "No",
+      "Registrado por": expense.creator?.full_name || "N/A",
+      Notas: expense.notes,
     }));
     exportToExcel(dataToExport, "gastos_reporte", "Gastos");
   };
@@ -201,15 +227,16 @@ export const Expenses = () => {
         }}
       >
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
-          Gastos
+          Gestión de Gastos
         </Typography>
         <Box sx={{ display: "flex", gap: 1 }}>
           <Button
             variant="outlined"
             startIcon={<ExportIcon />}
             onClick={handleExportToExcel}
+            disabled={expenses.length === 0}
           >
-            Exportar Excel
+            Exportar
           </Button>
           {hasPermission("merma.create") && (
             <Button
@@ -232,7 +259,7 @@ export const Expenses = () => {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                placeholder="Buscar gastos..."
+                placeholder="Buscar por descripción..."
                 name="search"
                 value={searchFilters.search || ""}
                 onChange={handleChangeFilter}
@@ -245,7 +272,7 @@ export const Expenses = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} sm={6} md={3}>
               <FormControl fullWidth>
                 <InputLabel>Categoría</InputLabel>
                 <Select
@@ -254,39 +281,37 @@ export const Expenses = () => {
                   label="Categoría"
                   onChange={handleChangeFilter}
                 >
-                  <MenuItem value="">Todas las Categorías</MenuItem>
+                  <MenuItem value="">
+                    <em>Todas</em>
+                  </MenuItem>
                   {categories.map((category) => (
-                    <MenuItem key={category.id} value={category.id.toString()}>
+                    <MenuItem key={category.id} value={category.id}>
                       {category.name}
                     </MenuItem>
                   ))}
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} sm={6} md={2}>
               <TextField
                 fullWidth
-                label="Fecha Desde"
+                label="Desde"
                 type="date"
                 name="date_from"
                 value={searchFilters.date_from || ""}
                 onChange={handleChangeFilter}
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
-            <Grid item xs={12} md={2}>
+            <Grid item xs={12} sm={6} md={2}>
               <TextField
                 fullWidth
-                label="Fecha Hasta"
+                label="Hasta"
                 type="date"
                 name="date_to"
                 value={searchFilters.date_to || ""}
                 onChange={handleChangeFilter}
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
           </Grid>
@@ -305,74 +330,89 @@ export const Expenses = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {expenses.map((expense) => (
-                  <TableRow key={expense.id}>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {expense.description}
-                      </Typography>
-                      {expense.notes && (
-                        <Typography variant="caption" color="text.secondary">
-                          {expense.notes}
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={expense.category.name}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 600, color: "error.main" }}
-                      >
-                        -{formatCurrency(expense.amount)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{formatDate(expense.expense_date)}</TableCell>
-                    <TableCell>
-                      {expense.receipt_number ? (
-                        <Chip
-                          label={expense.receipt_number}
-                          size="small"
-                          icon={<ReceiptIcon />}
-                          variant="outlined"
-                        />
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">
-                          Sin factura
-                        </Typography>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {expense.created_by}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      {hasPermission("merma.edit") && (
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenDialog(expense)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                      )}
-                      {hasPermission("merma.delete") && (
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteExpense(expense.id)}
-                          color="error"
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      )}
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <CircularProgress />
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  expenses.map((expense) => (
+                    <TableRow key={expense.id}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {expense.description}
+                        </Typography>
+                        {expense.notes && (
+                          <Typography variant="caption" color="text.secondary">
+                            {expense.notes}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={expense.category?.name || "N/A"}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, color: "error.main" }}
+                        >
+                          -{formatCurrency(expense.amount)}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{formatDate(expense.expense_date)}</TableCell>
+                      <TableCell>
+                        {expense.receipt_path ? (
+                          <Link
+                            href={`http://localhost:8000/storage/${expense.receipt_path}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Chip
+                              label="Ver Factura"
+                              size="small"
+                              icon={<ReceiptIcon />}
+                              variant="outlined"
+                              clickable
+                            />
+                          </Link>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">
+                            Sin factura
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary">
+                          {expense.creator?.full_name || "N/A"}
+                        </Typography>
+                      </TableCell>
+                      <TableCell align="right">
+                        {hasPermission("merma.edit") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog(expense)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        )}
+                        {hasPermission("merma.delete") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteExpense(expense.id)}
+                            color="error"
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -388,7 +428,6 @@ export const Expenses = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog para crear/editar gasto */}
       <Dialog
         open={openDialog}
         onClose={handleCloseDialog}
@@ -406,10 +445,7 @@ export const Expenses = () => {
                 label="Descripción"
                 value={formData.description}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    description: e.target.value,
-                  }))
+                  setFormData({ ...formData, description: e.target.value })
                 }
                 required
               />
@@ -422,7 +458,7 @@ export const Expenses = () => {
                 step="0.01"
                 value={formData.amount}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, amount: e.target.value }))
+                  setFormData({ ...formData, amount: e.target.value })
                 }
                 required
               />
@@ -434,10 +470,7 @@ export const Expenses = () => {
                   value={formData.category_id}
                   label="Categoría"
                   onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      category_id: e.target.value,
-                    }))
+                    setFormData({ ...formData, category_id: e.target.value })
                   }
                 >
                   {categories.map((category) => (
@@ -455,39 +488,40 @@ export const Expenses = () => {
                 type="date"
                 value={formData.expense_date}
                 onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    expense_date: e.target.value,
-                  }))
+                  setFormData({ ...formData, expense_date: e.target.value })
                 }
-                InputLabelProps={{
-                  shrink: true,
-                }}
+                InputLabelProps={{ shrink: true }}
                 required
               />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
+              <Button
+                variant="outlined"
+                component="label"
                 fullWidth
-                label="Número de Factura"
-                value={formData.receipt_number}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    receipt_number: e.target.value,
-                  }))
-                }
-              />
+                startIcon={<UploadIcon />}
+              >
+                Subir Factura
+                <input type="file" hidden onChange={handleFileChange} accept="image/*,application/pdf" />
+              </Button>
+              {receiptFile && (
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                  <Typography variant="body2" sx={{ mr: 1 }}>{receiptFile.name}</Typography>
+                  <IconButton size="small" onClick={() => setReceiptFile(null)}>
+                    <ClearIcon />
+                  </IconButton>
+                </Box>
+              )}
             </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
-                label="Notas"
+                label="Notas Adicionales"
                 multiline
                 rows={3}
                 value={formData.notes}
                 onChange={(e) =>
-                  setFormData((prev) => ({ ...prev, notes: e.target.value }))
+                  setFormData({ ...formData, notes: e.target.value })
                 }
               />
             </Grid>

@@ -412,18 +412,29 @@ export const PointOfSale = () => {
               >
                 {item.type === "product" ? (
                   <Avatar
-                    src={item.image_url}
+                    src={
+                      item.image_path
+                        ? `http://localhost:8000/storage/${item.image_path}`
+                        : null
+                    }
                     sx={{ width: 80, height: 80 }}
                     variant="rounded"
                   >
-                    <InventoryIcon sx={{ fontSize: 40 }} />
+                    {!item.image_path && (
+                      <InventoryIcon sx={{ fontSize: 40 }} />
+                    )}
                   </Avatar>
                 ) : (
                   <Avatar
+                    src={
+                      item.image_path
+                        ? `http://localhost:8000/storage/${item.image_path}`
+                        : null
+                    }
                     sx={{ width: 80, height: 80, bgcolor: "secondary.main" }}
                     variant="rounded"
                   >
-                    <BuildIcon sx={{ fontSize: 40 }} />
+                    {!item.image_path && <BuildIcon sx={{ fontSize: 40 }} />}
                   </Avatar>
                 )}
               </Box>

@@ -18,6 +18,8 @@ export const formatDate = (date, format = 'DD/MM/YYYY') => {
       return `${year}-${month}-${day}`;
     case 'DD/MM/YYYY HH:mm':
       return `${day}/${month}/${year} ${hours}:${minutes}`;
+    case 'HH:mm':
+      return `${hours}:${minutes}`;
     case 'relative':
       return getRelativeTime(d);
     default:

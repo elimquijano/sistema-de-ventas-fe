@@ -16,6 +16,7 @@ import {
   ToggleButton,
   Divider,
   Skeleton,
+  Chip,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -44,7 +45,11 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { formatCurrency, formatFullName } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  formatFullName,
+} from "../utils/formatters";
 import { businessAPI } from "../utils/api";
 import { notificationSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
@@ -118,7 +123,7 @@ export const BusinessDashboard = () => {
       try {
         const [businessRes, dashboardRes] = await Promise.all([
           businessAPI.getById(user.business_id),
-          businessAPI.getStats(user.business_id, `period=week`),
+          businessAPI.getStats(user.business_id, `week`),
         ]);
         setBusiness(businessRes.data);
         setStats(dashboardRes.data.stats);
@@ -152,7 +157,7 @@ export const BusinessDashboard = () => {
       try {
         const dashboardRes = await businessAPI.getStats(
           user.business_id,
-          `period=${period}`
+          period
         );
         processChartData(dashboardRes.data);
       } catch (error) {
@@ -193,21 +198,21 @@ export const BusinessDashboard = () => {
 
   const statsCards = [
     {
-      title: "Ventas del Día",
+      title: "Ventas de Hoy",
       value: formatCurrency(stats?.daily_sales || 0, currency),
       icon: <ShoppingCart />,
       trend: getTrend(stats?.daily_sales, stats?.monthly_sales / 30),
       gradient: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
     },
     {
-      title: "Ventas del Mes",
+      title: "Ventas de este Mes",
       value: formatCurrency(stats?.monthly_sales || 0, currency),
       icon: <AttachMoney />,
       trend: getTrend(stats?.monthly_sales, stats?.previous_monthly_sales || 0),
       gradient: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
     },
     {
-      title: "Gastos del Día",
+      title: "Gastos de Hoy",
       value: formatCurrency(stats?.daily_expenses || 0, currency),
       icon: <TrendingDown />,
       trend: getTrend(stats?.daily_expenses, stats?.monthly_expenses / 30),
@@ -426,7 +431,7 @@ export const BusinessDashboard = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
-                Cajas Abiertas Hoy
+                Cajas De Hoy
               </Typography>
               {cashRegisters?.length > 0 ? (
                 <List dense>
@@ -436,23 +441,53 @@ export const BusinessDashboard = () => {
                         <Person />
                       </ListItemIcon>
                       <ListItemText
-                        primary={formatFullName(
-                          reg.opened_by.first_name,
-                          reg.opened_by.last_name
-                        )}
+                        primary={reg.opened_by.full_name}
                         secondary={
-                          <>
-                            <AccessTime
-                              sx={{
-                                fontSize: "0.9rem",
-                                verticalAlign: "middle",
-                              }}
-                            />{" "}
-                            {new Date(reg.opened_at).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </>
+                          <Chip
+                            size="small"
+                            label={
+                              <>
+                                <AccessTime
+                                  sx={{
+                                    fontSize: "0.9rem",
+                                    verticalAlign: "middle",
+                                  }}
+                                />{" "}
+                                {formatDate(
+                                  reg.status === "open"
+                                    ? reg.created_at
+                                    : reg.closed_at,
+                                  "HH:mm"
+                                )}
+                              </>
+                            }
+                            color={
+                              reg.status === "open" ? "success" : "default"
+                            }
+                          />
+                        }
+                      />
+                      <ListItemText
+                        primary={"Inicial: "}
+                        secondary={formatCurrency(reg.initial_amount)}
+                      />
+                      <ListItemText
+                        primary={"Cierre: "}
+                        secondary={
+                          <Typography
+                            variant="body2"
+                            color={theme.palette.success.main}
+                          >
+                            {formatCurrency(reg.final_amount)}
+                          </Typography>
+                        }
+                      />
+                      <ListItemText
+                        primary={"Crédito: "}
+                        secondary={
+                          <Typography variant="body2" color="error">
+                            {formatCurrency(reg.difference)}
+                          </Typography>
                         }
                       />
                     </ListItem>

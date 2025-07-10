@@ -167,13 +167,18 @@ export const notificationsAPI = {
 
 // NUEVAS APIs para el sistema de ventas
 export const businessAPI = {
-  getAll: (params = {}) => api.get("/businesses", { params }),
+  getAll: (params = {}) => api.get('/businesses', { params }),
   getById: (id) => api.get(`/businesses/${id}`),
-  create: (businessData) => api.post("/businesses", businessData),
+  create: (businessData) => api.post('/businesses', businessData),
   update: (id, businessData) => api.put(`/businesses/${id}`, businessData),
   delete: (id) => api.delete(`/businesses/${id}`),
-  getStats: (id, period) =>
-    api.get(`/businesses/${id}/dashboard`, { params: { period } }),
+  getStats: (id, params) => api.get(`/businesses/${id}/dashboard`, { params }),
+  searchProducts: (term) => api.get(`/products/search?term=${term}`),
+  createPurchase: (purchaseData) => api.post('/purchases', purchaseData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
 };
 
 export const productsAPI = {

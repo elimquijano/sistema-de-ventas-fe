@@ -57,6 +57,7 @@ import {
 import { formatCurrency } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import {
+  API_STORAGE_URL,
   cashRegisterAPI,
   productsAPI,
   salesAPI,
@@ -431,7 +432,7 @@ export const PointOfSale = () => {
                   <Avatar
                     src={
                       item.image_path
-                        ? `http://localhost:8000/storage/${item.image_path}`
+                        ? `${API_STORAGE_URL}/${item.image_path}`
                         : null
                     }
                     sx={{ width: 80, height: 80 }}
@@ -445,7 +446,7 @@ export const PointOfSale = () => {
                   <Avatar
                     src={
                       item.image_path
-                        ? `http://localhost:8000/storage/${item.image_path}`
+                        ? `${API_STORAGE_URL}/${item.image_path}`
                         : null
                     }
                     sx={{ width: 80, height: 80, bgcolor: "secondary.main" }}

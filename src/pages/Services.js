@@ -40,7 +40,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { categoriesAPI, servicesAPI } from "../utils/api";
+import { API_STORAGE_URL, categoriesAPI, servicesAPI } from "../utils/api";
 
 export const Services = () => {
   const { hasPermission } = useAuth();
@@ -313,7 +313,7 @@ export const Services = () => {
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
                       >
                         <Avatar 
-                          src={service.image_path ? `http://localhost:8000/storage/${service.image_path}` : null}
+                          src={service.image_path ? `${API_STORAGE_URL}/${service.image_path}` : null}
                           sx={{ bgcolor: "secondary.main" }}>
                           {!service.image_path && <BuildIcon />}
                         </Avatar>

@@ -42,7 +42,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import api, { categoriesAPI, expensesAPI } from "../utils/api";
+import api, { API_STORAGE_URL, categoriesAPI, expensesAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
 
 export const Expenses = () => {
@@ -368,7 +368,7 @@ export const Expenses = () => {
                       <TableCell>
                         {expense.receipt_path ? (
                           <Link
-                            href={`http://localhost:8000/storage/${expense.receipt_path}`}
+                            href={`${API_STORAGE_URL}/${expense.receipt_path}`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >

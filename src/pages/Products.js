@@ -42,7 +42,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { categoriesAPI, productsAPI } from "../utils/api";
+import { API_STORAGE_URL, categoriesAPI, productsAPI } from "../utils/api";
 
 export const Products = () => {
   const { hasPermission } = useAuth();
@@ -332,7 +332,7 @@ export const Products = () => {
                           sx={{ display: "flex", alignItems: "center", gap: 2 }}
                         >
                           <Avatar
-                            src={product.image_path ? `http://localhost:8000/storage/${product.image_path}` : null}
+                            src={product.image_path ? `${API_STORAGE_URL}/${product.image_path}` : null}
                             sx={{ width: 50, height: 50 }}
                           >
                             {!product.image_path && <InventoryIcon />}

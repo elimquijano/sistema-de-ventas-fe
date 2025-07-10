@@ -167,18 +167,20 @@ export const notificationsAPI = {
 
 // NUEVAS APIs para el sistema de ventas
 export const businessAPI = {
-  getAll: (params = {}) => api.get('/businesses', { params }),
+  getAll: (params = {}) => api.get("/businesses", { params }),
   getById: (id) => api.get(`/businesses/${id}`),
-  create: (businessData) => api.post('/businesses', businessData),
+  create: (businessData) => api.post("/businesses", businessData),
   update: (id, businessData) => api.put(`/businesses/${id}`, businessData),
   delete: (id) => api.delete(`/businesses/${id}`),
-  getStats: (id, params) => api.get(`/businesses/${id}/dashboard`, { params }),
+  getStats: (id, period) =>
+    api.get(`/businesses/${id}/dashboard`, { params: { period } }),
   searchProducts: (term) => api.get(`/products/search?term=${term}`),
-  createPurchase: (purchaseData) => api.post('/purchases', purchaseData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  }),
+  createPurchase: (purchaseData) =>
+    api.post("/purchases", purchaseData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
 };
 
 export const productsAPI = {
@@ -232,6 +234,8 @@ export const salesAPI = {
   delete: (id) => api.delete(`/sales/${id}`),
   getDaily: (date) => api.get(`/sales/daily?date=${date}`),
   getMonthlySales: (month, year) => api.get(`/sales/monthly/${year}/${month}`),
+  getSaleReceipt: (saleId) =>
+    api.get(`/sales/${saleId}/receipt`, { responseType: "blob" }),
 };
 
 export const expensesAPI = {

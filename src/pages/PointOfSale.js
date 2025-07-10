@@ -52,6 +52,7 @@ import {
   Close as CloseIcon,
   CreditCard as CreditCardIcon,
   AccountBalance as BankIcon,
+  Print as PrintIcon, // Cambiado de ReceiptIcon a PrintIcon para claridad
 } from "@mui/icons-material";
 import { formatCurrency } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
@@ -100,6 +101,7 @@ export const PointOfSale = () => {
   const [initCashAmount, setInitCashAmount] = useState("");
   const [reportData, setReportData] = useState(null);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Mantener todas las funciones originales sin cambios
@@ -355,6 +357,21 @@ export const PointOfSale = () => {
     } catch (error) {
       console.error("Error completing sale:", error);
       notificationSwal("Error", "Error al completar la venta.", "error");
+    }
+  };
+
+  const handlePrintReceipt = async (saleId) => {
+    setIsPrinting(true);
+    try {
+      const response = await salesAPI.getSaleReceipt(saleId);
+      const file = new Blob([response.data], { type: "application/pdf" });
+      const fileURL = URL.createObjectURL(file);
+      window.open(fileURL, "_blank");
+    } catch (error) {
+      console.error("Error printing receipt:", error);
+      notificationSwal("Error", "No se pudo generar el recibo.", "error");
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -1434,6 +1451,15 @@ export const PointOfSale = () => {
                           <Typography variant="h6" sx={{ fontWeight: 700 }}>
                             {formatCurrency(sale.total_amount, currency)}
                           </Typography>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            sx={{ ml: 2 }}
+                            onClick={() => handlePrintReceipt(sale.id)}
+                            disabled={isPrinting}
+                          >
+                            <PrintIcon />
+                          </IconButton>
                         </ListItem>
                       ))}
                     </List>

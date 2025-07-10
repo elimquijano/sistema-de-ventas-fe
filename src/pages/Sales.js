@@ -36,7 +36,7 @@ import {
   Delete as DeleteIcon,
   Visibility as ViewIcon,
   GetApp as ExportIcon,
-  Receipt as ReceiptIcon,
+  Print as PrintIcon, // Cambiado de ReceiptIcon a PrintIcon para claridad
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
@@ -52,6 +52,7 @@ export const Sales = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
+  const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
     loadSales();
@@ -107,6 +108,21 @@ export const Sales = () => {
         console.error("Error deleting sale:", error);
         notificationSwal("Error", "Error al eliminar la venta.", "error");
       }
+    }
+  };
+
+  const handlePrintReceipt = async (saleId) => {
+    setIsPrinting(true);
+    try {
+      const response = await salesAPI.getSaleReceipt(saleId);
+      const file = new Blob([response.data], { type: 'application/pdf' });
+      const fileURL = URL.createObjectURL(file);
+      window.open(fileURL, '_blank');
+    } catch (error) {
+      console.error("Error printing receipt:", error);
+      notificationSwal("Error", "No se pudo generar el recibo.", "error");
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -286,23 +302,14 @@ export const Sales = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleViewSale(sale)}
-                      >
-                        <ViewIcon />
-                      </IconButton>
+                      <IconButton size="small" onClick={() => handleViewSale(sale)}><ViewIcon /></IconButton>
                       {hasPermission("ventas.edit") && (
                         <IconButton size="small">
                           <EditIcon />
                         </IconButton>
                       )}
                       {hasPermission("ventas.delete") && (
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteSale(sale.id)}
-                          color="error"
-                        >
+                        <IconButton size="small" onClick={() => handleDeleteSale(sale.id)} color="error">
                           <DeleteIcon />
                         </IconButton>
                       )}
@@ -325,25 +332,12 @@ export const Sales = () => {
       </Card>
 
       {/* Dialog para ver detalles de venta */}
-      <Dialog
-        open={openViewDialog}
-        onClose={() => setOpenViewDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Typography variant="h6">
-              Detalles de Venta - {selectedSale?.sale_number}
-            </Typography>
-            <IconButton>
-              <ReceiptIcon />
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <Typography variant="h6">Detalles de Venta - {selectedSale?.sale_number}</Typography>
+            <IconButton onClick={() => handlePrintReceipt(selectedSale.id)} disabled={isPrinting}>
+              <PrintIcon />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -352,88 +346,44 @@ export const Sales = () => {
             <Box>
               <Grid container spacing={2} sx={{ mb: 3 }}>
                 <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Cliente
-                  </Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                    {selectedSale.customer_name}
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Cliente</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>{selectedSale.customer_name}</Typography>
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Fecha
-                  </Typography>
-                  <Typography variant="body1">
-                    {formatDate(selectedSale.created_at)}
-                  </Typography>
+                  <Typography variant="body2" color="text.secondary">Fecha</Typography>
+                  <Typography variant="body1">{formatDate(selectedSale.created_at)}</Typography>
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Método de Pago
-                  </Typography>
-                  <Chip
-                    label={getPaymentMethodLabel(selectedSale.payment_method)}
-                    size="small"
-                    variant="outlined"
-                  />
+                  <Typography variant="body2" color="text.secondary">Método de Pago</Typography>
+                  <Chip label={getPaymentMethodLabel(selectedSale.payment_method)} size="small" variant="outlined" />
                 </Grid>
                 <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Estado
-                  </Typography>
-                  <Chip
-                    label={getPaymentStatusLabel(selectedSale.payment_status)}
-                    size="small"
-                    color={getPaymentStatusColor(selectedSale.payment_status)}
-                  />
+                  <Typography variant="body2" color="text.secondary">Estado</Typography>
+                  <Chip label={getPaymentStatusLabel(selectedSale.payment_status)} size="small" color={getPaymentStatusColor(selectedSale.payment_status)} />
                 </Grid>
               </Grid>
 
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Productos y Servicios
-              </Typography>
+              <Typography variant="h6" sx={{ mb: 2 }}>Productos y Servicios</Typography>
               <List dense>
                 {selectedSale.items.map((item, index) => (
                   <ListItem key={index} sx={{ px: 0 }}>
-                    <ListItemText
-                      primary={item.item_name}
-                      secondary={`${item.quantity} x ${formatCurrency(
-                        item.unit_price
-                      )}`}
-                    />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {formatCurrency(item.total_price)}
-                    </Typography>
+                    <ListItemText primary={item.item_name} secondary={`${item.quantity} x ${formatCurrency(item.unit_price)}`} />
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(item.total_price)}</Typography>
                   </ListItem>
                 ))}
               </List>
 
-              <Box
-                sx={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  mt: 2,
-                  pt: 2,
-                  borderTop: 1,
-                  borderColor: "divider",
-                }}
-              >
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
                 <Typography variant="h6">Total:</Typography>
-                <Typography
-                  variant="h6"
-                  sx={{ fontWeight: 700, color: "primary.main" }}
-                >
-                  {formatCurrency(selectedSale.total_amount)}
-                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main" }}>{formatCurrency(selectedSale.total_amount)}</Typography>
               </Box>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenViewDialog(false)}>Cerrar</Button>
-          <Button variant="contained" startIcon={<ReceiptIcon />}>
-            Imprimir Recibo
+          <Button variant="contained" startIcon={<PrintIcon />} onClick={() => handlePrintReceipt(selectedSale.id)} disabled={isPrinting}>
+            {isPrinting ? "Generando..." : "Imprimir Recibo"}
           </Button>
         </DialogActions>
       </Dialog>

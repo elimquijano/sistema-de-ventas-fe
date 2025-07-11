@@ -791,6 +791,7 @@ export const DashboardLayout = () => {
           mt: "64px",
           backgroundColor: theme.palette.background.default,
           minHeight: "calc(100vh - 64px)",
+          overflowX: "auto",
           transition: theme.transitions.create(["width", "margin"], {
             easing: theme.transitions.easing.sharp,
             duration: theme.transitions.duration.leavingScreen,

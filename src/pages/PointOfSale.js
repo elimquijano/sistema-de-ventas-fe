@@ -103,6 +103,7 @@ export const PointOfSale = () => {
   const [reportData, setReportData] = useState(null);
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Mantener todas las funciones originales sin cambios
@@ -341,6 +342,7 @@ export const PointOfSale = () => {
         paymentType === "credit" ? customerName : "Cliente General",
     };
     try {
+      setIsLoading(true);
       await salesAPI.create(saleData);
       notificationSwal(
         "Venta Completada",
@@ -358,6 +360,8 @@ export const PointOfSale = () => {
     } catch (error) {
       console.error("Error completing sale:", error);
       notificationSwal("Error", "Error al completar la venta.", "error");
+    } finally{
+      setIsLoading(false);
     }
   };
 
@@ -377,7 +381,7 @@ export const PointOfSale = () => {
   };
 
   const renderProductGrid = (items, type) => (
-    <Grid container spacing={2} sx={{ p: 2 }}>
+    <Grid container spacing={isMobile ? 1 : 2} sx={{ p: { xs: 1, md: 2 } }}>
       {items.map((item) => (
         <Grid item xs={6} sm={4} md={3} key={`${type}-${item.id}`}>
           <Card
@@ -512,7 +516,7 @@ export const PointOfSale = () => {
   return (
     <Box
       sx={{
-        height: "100vh",
+        height: "100%",
         display: "flex",
         flexDirection: "column",
         bgcolor: "background.default",
@@ -541,7 +545,6 @@ export const PointOfSale = () => {
                     {!cashRegister ? (
                       <Button
                         variant="contained"
-                        startIcon={<CashRegisterIcon />}
                         onClick={handleOpenCashRegister}
                         sx={{
                           bgcolor: "success.main",
@@ -555,16 +558,10 @@ export const PointOfSale = () => {
                     ) : (
                       <>
                         <Button
-                          variant="outlined"
-                          startIcon={<AssessmentIcon />}
+                          variant="contained"
                           onClick={handleOpenReports}
                           sx={{
-                            color: "white",
-                            borderColor: "white",
-                            "&:hover": {
-                              borderColor: "white",
-                              bgcolor: "rgba(255,255,255,0.1)",
-                            },
+                            bgcolor: "warning.main",
                             fontWeight: 600,
                             mr: 1,
                             whiteSpace: "nowrap",
@@ -574,7 +571,6 @@ export const PointOfSale = () => {
                         </Button>
                         <Button
                           variant="contained"
-                          startIcon={<CashRegisterIcon />}
                           onClick={handleCloseCashRegister}
                           sx={{
                             bgcolor: "error.main",
@@ -594,7 +590,7 @@ export const PointOfSale = () => {
                 <Grid container spacing={1} justifyContent="center">
                   <Grid item>
                     <Chip
-                      label={cashRegister ? "Caja Abierta" : "Caja Cerrada"}
+                      label={cashRegister ? "Abierta" : "Cerrada"}
                       color={cashRegister ? "success" : "error"}
                       icon={<CashRegisterIcon />}
                       sx={{ color: "white", fontWeight: 600 }}
@@ -662,17 +658,12 @@ export const PointOfSale = () => {
               ) : (
                 <>
                   <Button
-                    variant="outlined"
+                    variant="contained"
                     startIcon={<AssessmentIcon />}
                     onClick={handleOpenReports}
                     sx={{
+                      bgcolor: "warning.main",
                       mr: 1,
-                      color: "white",
-                      borderColor: "white",
-                      "&:hover": {
-                        borderColor: "white",
-                        bgcolor: "rgba(255,255,255,0.1)",
-                      },
                     }}
                   >
                     Reportes
@@ -1314,6 +1305,7 @@ export const PointOfSale = () => {
             onClick={handleCompleteSale}
             variant="contained"
             size="large"
+            disabled={isLoading}
             sx={{
               background: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
               px: 4,

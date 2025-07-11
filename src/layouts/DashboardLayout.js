@@ -50,6 +50,7 @@ import { getIcon } from "../config/moduleConfig";
 import { DynamicRoutes } from "../routes/DynamicRouteGenerator";
 import { findFirstValidRoute } from "../utils/navigationUtils";
 import Logo from "../components/Logo";
+import Swal from "sweetalert2";
 
 const drawerWidth = 260;
 const collapsedDrawerWidth = 64;
@@ -183,9 +184,21 @@ export const DashboardLayout = () => {
   };
 
   const handleLogout = () => {
-    logout();
-    navigate("/");
     handleClose();
+    Swal.fire({
+      title: "¿Estás seguro?",
+      text: "Estás a punto de cerrar tu sesión.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Sí, cerrar sesión",
+      cancelButtonText: "Cancelar",
+    }).then((result) => {
+      if (result.isConfirmed) {
+        logout();
+      }
+    });
   };
 
   const handleExpandClick = (text) => {

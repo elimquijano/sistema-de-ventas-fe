@@ -29,6 +29,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  CircularProgress,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -52,6 +53,7 @@ export const Sales = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
 
   useEffect(() => {
@@ -96,6 +98,7 @@ export const Sales = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await salesAPI.delete(saleId);
         notificationSwal(
@@ -107,6 +110,8 @@ export const Sales = () => {
       } catch (error) {
         console.error("Error deleting sale:", error);
         notificationSwal("Error", "Error al eliminar la venta.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -309,7 +314,7 @@ export const Sales = () => {
                         </IconButton>
                       )}
                       {hasPermission("ventas.delete") && (
-                        <IconButton size="small" onClick={() => handleDeleteSale(sale.id)} color="error">
+                        <IconButton size="small" onClick={() => handleDeleteSale(sale.id)} color="error" disabled={isSubmitting}>
                           <DeleteIcon />
                         </IconButton>
                       )}
@@ -381,9 +386,9 @@ export const Sales = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenViewDialog(false)}>Cerrar</Button>
+          <Button onClick={() => setOpenViewDialog(false)} disabled={isPrinting}>Cerrar</Button>
           <Button variant="contained" startIcon={<PrintIcon />} onClick={() => handlePrintReceipt(selectedSale.id)} disabled={isPrinting}>
-            {isPrinting ? "Generando..." : "Imprimir Recibo"}
+            {isPrinting ? <CircularProgress size={20} color="inherit" /> : "Imprimir Recibo"}
           </Button>
         </DialogActions>
       </Dialog>

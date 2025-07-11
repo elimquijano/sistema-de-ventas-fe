@@ -45,6 +45,7 @@ export const Categories = () => {
   const [typeFilter, setTypeFilter] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     type: "product", // Default type
@@ -94,6 +95,7 @@ export const Categories = () => {
   };
 
   const handleSaveCategory = async () => {
+    setIsSubmitting(true);
     try {
       if (editingCategory) {
         await categoriesAPI.update(editingCategory.id, formData);
@@ -115,6 +117,8 @@ export const Categories = () => {
     } catch (error) {
       console.error("Error saving category:", error);
       notificationSwal("Error", "Error al guardar la categoría.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -129,6 +133,7 @@ export const Categories = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await categoriesAPI.delete(categoryId);
         notificationSwal(
@@ -140,6 +145,8 @@ export const Categories = () => {
       } catch (error) {
         console.error("Error deleting category:", error);
         notificationSwal("Error", "Error al eliminar la categoría.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -267,6 +274,7 @@ export const Categories = () => {
                           size="small"
                           onClick={() => handleDeleteCategory(category.id)}
                           color="error"
+                          disabled={isSubmitting}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -322,14 +330,15 @@ export const Categories = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveCategory}
             variant="contained"
-            disabled={!formData.name}
+            disabled={!formData.name || isSubmitting}
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingCategory ? "Actualizar" : "Crear"} Categoría
           </Button>

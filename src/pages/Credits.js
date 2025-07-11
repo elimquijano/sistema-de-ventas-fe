@@ -56,6 +56,7 @@ export const Credits = () => {
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [selectedCredit, setSelectedCredit] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Edit Dialog State
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -110,6 +111,7 @@ export const Credits = () => {
         return;
       }
 
+      setIsSubmitting(true);
       await creditsAPI.processPayment(selectedCredit.id, { amount });
 
       notificationSwal(
@@ -125,6 +127,8 @@ export const Credits = () => {
     } catch (error) {
       console.error("Error processing payment:", error);
       notificationSwal("Error", "Error al procesar el pago.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -146,6 +150,7 @@ export const Credits = () => {
 
   const handleUpdateCredit = async () => {
     if (!editingCredit) return;
+    setIsSubmitting(true);
     try {
       const dataToUpdate = {
         ...editFormData,
@@ -158,6 +163,8 @@ export const Credits = () => {
     } catch (error) {
       console.error("Error updating credit:", error);
       notificationSwal("Error", "No se pudo actualizar el crédito.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -368,14 +375,15 @@ export const Credits = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenPaymentDialog(false)}>Cancelar</Button>
+          <Button onClick={() => setOpenPaymentDialog(false)} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleProcessPayment}
             variant="contained"
-            disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}
+            disabled={!paymentAmount || parseFloat(paymentAmount) <= 0 || isSubmitting}
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             Registrar Pago
           </Button>
@@ -396,6 +404,7 @@ export const Credits = () => {
                   value={editFormData.due_date}
                   onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
                   InputLabelProps={{ shrink: true }}
+                  disabled={isSubmitting}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -408,10 +417,11 @@ export const Credits = () => {
                   InputLabelProps={{ shrink: true }}
                   error={parseFloat(editFormData.paid_amount) > editingCredit?.total_amount}
                   helperText={parseFloat(editFormData.paid_amount) > editingCredit?.total_amount ? "No puede ser mayor al total." : ""}
+                  disabled={isSubmitting}
                 />
               </Grid>
               <Grid item xs={12}>
-                <FormControl fullWidth>
+                <FormControl fullWidth disabled={isSubmitting}>
                   <InputLabel>Estado</InputLabel>
                   <Select value={editFormData.status} label="Estado" onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}>
                     <MenuItem value="pending">Pendiente</MenuItem>
@@ -424,8 +434,10 @@ export const Credits = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseEditDialog}>Cancelar</Button>
-          <Button onClick={handleUpdateCredit} variant="contained">Guardar Cambios</Button>
+          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleUpdateCredit} variant="contained" disabled={isSubmitting}>
+            {isSubmitting ? <CircularProgress size={20} color="inherit" /> : "Guardar Cambios"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

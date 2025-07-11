@@ -68,6 +68,7 @@ export const Modules = () => {
   const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
   const [openDialog, setOpenDialog] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingModule, setEditingModule] = useState(null);
   const [treeData, setTreeData] = useState([]);
   const [formData, setFormData] = useState({
@@ -183,8 +184,17 @@ export const Modules = () => {
   };
 
   const handleSaveModule = async () => {
+    setIsSubmitting(true);
     try {
       setError("");
+
+      // Buscar el módulo por nombre si no se ha seleccionado module_id
+      if (formData.module && !formData.module_id) {
+        const module = modules.find((m) => m.name === formData.module);
+        if (module) {
+          formData.module_id = module.id;
+        }
+      }
 
       if (editingModule) {
         await modulesAPI.update(editingModule.id, formData);
@@ -208,6 +218,8 @@ export const Modules = () => {
     } catch (error) {
       console.error("Error saving module:", error);
       setError(error.response?.data?.message || "Error al guardar el módulo");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -237,6 +249,7 @@ export const Modules = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await modulesAPI.delete(moduleId);
         notificationSwal(
@@ -253,6 +266,8 @@ export const Modules = () => {
           error.response?.data?.message || "Error al eliminar el módulo.",
           "error"
         );
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -542,6 +557,7 @@ export const Modules = () => {
                                 size="small"
                                 onClick={() => handleDeleteModule(module.id)}
                                 color="error"
+                                disabled={isSubmitting}
                               >
                                 <DeleteIcon />
                               </IconButton>
@@ -751,6 +767,7 @@ export const Modules = () => {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, show_in_menu: e.target.checked }))
                       }
+                      disabled={isSubmitting}
                     />
                   }
                   label="Mostrar en Menú"
@@ -762,6 +779,7 @@ export const Modules = () => {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, auto_create_permissions: e.target.checked }))
                       }
+                      disabled={isSubmitting}
                     />
                   }
                   label="Crear Permisos Automáticamente"
@@ -771,14 +789,15 @@ export const Modules = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveModule}
             variant="contained"
-            disabled={!formData.name || !formData.slug}
+            disabled={!formData.name || !formData.slug || isSubmitting}
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingModule ? "Actualizar" : "Crear"} Módulo
           </Button>

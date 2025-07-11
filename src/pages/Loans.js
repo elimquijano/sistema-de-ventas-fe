@@ -47,6 +47,7 @@ export const Loans = () => {
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Dialog for Create/Edit Loan
   const [openDialog, setOpenDialog] = useState(false);
@@ -130,6 +131,7 @@ export const Loans = () => {
   };
 
   const handleSaveLoan = async () => {
+    setIsSubmitting(true);
     try {
       const dataToSave = {
         ...formData,
@@ -162,6 +164,8 @@ export const Loans = () => {
         ? Object.values(error.response.data.errors).join(", ")
         : "Error al guardar el préstamo.";
       notificationSwal("Error", errorMessage, "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -173,6 +177,7 @@ export const Loans = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await loansAPI.delete(loanId);
         notificationSwal(
@@ -184,6 +189,8 @@ export const Loans = () => {
       } catch (error) {
         console.error("Error deleting loan:", error);
         notificationSwal("Error", "Error al eliminar el préstamo.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -206,6 +213,7 @@ export const Loans = () => {
       return;
     }
 
+    setIsSubmitting(true);
     try {
       await loansAPI.addPayment(payingLoan.id, { amount: parseFloat(paymentAmount) });
       notificationSwal("Pago Registrado", "El pago ha sido registrado exitosamente.", "success");
@@ -215,6 +223,8 @@ export const Loans = () => {
       console.error("Error processing payment:", error);
       const errorMessage = error.response?.data?.message || "Error al procesar el pago.";
       notificationSwal("Error", errorMessage, "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -309,7 +319,7 @@ export const Loans = () => {
                           <IconButton size="small" onClick={() => handleOpenDialog(loan)}><EditIcon /></IconButton>
                         )}
                         {hasPermission("prestamos.delete") && (
-                          <IconButton size="small" onClick={() => handleDeleteLoan(loan.id)} color="error"><DeleteIcon /></IconButton>
+                          <IconButton size="small" onClick={() => handleDeleteLoan(loan.id)} color="error" disabled={isSubmitting}><DeleteIcon /></IconButton>
                         )}
                       </TableCell>
                     </TableRow>
@@ -360,8 +370,8 @@ export const Loans = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
-          <Button onClick={handleSaveLoan} variant="contained" disabled={!formData.description || !formData.amount || !formData.loan_date} sx={{ background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)" }}>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleSaveLoan} variant="contained" disabled={!formData.description || !formData.amount || !formData.loan_date || isSubmitting} sx={{ background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)" }}>
             {editingLoan ? "Actualizar" : "Crear"} Préstamo
           </Button>
         </DialogActions>
@@ -391,8 +401,10 @@ export const Loans = () => {
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleClosePaymentDialog}>Cancelar</Button>
-          <Button onClick={handleProcessPayment} variant="contained">Registrar Pago</Button>
+          <Button onClick={handleClosePaymentDialog} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleProcessPayment} variant="contained" disabled={isSubmitting}>
+            {isSubmitting ? <CircularProgress size={20} color="inherit" /> : "Registrar Pago"}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

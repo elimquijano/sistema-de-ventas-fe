@@ -61,6 +61,8 @@ export const Business = () => {
     user_id: "",
   });
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     loadBusinesses();
     loadUsers();
@@ -129,6 +131,7 @@ export const Business = () => {
   };
 
   const handleSaveBusiness = async () => {
+    setIsSubmitting(true);
     try {
       if (editingBusiness) {
         await businessAPI.update(editingBusiness.id, formData);
@@ -150,6 +153,8 @@ export const Business = () => {
     } catch (error) {
       console.error("Error saving business:", error);
       notificationSwal("Error", "Error al guardar el negocio.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -164,6 +169,7 @@ export const Business = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await businessAPI.delete(businessId);
         notificationSwal(
@@ -175,6 +181,8 @@ export const Business = () => {
       } catch (error) {
         console.error("Error deleting business:", error);
         notificationSwal("Error", "Error al eliminar el negocio.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -333,6 +341,7 @@ export const Business = () => {
                           size="small"
                           onClick={() => handleDeleteBusiness(business.id)}
                           color="error"
+                          disabled={isSubmitting}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -487,14 +496,15 @@ export const Business = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveBusiness}
             variant="contained"
-            disabled={!formData.name}
+            disabled={!formData.name || isSubmitting}
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingBusiness ? "Actualizar" : "Crear"} Negocio
           </Button>

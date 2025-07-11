@@ -55,6 +55,7 @@ export const Expenses = () => {
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [receiptFile, setReceiptFile] = useState(null);
   const [formData, setFormData] = useState({
     description: "",
@@ -142,6 +143,7 @@ export const Expenses = () => {
   };
 
   const handleSaveExpense = async () => {
+    setIsSubmitting(true);
     try {
       let payload = { ...formData };
 
@@ -177,6 +179,8 @@ export const Expenses = () => {
       const errorMessage =
         error.response?.data?.message || "Error al guardar el gasto.";
       notificationSwal("Error", errorMessage, "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -188,6 +192,7 @@ export const Expenses = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await expensesAPI.delete(expenseId);
         notificationSwal(
@@ -199,6 +204,8 @@ export const Expenses = () => {
       } catch (error) {
         console.error("Error deleting expense:", error);
         notificationSwal("Error", "Error al eliminar el gasto.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -405,6 +412,7 @@ export const Expenses = () => {
                             size="small"
                             onClick={() => handleDeleteExpense(expense.id)}
                             color="error"
+                            disabled={isSubmitting}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -528,16 +536,17 @@ export const Expenses = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveExpense}
             variant="contained"
             disabled={
-              !formData.description || !formData.amount || !formData.category_id
+              !formData.description || !formData.amount || !formData.category_id || isSubmitting
             }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingExpense ? "Actualizar" : "Registrar"} Gasto
           </Button>

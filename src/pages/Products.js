@@ -53,6 +53,7 @@ export const Products = () => {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -155,6 +156,7 @@ export const Products = () => {
       }
     });
 
+    setIsSubmitting(true);
     try {
       if (editingProduct) {
         await productsAPI.update(editingProduct.id, data);
@@ -176,6 +178,8 @@ export const Products = () => {
     } catch (error) {
       console.error("Error saving product:", error);
       notificationSwal("Error", "Error al guardar el producto.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -190,6 +194,7 @@ export const Products = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await productsAPI.delete(productId);
         notificationSwal(
@@ -201,6 +206,8 @@ export const Products = () => {
       } catch (error) {
         console.error("Error deleting product:", error);
         notificationSwal("Error", "Error al eliminar el producto.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -416,6 +423,7 @@ export const Products = () => {
                             size="small"
                             onClick={() => handleDeleteProduct(product.id)}
                             color="error"
+                            disabled={isSubmitting}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -598,14 +606,15 @@ export const Products = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveProduct}
             variant="contained"
-            disabled={!formData.name || !formData.price || !formData.cost}
+            disabled={!formData.name || !formData.price || !formData.cost || isSubmitting}
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingProduct ? "Actualizar" : "Crear"} Producto
           </Button>

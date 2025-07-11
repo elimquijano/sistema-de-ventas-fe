@@ -76,6 +76,7 @@ export const UserPermissions = () => {
   const [modules, setModules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingPermission, setEditingPermission] = useState(null);
   const [formData, setFormData] = useState({
@@ -202,6 +203,7 @@ export const UserPermissions = () => {
   };
 
   const handleSavePermission = async () => {
+    setIsSubmitting(true);
     try {
       setError("");
 
@@ -234,6 +236,8 @@ export const UserPermissions = () => {
     } catch (error) {
       console.error("Error saving permission:", error);
       setError(error.response?.data?.message || "Error al guardar el permiso");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -252,6 +256,7 @@ export const UserPermissions = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await permissionsAPI.delete(permissionId);
         notificationSwal(
@@ -267,6 +272,8 @@ export const UserPermissions = () => {
           error.response?.data?.message || "Error al eliminar el permiso.",
           "error"
         );
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -520,6 +527,7 @@ export const UserPermissions = () => {
                                   handleDeletePermission(permission.id)
                                 }
                                 color="error"
+                                disabled={isSubmitting}
                               >
                                 <DeleteIcon />
                               </IconButton>
@@ -634,16 +642,17 @@ export const UserPermissions = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSavePermission}
             variant="contained"
             disabled={
-              !formData.name || !formData.display_name || !formData.module
+              !formData.name || !formData.display_name || !formData.module || isSubmitting
             }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingPermission ? "Actualizar" : "Crear"} Permiso
           </Button>

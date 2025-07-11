@@ -51,6 +51,7 @@ export const UserRoles = () => {
   const [permissions, setPermissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingRole, setEditingRole] = useState(null);
   const [formData, setFormData] = useState({
@@ -138,6 +139,7 @@ export const UserRoles = () => {
   };
 
   const handleSaveRole = async () => {
+    setIsSubmitting(true);
     try {
       if (editingRole) {
         await rolesAPI.update(editingRole.id, formData);
@@ -160,6 +162,7 @@ export const UserRoles = () => {
       notificationSwal("Error", "Hubo un error al guardar el rol", "error");
     } finally {
       handleCloseDialog();
+      setIsSubmitting(false);
     }
   };
 
@@ -185,6 +188,7 @@ export const UserRoles = () => {
     );
 
     if (confirmUser) {
+      setIsSubmitting(true);
       try {
         await rolesAPI.delete(roleId);
         notificationSwal(
@@ -196,6 +200,8 @@ export const UserRoles = () => {
       } catch (error) {
         console.error("Error deleting role:", error);
         notificationSwal("Error", "Hubo un error al eliminar el rol", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -352,6 +358,7 @@ export const UserRoles = () => {
                             size="small"
                             onClick={() => handleDeleteRole(role.id)}
                             color="error"
+                            disabled={isSubmitting}
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -458,14 +465,15 @@ export const UserRoles = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveRole}
             variant="contained"
-            disabled={!formData.name || !formData.description}
+            disabled={!formData.name || !formData.description || isSubmitting}
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingRole ? "Actualizar" : "Crear"} Rol
           </Button>

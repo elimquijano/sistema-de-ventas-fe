@@ -67,6 +67,7 @@ const CreateProductModal = ({ open, onClose, onProductCreated, businessId }) => 
           fullWidth
           variant="outlined"
           onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+          disabled={isSaving}
         />
         <TextField
           margin="dense"
@@ -75,6 +76,7 @@ const CreateProductModal = ({ open, onClose, onProductCreated, businessId }) => 
           fullWidth
           variant="outlined"
           onChange={(e) => setNewProduct({ ...newProduct, cost: e.target.value })}
+          disabled={isSaving}
         />
         <TextField
           margin="dense"
@@ -83,12 +85,13 @@ const CreateProductModal = ({ open, onClose, onProductCreated, businessId }) => 
           fullWidth
           variant="outlined"
           onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+          disabled={isSaving}
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
+        <Button onClick={onClose} disabled={isSaving}>Cancelar</Button>
         <Button onClick={handleSave} variant="contained" disabled={isSaving}>
-          {isSaving ? <CircularProgress size={24} /> : 'Guardar'}
+          {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Guardar'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -269,6 +272,7 @@ export const Purchases = () => {
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
                     fullWidth
+                    disabled={isSaving}
                   />
                 </Grid>
                 <Grid item xs={6}>
@@ -278,6 +282,7 @@ export const Purchases = () => {
                     value={cost}
                     onChange={(e) => setCost(e.target.value)}
                     fullWidth
+                    disabled={isSaving}
                   />
                 </Grid>
               </Grid>
@@ -287,6 +292,7 @@ export const Purchases = () => {
                 onClick={handleAddItem}
                 fullWidth
                 sx={{ mt: 2, py: 1.5 }}
+                disabled={isSaving}
               >
                 Añadir a la Compra
               </Button>
@@ -329,23 +335,23 @@ export const Purchases = () => {
                 <Typography variant="h6" sx={{ mb: 2 }}>Datos del Gasto y Factura</Typography>
                 <Grid container spacing={2}>
                     <Grid item xs={12} sm={6}>
-                        <TextField label="Nombre del Proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} fullWidth />
+                        <TextField label="Nombre del Proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} fullWidth disabled={isSaving} />
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                        <TextField type="date" label="Fecha de Compra" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} />
+                        <TextField type="date" label="Fecha de Compra" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} disabled={isSaving} />
                     </Grid>
                     <Grid item xs={12}>
-                        <TextField label="Notas / Descripción" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={2} />
+                        <TextField label="Notas / Descripción" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={2} disabled={isSaving} />
                     </Grid>
                     <Grid item xs={12} sm={6} sx={{display: 'flex', alignItems: 'center'}}>
-                        <Button variant="outlined" component="label" startIcon={<UploadFile />}>
+                        <Button variant="outlined" component="label" startIcon={<UploadFile />} disabled={isSaving}>
                             Subir Factura
                             <input type="file" hidden onChange={e => setReceiptFile(e.target.files[0])} />
                         </Button>
                         {receiptFile && <Chip label={receiptFile.name} onDelete={() => setReceiptFile(null)} sx={{ml: 1}}/>}
                     </Grid>
                     <Grid item xs={12} sm={6}>
-                        <FormControlLabel control={<Switch checked={generateReceipt} onChange={e => setGenerateReceipt(e.target.checked)} />} label="Generar Recibo PDF" />
+                        <FormControlLabel control={<Switch checked={generateReceipt} onChange={e => setGenerateReceipt(e.target.checked)} disabled={isSaving} />} label="Generar Recibo PDF" />
                     </Grid>
                 </Grid>
             </CardContent>

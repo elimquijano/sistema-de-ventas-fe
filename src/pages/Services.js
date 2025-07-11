@@ -51,6 +51,7 @@ export const Services = () => {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingService, setEditingService] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
@@ -144,6 +145,7 @@ export const Services = () => {
       }
     });
 
+    setIsSubmitting(true);
     try {
       if (editingService) {
         await servicesAPI.update(editingService.id, data);
@@ -165,6 +167,8 @@ export const Services = () => {
     } catch (error) {
       console.error("Error saving service:", error);
       notificationSwal("Error", "Error al guardar el servicio.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -179,6 +183,7 @@ export const Services = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await servicesAPI.delete(serviceId);
         notificationSwal(
@@ -190,6 +195,8 @@ export const Services = () => {
       } catch (error) {
         console.error("Error deleting service:", error);
         notificationSwal("Error", "Error al eliminar el servicio.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -378,6 +385,7 @@ export const Services = () => {
                           size="small"
                           onClick={() => handleDeleteService(service.id)}
                           color="error"
+                          disabled={isSubmitting}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -521,14 +529,15 @@ export const Services = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveService}
             variant="contained"
-            disabled={!formData.name || !formData.price || !formData.duration}
+            disabled={!formData.name || !formData.price || !formData.duration || isSubmitting}
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingService ? "Actualizar" : "Crear"} Servicio
           </Button>

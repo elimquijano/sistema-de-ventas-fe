@@ -52,6 +52,7 @@ export const Users = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     first_name: "",
     last_name: "",
@@ -151,6 +152,7 @@ export const Users = () => {
   };
 
   const handleSaveUser = async () => {
+    setIsSubmitting(true);
     try {
       if (editingUser) {
         await usersAPI.update(editingUser.id, formData);
@@ -168,6 +170,7 @@ export const Users = () => {
         );
       }
       loadUsers();
+      handleCloseDialog();
     } catch (error) {
       console.error("Error al guardar el usuario:", error);
       notificationSwal(
@@ -176,7 +179,7 @@ export const Users = () => {
         "error"
       );
     } finally {
-      handleCloseDialog();
+      setIsSubmitting(false);
     }
   };
 
@@ -191,6 +194,7 @@ export const Users = () => {
     );
 
     if (userConfirmed) {
+      setIsSubmitting(true);
       try {
         await usersAPI.delete(userId);
         notificationSwal(
@@ -206,6 +210,8 @@ export const Users = () => {
           error?.response?.data?.message || "Hubo un problema al eliminar el usuario.",
           "error"
         );
+      } finally {
+        setIsSubmitting(false);
       }
     }
   };
@@ -412,6 +418,7 @@ export const Users = () => {
                           size="small"
                           onClick={() => handleDeleteUser(user.id)}
                           color="error"
+                          disabled={isSubmitting}
                         >
                           <DeleteIcon />
                         </IconButton>
@@ -575,7 +582,7 @@ export const Users = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
           <Button
             onClick={handleSaveUser}
             variant="contained"
@@ -583,11 +590,13 @@ export const Users = () => {
               !formData.first_name ||
               !formData.last_name ||
               !formData.email ||
-              (!editingUser && !formData.password)
+              (!editingUser && !formData.password) ||
+              isSubmitting
             }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
           >
             {editingUser ? "Editar" : "Crear"} Usuario
           </Button>

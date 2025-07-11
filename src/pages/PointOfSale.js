@@ -360,7 +360,7 @@ export const PointOfSale = () => {
     } catch (error) {
       console.error("Error completing sale:", error);
       notificationSwal("Error", "Error al completar la venta.", "error");
-    } finally{
+    } finally {
       setIsLoading(false);
     }
   };
@@ -1325,7 +1325,7 @@ export const PointOfSale = () => {
         fullWidth
         TransitionComponent={Transition}
       >
-        <DialogTitle>
+        <DialogTitle sx={{ p: { xs: 1, md: 3 } }}>
           <Box
             sx={{
               display: "flex",
@@ -1341,10 +1341,14 @@ export const PointOfSale = () => {
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ p: { xs: 1, md: 3 } }}>
           {reportData && (
             <>
-              <Grid container spacing={3} sx={{ mb: 3 }}>
+              <Grid
+                container
+                spacing={isMobile ? 1 : 3}
+                sx={{ mb: { xs: 1, md: 3 } }}
+              >
                 <Grid item xs={6} md={3}>
                   <Paper
                     sx={{
@@ -1410,7 +1414,11 @@ export const PointOfSale = () => {
               <Tabs
                 value={reportType}
                 onChange={(e, newValue) => setReportType(newValue)}
-                sx={{ borderBottom: 1, borderColor: "divider", mb: 3 }}
+                sx={{
+                  borderBottom: 1,
+                  borderColor: "divider",
+                  mb: { xs: 1, md: 3 },
+                }}
               >
                 <Tab label="Ventas del Día" value="sales" />
                 <Tab label="Resumen de Productos" value="products" />

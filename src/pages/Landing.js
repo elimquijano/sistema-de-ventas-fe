@@ -313,7 +313,7 @@ export const Landing = () => {
               color: theme.palette.text.secondary,
             }}
           >
-            © 2024 Berry Dashboard. Built with Material-UI and React.
+            © 2025 Stock Master. Simplifica tu administración, maximiza tus ganancias. Todos los derechos reservados
           </Typography>
         </Container>
       </Box>

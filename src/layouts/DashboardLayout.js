@@ -118,7 +118,7 @@ export const DashboardLayout = () => {
           id: 1,
           type: "info",
           title: "Welcome",
-          message: "Welcome to Berry Dashboard",
+          message: "Welcome to Stock Master",
           read_at: null,
           created_at: new Date().toISOString(),
         },

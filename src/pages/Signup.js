@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -16,13 +16,11 @@ import {
   LinearProgress,
   Grid,
   useTheme,
-} from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-} from '@mui/icons-material';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
+} from "@mui/material";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import Logo from "../components/Logo";
 
 const getPasswordStrength = (password) => {
   let strength = 0;
@@ -30,11 +28,13 @@ const getPasswordStrength = (password) => {
   if (/[a-z]/.test(password)) strength += 25;
   if (/[A-Z]/.test(password)) strength += 25;
   if (/[0-9]/.test(password)) strength += 25;
-  
-  if (strength <= 25) return { value: strength, label: 'Weak', color: 'error' };
-  if (strength <= 50) return { value: strength, label: 'Fair', color: 'warning' };
-  if (strength <= 75) return { value: strength, label: 'Good', color: 'info' };
-  return { value: strength, label: 'Strong', color: 'success' };
+
+  if (strength <= 25)
+    return { value: strength, label: "Débil", color: "error" };
+  if (strength <= 50)
+    return { value: strength, label: "Aceptable", color: "warning" };
+  if (strength <= 75) return { value: strength, label: "Buena", color: "info" };
+  return { value: strength, label: "Fuerte", color: "success" };
 };
 
 export const Signup = () => {
@@ -42,52 +42,49 @@ export const Signup = () => {
   const navigate = useNavigate();
   const { signup } = useAuth();
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    password: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
     agreeToTerms: false,
   });
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
   const passwordStrength = getPasswordStrength(formData.password);
 
   const handleChange = (e) => {
     const { name, value, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: name === 'agreeToTerms' ? checked : value,
+      [name]: name === "agreeToTerms" ? checked : value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-
+    setError("");
     if (!formData.agreeToTerms) {
-      setError('Please agree to the terms and conditions');
+      setError("Por favor, acepta los términos y condiciones");
       setLoading(false);
       return;
     }
-
     try {
       const success = await signup({
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
         password: formData.password,
-        role: 'user',
+        role: "user",
       });
       if (success) {
-        navigate('/dashboard');
+        navigate("/dashboard");
       } else {
-        setError('Failed to create account');
+        setError("Error al crear la cuenta");
       }
     } catch (err) {
-      setError('An error occurred during signup');
+      setError("Ocurrió un error durante el registro");
     } finally {
       setLoading(false);
     }
@@ -96,41 +93,44 @@ export const Signup = () => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
+        minHeight: "100vh",
         background: theme.palette.background.default,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         p: 2,
       }}
     >
       <Card
         sx={{
           maxWidth: 475,
-          width: '100%',
-          boxShadow: 'none',
+          width: "100%",
+          boxShadow: "none",
           border: `1px solid ${theme.palette.divider}`,
         }}
       >
         <CardContent sx={{ p: 4 }}>
           {/* Logo */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 3,
+              }}
+            >
               <Box
                 sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
+                  borderRadius: "50%",
                   background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   mr: 1,
                 }}
               >
-                <Typography variant="body2" sx={{ color: 'white', fontWeight: 700 }}>
-                  🍇
-                </Typography>
+                <Logo height={32} />
               </Box>
               <Typography
                 variant="h5"
@@ -139,32 +139,36 @@ export const Signup = () => {
                   color: theme.palette.primary.main,
                 }}
               >
-                BERRY
+                STOCK MASTER
               </Typography>
             </Box>
-            <Typography variant="h4" sx={{ color: theme.palette.primary.main, mb: 1, fontWeight: 600 }}>
-              Sign up
+            <Typography
+              variant="h4"
+              sx={{ color: theme.palette.primary.main, mb: 1, fontWeight: 600 }}
+            >
+              Regístrate
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-              Enter your details to continue
+              Ingresa tus datos para continuar
             </Typography>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Sign up with Email address
+              Regístrate con tu correo electrónico
             </Typography>
           </Box>
-
-          {/* Form */}
+          {/* Formulario */}
           <form onSubmit={handleSubmit}>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
-
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={6}>
-                <Typography variant="body2" sx={{ mb: 1, color: theme.palette.text.secondary }}>
-                  First Name
+                <Typography
+                  variant="body2"
+                  sx={{ mb: 1, color: theme.palette.text.secondary }}
+                >
+                  Nombre
                 </Typography>
                 <TextField
                   fullWidth
@@ -173,16 +177,19 @@ export const Signup = () => {
                   onChange={handleChange}
                   variant="outlined"
                   sx={{
-                    '& .MuiOutlinedInput-root': {
+                    "& .MuiOutlinedInput-root": {
                       borderRadius: 1,
-                    }
+                    },
                   }}
                   required
                 />
               </Grid>
               <Grid item xs={6}>
-                <Typography variant="body2" sx={{ mb: 1, color: theme.palette.text.secondary }}>
-                  Last Name
+                <Typography
+                  variant="body2"
+                  sx={{ mb: 1, color: theme.palette.text.secondary }}
+                >
+                  Apellido
                 </Typography>
                 <TextField
                   fullWidth
@@ -191,18 +198,20 @@ export const Signup = () => {
                   onChange={handleChange}
                   variant="outlined"
                   sx={{
-                    '& .MuiOutlinedInput-root': {
+                    "& .MuiOutlinedInput-root": {
                       borderRadius: 1,
-                    }
+                    },
                   }}
                   required
                 />
               </Grid>
             </Grid>
-
             <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ mb: 1, color: theme.palette.text.secondary }}>
-                Email Address / Username
+              <Typography
+                variant="body2"
+                sx={{ mb: 1, color: theme.palette.text.secondary }}
+              >
+                Correo Electrónico / Nombre de Usuario
               </Typography>
               <TextField
                 fullWidth
@@ -212,29 +221,31 @@ export const Signup = () => {
                 onChange={handleChange}
                 variant="outlined"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 1,
-                  }
+                  },
                 }}
                 required
               />
             </Box>
-
             <Box sx={{ mb: 1 }}>
-              <Typography variant="body2" sx={{ mb: 1, color: theme.palette.text.secondary }}>
-                Password
+              <Typography
+                variant="body2"
+                sx={{ mb: 1, color: theme.palette.text.secondary }}
+              >
+                Contraseña
               </Typography>
               <TextField
                 fullWidth
                 name="password"
-                type={showPassword ? 'text' : 'password'}
+                type={showPassword ? "text" : "password"}
                 value={formData.password}
                 onChange={handleChange}
                 variant="outlined"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
+                  "& .MuiOutlinedInput-root": {
                     borderRadius: 1,
-                  }
+                  },
                 }}
                 required
                 InputProps={{
@@ -251,8 +262,7 @@ export const Signup = () => {
                 }}
               />
             </Box>
-
-            {/* Password Strength Indicator */}
+            {/* Indicador de Fuerza de Contraseña */}
             {formData.password && (
               <Box sx={{ mb: 2 }}>
                 <LinearProgress
@@ -261,12 +271,14 @@ export const Signup = () => {
                   color={passwordStrength.color}
                   sx={{ height: 6, borderRadius: 3, mb: 1 }}
                 />
-                <Typography variant="caption" color={`${passwordStrength.color}.main`}>
+                <Typography
+                  variant="caption"
+                  color={`${passwordStrength.color}.main`}
+                >
                   {passwordStrength.label}
                 </Typography>
               </Box>
             )}
-
             <FormControlLabel
               control={
                 <Checkbox
@@ -279,21 +291,20 @@ export const Signup = () => {
               }
               label={
                 <Typography variant="body2">
-                  Agree with{' '}
+                  Acepto los{" "}
                   <Link
                     href="#"
                     sx={{
                       color: theme.palette.primary.main,
-                      textDecoration: 'underline',
+                      textDecoration: "underline",
                     }}
                   >
-                    Terms & Condition.
+                    Términos y Condiciones
                   </Link>
                 </Typography>
               }
               sx={{ mb: 3 }}
             />
-
             <Button
               type="submit"
               fullWidth
@@ -304,35 +315,38 @@ export const Signup = () => {
                 background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                 py: 1.5,
                 mb: 3,
-                textTransform: 'none',
-                fontSize: '1rem',
+                textTransform: "none",
+                fontSize: "1rem",
                 fontWeight: 600,
                 borderRadius: 1,
-                boxShadow: 'none',
-                '&:hover': {
-                  boxShadow: 'none',
+                boxShadow: "none",
+                "&:hover": {
+                  boxShadow: "none",
                 },
               }}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Sign Up'}
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                "Regístrate"
+              )}
             </Button>
-
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary">
-                Already have an account?{' '}
+                ¿Ya tienes una cuenta?{" "}
                 <Link
                   component={RouterLink}
                   to="/login"
                   sx={{
                     color: theme.palette.primary.main,
-                    textDecoration: 'none',
+                    textDecoration: "none",
                     fontWeight: 600,
-                    '&:hover': {
-                      textDecoration: 'underline',
+                    "&:hover": {
+                      textDecoration: "underline",
                     },
                   }}
                 >
-                  Sign in
+                  Inicia sesión
                 </Link>
               </Typography>
             </Box>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Box,
   Card,
@@ -10,45 +10,45 @@ import {
   Alert,
   CircularProgress,
   useTheme,
-} from '@mui/material';
-import { ArrowBack } from '@mui/icons-material';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
-import Swal from 'sweetalert2';
-import withReactContent from 'sweetalert2-react-content';
+} from "@mui/material";
+import { ArrowBack } from "@mui/icons-material";
+import { useNavigate, Link as RouterLink } from "react-router-dom";
+import Swal from "sweetalert2";
+import withReactContent from "sweetalert2-react-content";
 
 const MySwal = withReactContent(Swal);
 
 export const ForgotPassword = () => {
   const theme = useTheme();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-
+    setError("");
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
+      // Simular llamada a la API
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
       setSuccess(true);
-      
+
       MySwal.fire({
-        title: 'Email Sent!',
-        text: 'Password reset instructions have been sent to your email address.',
-        icon: 'success',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#673ab7',
+        title: "¡Correo enviado!",
+        text: "Las instrucciones para restablecer la contraseña han sido enviadas a tu dirección de correo electrónico.",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#673ab7",
       }).then(() => {
-        navigate('/login');
+        navigate("/login");
       });
-      
     } catch (err) {
-      setError('Failed to send reset email. Please try again.');
+      setError(
+        "Error al enviar el correo de restablecimiento. Por favor, inténtalo de nuevo."
+      );
     } finally {
       setLoading(false);
     }
@@ -57,80 +57,89 @@ export const ForgotPassword = () => {
   return (
     <Box
       sx={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
         p: 2,
-        position: 'relative',
+        position: "relative",
       }}
     >
-      {/* Background decorative elements */}
+      {/* Elementos decorativos de fondo */}
       <Box
         sx={{
-          position: 'absolute',
-          top: '10%',
-          right: '10%',
+          position: "absolute",
+          top: "10%",
+          right: "10%",
           width: 200,
           height: 150,
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
           borderRadius: 3,
           opacity: 0.1,
-          transform: 'rotate(15deg)',
+          transform: "rotate(15deg)",
         }}
       />
       <Box
         sx={{
-          position: 'absolute',
-          bottom: '15%',
-          left: '15%',
+          position: "absolute",
+          bottom: "15%",
+          left: "15%",
           width: 150,
           height: 100,
-          background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+          background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
           borderRadius: 3,
           opacity: 0.1,
-          transform: 'rotate(-15deg)',
+          transform: "rotate(-15deg)",
         }}
       />
-
       <Card
         sx={{
           maxWidth: 400,
-          width: '100%',
+          width: "100%",
           borderRadius: 3,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.1)',
-          border: 'none',
-          position: 'relative',
+          boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+          border: "none",
+          position: "relative",
           zIndex: 1,
         }}
       >
         <CardContent sx={{ p: 4 }}>
-          {/* Back Button */}
+          {/* Botón de retroceso */}
           <Button
             startIcon={<ArrowBack />}
-            onClick={() => navigate('/login')}
-            sx={{ mb: 2, color: '#673ab7' }}
+            onClick={() => navigate("/login")}
+            sx={{ mb: 2, color: "#673ab7" }}
           >
-            Back to Login
+            Volver al inicio de sesión
           </Button>
-
           {/* Logo */}
-          <Box sx={{ textAlign: 'center', mb: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
+          <Box sx={{ textAlign: "center", mb: 4 }}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 2,
+              }}
+            >
               <Box
                 sx={{
                   width: 40,
                   height: 40,
-                  borderRadius: '50%',
-                  background: 'linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  borderRadius: "50%",
+                  background:
+                    "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   mr: 1,
                 }}
               >
-                <Typography variant="h6" sx={{ color: 'white', fontWeight: 700 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ color: "white", fontWeight: 700 }}
+                >
                   🍇
                 </Typography>
               </Box>
@@ -144,45 +153,46 @@ export const ForgotPassword = () => {
                 BERRY
               </Typography>
             </Box>
-            <Typography variant="h4" sx={{ color: '#673ab7', mb: 1, fontWeight: 600 }}>
-              Forgot Password?
+            <Typography
+              variant="h4"
+              sx={{ color: "#673ab7", mb: 1, fontWeight: 600 }}
+            >
+              ¿Olvidaste tu contraseña?
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Enter your email address and we'll send you instructions to reset your password.
+              Ingresa tu dirección de correo electrónico y te enviaremos
+              instrucciones para restablecer tu contraseña.
             </Typography>
           </Box>
-
-          {/* Form */}
+          {/* Formulario */}
           <form onSubmit={handleSubmit}>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
-
             {success && (
               <Alert severity="success" sx={{ mb: 2 }}>
-                Reset instructions sent to your email!
+                ¡Instrucciones de restablecimiento enviadas a tu correo
+                electrónico!
               </Alert>
             )}
-
             <TextField
               fullWidth
-              label="Email Address"
+              label="Correo Electrónico"
               name="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               variant="outlined"
-              sx={{ 
+              sx={{
                 mb: 3,
-                '& .MuiOutlinedInput-root': {
+                "& .MuiOutlinedInput-root": {
                   borderRadius: 2,
-                }
+                },
               }}
               required
             />
-
             <Button
               type="submit"
               fullWidth
@@ -190,38 +200,41 @@ export const ForgotPassword = () => {
               size="large"
               disabled={loading}
               sx={{
-                background: 'linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)',
+                background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
                 py: 1.5,
                 mb: 3,
-                textTransform: 'none',
-                fontSize: '1rem',
+                textTransform: "none",
+                fontSize: "1rem",
                 fontWeight: 600,
                 borderRadius: 2,
-                boxShadow: '0 4px 15px rgba(103, 58, 183, 0.3)',
-                '&:hover': {
-                  boxShadow: '0 6px 20px rgba(103, 58, 183, 0.4)',
+                boxShadow: "0 4px 15px rgba(103, 58, 183, 0.3)",
+                "&:hover": {
+                  boxShadow: "0 6px 20px rgba(103, 58, 183, 0.4)",
                 },
               }}
             >
-              {loading ? <CircularProgress size={24} color="inherit" /> : 'Send Reset Instructions'}
+              {loading ? (
+                <CircularProgress size={24} color="inherit" />
+              ) : (
+                "Enviar instrucciones de restablecimiento"
+              )}
             </Button>
-
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary">
-                Remember your password?{' '}
+                ¿Recuerdas tu contraseña?{" "}
                 <Link
                   component={RouterLink}
                   to="/login"
                   sx={{
-                    color: '#673ab7',
-                    textDecoration: 'none',
+                    color: "#673ab7",
+                    textDecoration: "none",
                     fontWeight: 600,
-                    '&:hover': {
-                      textDecoration: 'underline',
+                    "&:hover": {
+                      textDecoration: "underline",
                     },
                   }}
                 >
-                  Sign in
+                  Inicia sesión
                 </Link>
               </Typography>
             </Box>

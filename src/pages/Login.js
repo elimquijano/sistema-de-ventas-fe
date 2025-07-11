@@ -45,16 +45,15 @@ export const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
       const success = await login(formData.email, formData.password);
       if (success) {
         navigate("/dashboard");
       } else {
-        setError("Invalid email or password");
+        setError("Correo electrónico o contraseña inválidos");
       }
     } catch (err) {
-      setError("An error occurred during login");
+      setError("Ocurrió un error durante el inicio de sesión");
     } finally {
       setLoading(false);
     }
@@ -116,27 +115,25 @@ export const Login = () => {
               variant="h4"
               sx={{ color: theme.palette.primary.main, mb: 1, fontWeight: 600 }}
             >
-              Hi, Welcome Back
+              Hola, Bienvenido de Nuevo
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Enter your credentials to continue
+              Ingresa tus credenciales para continuar
             </Typography>
           </Box>
-
-          {/* Form */}
+          {/* Formulario */}
           <form onSubmit={handleSubmit}>
             {error && (
               <Alert severity="error" sx={{ mb: 2 }}>
                 {error}
               </Alert>
             )}
-
             <Box sx={{ mb: 2 }}>
               <Typography
                 variant="body2"
                 sx={{ mb: 1, color: theme.palette.text.secondary }}
               >
-                Email Address / Username
+                Correo Electrónico / Nombre de Usuario
               </Typography>
               <TextField
                 fullWidth
@@ -154,13 +151,12 @@ export const Login = () => {
                 required
               />
             </Box>
-
             <Box sx={{ mb: 2 }}>
               <Typography
                 variant="body2"
                 sx={{ mb: 1, color: theme.palette.text.secondary }}
               >
-                Password
+                Contraseña
               </Typography>
               <TextField
                 fullWidth
@@ -190,7 +186,6 @@ export const Login = () => {
                 }}
               />
             </Box>
-
             <Box
               sx={{
                 display: "flex",
@@ -210,7 +205,7 @@ export const Login = () => {
                   />
                 }
                 label={
-                  <Typography variant="body2">Keep me logged in</Typography>
+                  <Typography variant="body2">Mantenerme conectado</Typography>
                 }
               />
               <Link
@@ -225,10 +220,9 @@ export const Login = () => {
                   },
                 }}
               >
-                Forgot Password?
+                ¿Olvidaste tu contraseña?
               </Link>
             </Box>
-
             <Button
               type="submit"
               fullWidth
@@ -252,13 +246,12 @@ export const Login = () => {
               {loading ? (
                 <CircularProgress size={24} color="inherit" />
               ) : (
-                "Sign In"
+                "Iniciar Sesión"
               )}
             </Button>
-
             <Box sx={{ textAlign: "center" }}>
               <Typography variant="body2" color="text.secondary">
-                Don't have an account?{" "}
+                ¿No tienes una cuenta?{" "}
                 <Link
                   component={RouterLink}
                   to="/signup"
@@ -271,7 +264,7 @@ export const Login = () => {
                     },
                   }}
                 >
-                  Sign up
+                  Regístrate
                 </Link>
               </Typography>
             </Box>

@@ -17,6 +17,7 @@ import {
   Divider,
   Skeleton,
   Chip,
+  useMediaQuery,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -96,6 +97,7 @@ export const BusinessDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(false);
   const [period, setPeriod] = useState("week");
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isInitialMount = useRef(true);
 
   const currency = business?.currency || "PEN";
@@ -237,11 +239,11 @@ export const BusinessDashboard = () => {
 
   return (
     <Box>
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
+      <Typography variant="h4" sx={{ mb: { xs: 1, md: 3 }, fontWeight: 600 }}>
         Dashboard de {business?.name}
       </Typography>
 
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={isMobile ? 1 : 3} sx={{ mb: { xs: 1, md: 4 } }}>
         {statsCards.map((stat, index) => (
           <Grid item xs={12} sm={6} md={3} key={index}>
             <Card
@@ -299,7 +301,7 @@ export const BusinessDashboard = () => {
         ))}
       </Grid>
 
-      <Grid container spacing={3}>
+      <Grid container spacing={isMobile ? 1 : 3}>
         <Grid item xs={12} lg={8}>
           <Card sx={{ position: "relative" }}>
             <CardContent>
@@ -401,7 +403,7 @@ export const BusinessDashboard = () => {
           <Card>
             <CardContent>
               <Typography variant="h6" sx={{ fontWeight: 600, mb: 2 }}>
-                Alertas y Cajas
+                Alertas y Notificaciones
               </Typography>
               <List dense>
                 <ListItem disableGutters>

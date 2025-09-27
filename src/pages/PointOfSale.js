@@ -96,6 +96,9 @@ export const PointOfSale = () => {
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [paymentType, setPaymentType] = useState("paid");
   const [customerName, setCustomerName] = useState("");
+  const [yapeAmount, setYapeAmount] = useState("");
+  const [yapeName, setYapeName] = useState("");
+  const [receivedAmount, setReceivedAmount] = useState("");
   const [openReportsDialog, setOpenReportsDialog] = useState(false);
   const [reportType, setReportType] = useState("sales");
   const [openInitCashDialog, setOpenInitCashDialog] = useState(false);
@@ -316,6 +319,7 @@ export const PointOfSale = () => {
       );
       return;
     }
+    setYapeAmount(getTotalAmount().toString());
     setOpenPaymentDialog(true);
   };
 
@@ -329,6 +333,14 @@ export const PointOfSale = () => {
       );
       return;
     }
+
+    let finalCustomerName = "Cliente General";
+    if (paymentType === 'credit' && customerName.trim()) {
+      finalCustomerName = customerName;
+    } else if (paymentType === 'yape' && yapeName.trim()) {
+      finalCustomerName = yapeName;
+    }
+
     const saleData = {
       items: cart.map((item) => ({
         id: item.id,
@@ -337,23 +349,28 @@ export const PointOfSale = () => {
         price: item.price,
       })),
       total_amount: total,
-      payment_method: paymentType === "paid" ? "cash" : "credit",
-      customer_name:
-        paymentType === "credit" ? customerName : "Cliente General",
+      payment_method: paymentType === "paid" ? "cash" : paymentType,
+      customer_name: finalCustomerName,
+      yape_amount: paymentType === "yape" ? parseFloat(yapeAmount) || 0 : null,
+      yape_name: paymentType === "yape" ? yapeName : null,
+      received_amount:
+        paymentType === "discount" ? parseFloat(receivedAmount) || 0 : null,
     };
+
     try {
       setIsLoading(true);
       await salesAPI.create(saleData);
       notificationSwal(
         "Venta Completada",
-        paymentType === "paid"
-          ? `Venta procesada por ${formatCurrency(total, currency)}`
-          : `Venta a crédito registrada para ${customerName}`,
+        `Venta procesada exitosamente.`,
         "success"
       );
       setCart([]);
       setOpenPaymentDialog(false);
       setCustomerName("");
+      setYapeAmount("");
+      setYapeName("");
+      setReceivedAmount("");
       setPaymentType("paid");
       checkCashRegisterStatus();
       loadProducts();
@@ -1248,7 +1265,7 @@ export const PointOfSale = () => {
               Tipo de Pago:
             </Typography>
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid item xs={6}>
+              <Grid item xs={6} md={3}>
                 <Button
                   fullWidth
                   variant={paymentType === "paid" ? "contained" : "outlined"}
@@ -1265,7 +1282,41 @@ export const PointOfSale = () => {
                   Pago Inmediato
                 </Button>
               </Grid>
-              <Grid item xs={6}>
+              <Grid item xs={6} md={3}>
+                <Button
+                  fullWidth
+                  variant={paymentType === "yape" ? "contained" : "outlined"}
+                  onClick={() => setPaymentType("yape")}
+                  sx={{
+                    height: 80,
+                    flexDirection: "column",
+                    gap: 1,
+                    fontSize: "1rem",
+                    fontWeight: 600,
+                  }}
+                  color="success"
+                >
+                  Yape
+                </Button>
+              </Grid>
+              <Grid item xs={6} md={3}>
+                <Button
+                  fullWidth
+                  variant={paymentType === "discount" ? "contained" : "outlined"}
+                  onClick={() => setPaymentType("discount")}
+                  sx={{
+                    height: 80,
+                    flexDirection: "column",
+                    gap: 1,
+                    fontSize: "1rem",
+                    fontWeight: 600,
+                  }}
+                  color="info"
+                >
+                  Con Descuento
+                </Button>
+              </Grid>
+              <Grid item xs={6} md={3}>
                 <Button
                   fullWidth
                   variant={paymentType === "credit" ? "contained" : "outlined"}
@@ -1292,6 +1343,35 @@ export const PointOfSale = () => {
                 onChange={(e) => setCustomerName(e.target.value)}
                 placeholder="Ingrese el nombre del cliente"
                 required
+                sx={{ mb: 2 }}
+              />
+            )}
+            {paymentType === "yape" && (
+              <Box>
+                <TextField
+                  fullWidth
+                  label="Monto en Yape"
+                  type="number"
+                  value={yapeAmount}
+                  onChange={(e) => setYapeAmount(e.target.value)}
+                  sx={{ mb: 2 }}
+                />
+                <TextField
+                  fullWidth
+                  label="Nombre en Yape (Opcional)"
+                  value={yapeName}
+                  onChange={(e) => setYapeName(e.target.value)}
+                  sx={{ mb: 2 }}
+                />
+              </Box>
+            )}
+            {paymentType === "discount" && (
+              <TextField
+                fullWidth
+                label="Monto Recibido"
+                type="number"
+                value={receivedAmount}
+                onChange={(e) => setReceivedAmount(e.target.value)}
                 sx={{ mb: 2 }}
               />
             )}

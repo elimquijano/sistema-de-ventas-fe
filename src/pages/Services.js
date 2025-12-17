@@ -106,7 +106,7 @@ export const Services = () => {
         image: null,
         status: service.status,
       });
-      setImagePreview(service.image_path ? `${process.env.REACT_APP_API_URL}/storage/${service.image_path}` : null);
+      setImagePreview(service.image_path ? `${API_STORAGE_URL}/${service.image_path}` : null);
     } else {
       setEditingService(null);
       setFormData({

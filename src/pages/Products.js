@@ -339,10 +339,10 @@ export const Products = () => {
                           sx={{ display: "flex", alignItems: "center", gap: 2 }}
                         >
                           <Avatar
-                            src={product.image_path ? `${API_STORAGE_URL}/${product.image_path}` : null}
+                            src={product.image_url ? `${product.image_url}` : null}
                             sx={{ width: 50, height: 50 }}
                           >
-                            {!product.image_path && <InventoryIcon />}
+                            {!product.image_url && <InventoryIcon />}
                           </Avatar>
                           <Box>
                             <Typography

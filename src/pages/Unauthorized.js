@@ -9,10 +9,17 @@ import {
 } from "@mui/material";
 import { Lock, ArrowBack } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 export const Unauthorized = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate("/login");
+  };
 
   return (
     <Box
@@ -86,7 +93,7 @@ export const Unauthorized = () => {
 
             <Button
               variant="contained"
-              onClick={() => navigate("/dashboard")}
+              onClick={handleLogout}
               sx={{
                 background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
                 "&:hover": {
@@ -95,7 +102,7 @@ export const Unauthorized = () => {
                 },
               }}
             >
-              Ir al Dashboard
+              Iniciar sesión nuevamente
             </Button>
           </Box>
         </CardContent>

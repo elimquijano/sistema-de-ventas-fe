@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Card,
@@ -30,6 +30,8 @@ import {
   ListItem,
   ListItemText,
   CircularProgress,
+  Stack,
+  Divider,
 } from "@mui/material";
 import {
   Search as SearchIcon,
@@ -37,13 +39,39 @@ import {
   Delete as DeleteIcon,
   Visibility as ViewIcon,
   GetApp as ExportIcon,
-  Print as PrintIcon, // Cambiado de ReceiptIcon a PrintIcon para claridad
+  Print as PrintIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { salesAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
+
+const PAYMENT_METHOD_LABELS = {
+  cash: "Efectivo",
+  yape: "Yape",
+  plin: "Plin",
+  card: "Tarjeta",
+  transfer: "Transferencia",
+  credit: "Crédito",
+  discount: "Descuento",
+};
+
+const getPaymentMethodLabel = (method) =>
+  PAYMENT_METHOD_LABELS[method] || method;
+
+const PAYMENT_METHOD_COLORS = {
+  cash: "success",
+  yape: "primary",
+  plin: "secondary",
+  card: "warning",
+  transfer: "info",
+  credit: "error",
+  discount: "default",
+};
+
+const getPaymentMethodColor = (method) =>
+  PAYMENT_METHOD_COLORS[method] || "default";
 
 export const Sales = () => {
   const { hasPermission } = useAuth();
@@ -53,14 +81,18 @@ export const Sales = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [editingSale, setEditingSale] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadSales();
   }, [page, searchFilters]);
 
   const loadSales = async () => {
+    setIsLoading(true);
     try {
       const response = await salesAPI.getAll({ page, ...searchFilters });
       setSales(response.data.data);
@@ -68,6 +100,8 @@ export const Sales = () => {
     } catch (error) {
       console.error("Error loading sales:", error);
       notificationSwal("Error", "Hubo un error al cargar las ventas.", "error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -85,6 +119,37 @@ export const Sales = () => {
     setPage(1);
   };
 
+  const handleOpenEditDialog = (sale) => {
+    setEditingSale(sale);
+    setOpenEditDialog(true);
+  };
+
+  const handleEditFormChange = (event) => {
+    const { name, value } = event.target;
+    setEditingSale((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleUpdateSale = async () => {
+    if (!editingSale) return;
+    setIsSubmitting(true);
+    try {
+      const { id, customer_name, status } = editingSale;
+      await salesAPI.update(id, { customer_name, status });
+      notificationSwal(
+        "Venta Actualizada",
+        "La venta se ha actualizado correctamente.",
+        "success"
+      );
+      setOpenEditDialog(false);
+      loadSales();
+    } catch (error) {
+      console.error("Error updating sale:", error);
+      notificationSwal("Error", "No se pudo actualizar la venta.", "error");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleViewSale = (sale) => {
     setSelectedSale(sale);
     setOpenViewDialog(true);
@@ -93,7 +158,7 @@ export const Sales = () => {
   const handleDeleteSale = async (saleId) => {
     const userConfirmed = await confirmSwal(
       "¿Estás seguro?",
-      "Esta acción eliminará la venta permanentemente.",
+      "Esta acción eliminará la venta permanentemente y revertirá el stock de los productos.",
       { confirmButtonText: "Sí, eliminar", icon: "warning" }
     );
 
@@ -120,9 +185,9 @@ export const Sales = () => {
     setIsPrinting(true);
     try {
       const response = await salesAPI.getSaleReceipt(saleId);
-      const file = new Blob([response.data], { type: 'application/pdf' });
+      const file = new Blob([response.data], { type: "application/pdf" });
       const fileURL = URL.createObjectURL(file);
-      window.open(fileURL, '_blank');
+      window.open(fileURL, "_blank");
     } catch (error) {
       console.error("Error printing receipt:", error);
       notificationSwal("Error", "No se pudo generar el recibo.", "error");
@@ -131,23 +196,17 @@ export const Sales = () => {
     }
   };
 
-  const getPaymentMethodLabel = (method) => {
-    const methods = {
-      cash: "Efectivo",
-      card: "Tarjeta",
-      transfer: "Transferencia",
-      credit: "Crédito",
-    };
-    return methods[method] || method;
-  };
-
   const getPaymentStatusColor = (status) => {
-    const colors = { paid: "success", pending: "warning", overdue: "error" };
+    const colors = { completed: "success", pending: "warning", cancelled: "error" };
     return colors[status] || "default";
   };
 
   const getPaymentStatusLabel = (status) => {
-    const statuses = { paid: "Pagado", pending: "Pendiente", overdue: "Vencido" };
+    const statuses = {
+      completed: "Pagado",
+      pending: "Pendiente",
+      cancelled: "Cancelado",
+    };
     return statuses[status] || status;
   };
 
@@ -156,8 +215,11 @@ export const Sales = () => {
       "Número de Venta": sale.sale_number,
       Cliente: sale.customer_name,
       Total: sale.total_amount,
-      "Método de Pago": getPaymentMethodLabel(sale.payment_method),
-      "Estado de Pago": getPaymentStatusLabel(sale.payment_status),
+      "Métodos de Pago":
+        sale.payments
+          ?.map((p) => getPaymentMethodLabel(p.payment_method))
+          .join(", ") || "",
+      "Estado de Pago": getPaymentStatusLabel(sale.status),
       Fecha: formatDate(sale.created_at),
       Vendedor: sale.creator.full_name,
     }));
@@ -181,9 +243,6 @@ export const Sales = () => {
           variant="contained"
           startIcon={<ExportIcon />}
           onClick={handleExportToExcel}
-          sx={{
-            background: "linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)",
-          }}
         >
           Exportar Excel
         </Button>
@@ -195,7 +254,7 @@ export const Sales = () => {
             <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                placeholder="Buscar por número de venta o cliente..."
+                placeholder="Buscar por número o cliente..."
                 name="search"
                 value={searchFilters.search || ""}
                 onChange={handleChangeFilter}
@@ -218,10 +277,13 @@ export const Sales = () => {
                   onChange={handleChangeFilter}
                 >
                   <MenuItem value="">Todos</MenuItem>
-                  <MenuItem value="cash">Efectivo</MenuItem>
-                  <MenuItem value="card">Tarjeta</MenuItem>
-                  <MenuItem value="transfer">Transferencia</MenuItem>
-                  <MenuItem value="credit">Crédito</MenuItem>
+                  {Object.entries(PAYMENT_METHOD_LABELS).map(
+                    ([value, label]) => (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    )
+                  )}
                 </Select>
               </FormControl>
             </Grid>
@@ -229,15 +291,15 @@ export const Sales = () => {
               <FormControl fullWidth>
                 <InputLabel>Estado de Pago</InputLabel>
                 <Select
-                  name="payment_status"
-                  value={searchFilters.payment_status || ""}
+                  name="status"
+                  value={searchFilters.status || ""}
                   label="Estado de Pago"
                   onChange={handleChangeFilter}
                 >
                   <MenuItem value="">Todos</MenuItem>
-                  <MenuItem value="paid">Pagado</MenuItem>
+                  <MenuItem value="completed">Pagado</MenuItem>
                   <MenuItem value="pending">Pendiente</MenuItem>
-                  <MenuItem value="overdue">Vencido</MenuItem>
+                  <MenuItem value="cancelled">Vencido</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -261,7 +323,7 @@ export const Sales = () => {
                   <TableCell>Número</TableCell>
                   <TableCell>Cliente</TableCell>
                   <TableCell>Total</TableCell>
-                  <TableCell>Método de Pago</TableCell>
+                  <TableCell>Métodos de Pago</TableCell>
                   <TableCell>Estado</TableCell>
                   <TableCell>Fecha</TableCell>
                   <TableCell>Vendedor</TableCell>
@@ -269,58 +331,77 @@ export const Sales = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {sales.map((sale) => (
-                  <TableRow key={sale.id}>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {sale.sale_number}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {sale.customer_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(sale.total_amount)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getPaymentMethodLabel(sale.payment_method)}
-                        size="small"
-                        variant="outlined"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={getPaymentStatusLabel(sale.payment_status)}
-                        size="small"
-                        color={getPaymentStatusColor(sale.payment_status)}
-                      />
-                    </TableCell>
-                    <TableCell>{formatDate(sale.created_at)}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {sale.creator.full_name}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton size="small" onClick={() => handleViewSale(sale)}><ViewIcon /></IconButton>
-                      {hasPermission("ventas.edit") && (
-                        <IconButton size="small">
-                          <EditIcon />
-                        </IconButton>
-                      )}
-                      {hasPermission("ventas.delete") && (
-                        <IconButton size="small" onClick={() => handleDeleteSale(sale.id)} color="error" disabled={isSubmitting}>
-                          <DeleteIcon />
-                        </IconButton>
-                      )}
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      <CircularProgress />
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  sales.map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell>{sale.sale_number}</TableCell>
+                      <TableCell>{sale.customer_name}</TableCell>
+                      <TableCell>
+                        {formatCurrency(sale.total_amount)}
+                      </TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5}>
+                          {sale.payments?.map((payment) => (
+                            <Chip
+                              key={payment.id}
+                              label={getPaymentMethodLabel(
+                                payment.payment_method
+                              )}
+                              size="small"
+                              color={getPaymentMethodColor(
+                                payment.payment_method
+                              )}
+                            />
+                          ))}
+                        </Stack>
+                      </TableCell>
+                      <TableCell>
+                        {sale.status && (
+                          <Chip
+                            label={getPaymentStatusLabel(sale.status)}
+                            size="small"
+                            color={getPaymentStatusColor(sale.status)}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>{formatDate(sale.created_at)}</TableCell>
+                      <TableCell>{sale.creator.full_name}</TableCell>
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleViewSale(sale)}
+                        >
+                          <ViewIcon />
+                        </IconButton>
+                        {hasPermission("ventas.edit") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenEditDialog(sale)}
+                            color="secondary"
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        )}
+                        {hasPermission("ventas.delete") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeleteSale(sale.id)}
+                            color="error"
+                            disabled={isSubmitting}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -336,59 +417,197 @@ export const Sales = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog para ver detalles de venta */}
-      <Dialog open={openViewDialog} onClose={() => setOpenViewDialog(false)} maxWidth="md" fullWidth>
+      <Dialog
+        open={openViewDialog}
+        onClose={() => setOpenViewDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle>
-          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <Typography variant="h6">Detalles de Venta - {selectedSale?.sale_number}</Typography>
-            <IconButton onClick={() => handlePrintReceipt(selectedSale.id)} disabled={isPrinting}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="h6">
+              Detalles de Venta - {selectedSale?.sale_number}
+            </Typography>
+            <IconButton
+              onClick={() => handlePrintReceipt(selectedSale.id)}
+              disabled={isPrinting}
+            >
               <PrintIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers>
           {selectedSale && (
-            <Box>
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">Cliente</Typography>
-                  <Typography variant="body1" sx={{ fontWeight: 600 }}>{selectedSale.customer_name}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">Fecha</Typography>
-                  <Typography variant="body1">{formatDate(selectedSale.created_at)}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">Método de Pago</Typography>
-                  <Chip label={getPaymentMethodLabel(selectedSale.payment_method)} size="small" variant="outlined" />
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="text.secondary">Estado</Typography>
-                  <Chip label={getPaymentStatusLabel(selectedSale.payment_status)} size="small" color={getPaymentStatusColor(selectedSale.payment_status)} />
-                </Grid>
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>
+                  Información General
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Cliente
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {selectedSale.customer_name}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Fecha
+                      </Typography>
+                      <Typography variant="body1">
+                        {formatDate(selectedSale.created_at)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Vendedor
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedSale.creator.full_name}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Estado
+                      </Typography>
+                      {selectedSale.status && (
+                        <Chip
+                          label={getPaymentStatusLabel(
+                            selectedSale.status
+                          )}
+                          size="small"
+                          color={getPaymentStatusColor(
+                            selectedSale.status
+                          )}
+                        />
+                      )}
+                    </Grid>
+                  </Grid>
+                </Paper>
+
+                <Typography variant="h6" gutterBottom sx={{ mt: 3 }}>
+                  Pagos Realizados
+                </Typography>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  {selectedSale.payments?.map((payment) => (
+                    <Chip
+                      key={payment.id}
+                      label={`${getPaymentMethodLabel(
+                        payment.payment_method
+                      )}: ${formatCurrency(payment.amount)}`}
+                      color={getPaymentMethodColor(payment.payment_method)}
+                    />
+                  ))}
+                </Stack>
               </Grid>
 
-              <Typography variant="h6" sx={{ mb: 2 }}>Productos y Servicios</Typography>
-              <List dense>
-                {selectedSale.items.map((item, index) => (
-                  <ListItem key={index} sx={{ px: 0 }}>
-                    <ListItemText primary={item.item_name} secondary={`${item.quantity} x ${formatCurrency(item.unit_price)}`} />
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(item.total_price)}</Typography>
-                  </ListItem>
-                ))}
-              </List>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>
+                  Productos y Servicios
+                </Typography>
+                <List dense component={Paper} variant="outlined">
+                  {selectedSale.items.map((item, index) => (
+                    <React.Fragment key={index}>
+                      <ListItem>
+                        <ListItemText
+                          primary={item.item_name}
+                          secondary={`Cant: ${
+                            item.quantity
+                          } x ${formatCurrency(item.unit_price)}`}
+                        />
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(item.total_price)}
+                        </Typography>
+                      </ListItem>
+                      {index < selectedSale.items.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))}
+                </List>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mt: 2,
+                    pt: 2,
+                    borderTop: 1,
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="h6">Total General:</Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 700, color: "primary.main" }}
+                  >
+                    {formatCurrency(selectedSale.total_amount)}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenViewDialog(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
 
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mt: 2, pt: 2, borderTop: 1, borderColor: "divider" }}>
-                <Typography variant="h6">Total:</Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "primary.main" }}>{formatCurrency(selectedSale.total_amount)}</Typography>
-              </Box>
+      {/* Edit Sale Dialog */}
+      <Dialog
+        open={openEditDialog}
+        onClose={() => setOpenEditDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Editar Venta - {editingSale?.sale_number}</DialogTitle>
+        <DialogContent>
+          {editingSale && (
+            <Box component="form" sx={{ mt: 2 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="Nombre del Cliente"
+                    name="customer_name"
+                    value={editingSale.customer_name}
+                    onChange={handleEditFormChange}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Estado de Pago</InputLabel>
+                    <Select
+                      label="Estado de Pago"
+                      name="status"
+                      value={editingSale.status}
+                      onChange={handleEditFormChange}
+                    >
+                      <MenuItem value="completed">Pagado</MenuItem>
+                      <MenuItem value="pending">Pendiente</MenuItem>
+                      <MenuItem value="cancelled">Vencido</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
             </Box>
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenViewDialog(false)} disabled={isPrinting}>Cerrar</Button>
-          <Button variant="contained" startIcon={<PrintIcon />} onClick={() => handlePrintReceipt(selectedSale.id)} disabled={isPrinting}>
-            {isPrinting ? <CircularProgress size={20} color="inherit" /> : "Imprimir Recibo"}
+          <Button onClick={() => setOpenEditDialog(false)}>Cancelar</Button>
+          <Button
+            onClick={handleUpdateSale}
+            variant="contained"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? "Guardando..." : "Guardar Cambios"}
           </Button>
         </DialogActions>
       </Dialog>

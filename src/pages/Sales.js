@@ -44,7 +44,7 @@ import {
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { salesAPI } from "../utils/api";
+import { salesAPI, usersAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
 
 const PAYMENT_METHOD_LABELS = {
@@ -76,6 +76,7 @@ const getPaymentMethodColor = (method) =>
 export const Sales = () => {
   const { hasPermission } = useAuth();
   const [sales, setSales] = useState([]);
+  const [users, setUsers] = useState([]);
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -89,6 +90,7 @@ export const Sales = () => {
 
   useEffect(() => {
     loadSales();
+    loadUsers();
   }, [page, searchFilters]);
 
   const loadSales = async () => {
@@ -100,6 +102,23 @@ export const Sales = () => {
     } catch (error) {
       console.error("Error loading sales:", error);
       notificationSwal("Error", "Hubo un error al cargar las ventas.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    setIsLoading(true);
+    try {
+      const response = await usersAPI.getAll({ per_page: -1 });
+      setUsers(response.data.data);
+    } catch (error) {
+      console.error("Error loading users:", error);
+      notificationSwal(
+        "Error",
+        "Hubo un error al cargar los usuarios.",
+        "error"
+      );
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +216,11 @@ export const Sales = () => {
   };
 
   const getPaymentStatusColor = (status) => {
-    const colors = { completed: "success", pending: "warning", cancelled: "error" };
+    const colors = {
+      completed: "success",
+      pending: "warning",
+      cancelled: "error",
+    };
     return colors[status] || "default";
   };
 
@@ -267,7 +290,7 @@ export const Sales = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <FormControl fullWidth>
                 <InputLabel>Método de Pago</InputLabel>
                 <Select
@@ -287,7 +310,7 @@ export const Sales = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={2}>
               <FormControl fullWidth>
                 <InputLabel>Estado de Pago</InputLabel>
                 <Select
@@ -300,6 +323,24 @@ export const Sales = () => {
                   <MenuItem value="completed">Pagado</MenuItem>
                   <MenuItem value="pending">Pendiente</MenuItem>
                   <MenuItem value="cancelled">Vencido</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth>
+                <InputLabel>Responsable</InputLabel>
+                <Select
+                  name="created_by"
+                  value={searchFilters.created_by || ""}
+                  label="Responsable"
+                  onChange={handleChangeFilter}
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  {users.map((user) => {
+                    return (
+                      <MenuItem value={user.id}>{user.full_name}</MenuItem>
+                    );
+                  })}
                 </Select>
               </FormControl>
             </Grid>
@@ -342,9 +383,7 @@ export const Sales = () => {
                     <TableRow key={sale.id}>
                       <TableCell>{sale.sale_number}</TableCell>
                       <TableCell>{sale.customer_name}</TableCell>
-                      <TableCell>
-                        {formatCurrency(sale.total_amount)}
-                      </TableCell>
+                      <TableCell>{formatCurrency(sale.total_amount)}</TableCell>
                       <TableCell>
                         <Stack direction="row" spacing={0.5}>
                           {sale.payments?.map((payment) => (
@@ -481,13 +520,9 @@ export const Sales = () => {
                       </Typography>
                       {selectedSale.status && (
                         <Chip
-                          label={getPaymentStatusLabel(
-                            selectedSale.status
-                          )}
+                          label={getPaymentStatusLabel(selectedSale.status)}
                           size="small"
-                          color={getPaymentStatusColor(
-                            selectedSale.status
-                          )}
+                          color={getPaymentStatusColor(selectedSale.status)}
                         />
                       )}
                     </Grid>
@@ -520,9 +555,9 @@ export const Sales = () => {
                       <ListItem>
                         <ListItemText
                           primary={item.item_name}
-                          secondary={`Cant: ${
-                            item.quantity
-                          } x ${formatCurrency(item.unit_price)}`}
+                          secondary={`Cant: ${item.quantity} x ${formatCurrency(
+                            item.unit_price
+                          )}`}
                         />
                         <Typography variant="body1" sx={{ fontWeight: 600 }}>
                           {formatCurrency(item.total_price)}

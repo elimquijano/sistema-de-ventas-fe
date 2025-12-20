@@ -87,10 +87,13 @@ export const Services = () => {
 
   const loadCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll({ type: "service" });
-      setCategories(response.data || []);
+      const response = await categoriesAPI.getAll({
+        type: "service",
+        per_page: -1,
+      });
+      setCategories(response.data.data || []);
     } catch (error) {
-      console.error("Error loading categories:", error);
+      console.error("Error loading categories:", error); 
     }
   };
 
@@ -106,7 +109,9 @@ export const Services = () => {
         image: null,
         status: service.status,
       });
-      setImagePreview(service.image_path ? `${API_STORAGE_URL}/${service.image_path}` : null);
+      setImagePreview(
+        service.image_path ? `${API_STORAGE_URL}/${service.image_path}` : null
+      );
     } else {
       setEditingService(null);
       setFormData({
@@ -217,7 +222,8 @@ export const Services = () => {
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const matchesCategory =
-      !categoryFilter || (service.category && service.category.id.toString() === categoryFilter);
+      !categoryFilter ||
+      (service.category && service.category.id.toString() === categoryFilter);
     return matchesSearch && matchesCategory;
   });
 
@@ -319,9 +325,14 @@ export const Services = () => {
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
                       >
-                        <Avatar 
-                          src={service.image_path ? `${API_STORAGE_URL}/${service.image_path}` : null}
-                          sx={{ bgcolor: "secondary.main" }}>
+                        <Avatar
+                          src={
+                            service.image_path
+                              ? `${API_STORAGE_URL}/${service.image_path}`
+                              : null
+                          }
+                          sx={{ bgcolor: "secondary.main" }}
+                        >
                           {!service.image_path && <BuildIcon />}
                         </Avatar>
                         <Box>
@@ -529,15 +540,26 @@ export const Services = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>
+            Cancelar
+          </Button>
           <Button
             onClick={handleSaveService}
             variant="contained"
-            disabled={!formData.name || !formData.price || !formData.duration || isSubmitting}
+            disabled={
+              !formData.name ||
+              !formData.price ||
+              !formData.duration ||
+              isSubmitting
+            }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
-            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+            startIcon={
+              isSubmitting ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : null
+            }
           >
             {editingService ? "Actualizar" : "Crear"} Servicio
           </Button>

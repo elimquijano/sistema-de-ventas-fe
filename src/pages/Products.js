@@ -27,7 +27,6 @@ import {
   Grid,
   Avatar,
   CircularProgress,
-  Badge,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -35,14 +34,12 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Inventory as InventoryIcon,
-  Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
   CloudUpload as CloudUploadIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { API_STORAGE_URL, categoriesAPI, productsAPI } from "../utils/api";
+import { categoriesAPI, productsAPI } from "../utils/api";
 
 export const Products = () => {
   const { hasPermission } = useAuth();
@@ -92,8 +89,11 @@ export const Products = () => {
 
   const loadCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll({ type: "product" });
-      setCategories(response.data || []);
+      const response = await categoriesAPI.getAll({
+        type: "product",
+        per_page: -1,
+      });
+      setCategories(response.data.data || []);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -221,8 +221,7 @@ export const Products = () => {
   const filteredProducts = products.filter((product) => {
     const searchTermLower = searchTerm.toLowerCase();
     const matchesSearch =
-      (product.name &&
-        product.name.toLowerCase().includes(searchTermLower)) ||
+      (product.name && product.name.toLowerCase().includes(searchTermLower)) ||
       (product.barcode &&
         product.barcode.toLowerCase().includes(searchTermLower));
 
@@ -339,7 +338,9 @@ export const Products = () => {
                           sx={{ display: "flex", alignItems: "center", gap: 2 }}
                         >
                           <Avatar
-                            src={product.image_url ? `${product.image_url}` : null}
+                            src={
+                              product.image_url ? `${product.image_url}` : null
+                            }
                             sx={{ width: 50, height: 50 }}
                           >
                             {!product.image_url && <InventoryIcon />}
@@ -384,7 +385,10 @@ export const Products = () => {
                         >
                           <Typography
                             variant="body2"
-                            sx={{ fontWeight: 600, color: `${stockStatus.color}.main` }}
+                            sx={{
+                              fontWeight: 600,
+                              color: `${stockStatus.color}.main`,
+                            }}
                           >
                             {product.stock}
                           </Typography>
@@ -606,15 +610,26 @@ export const Products = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>
+            Cancelar
+          </Button>
           <Button
             onClick={handleSaveProduct}
             variant="contained"
-            disabled={!formData.name || !formData.price || !formData.cost || isSubmitting}
+            disabled={
+              !formData.name ||
+              !formData.price ||
+              !formData.cost ||
+              isSubmitting
+            }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
-            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+            startIcon={
+              isSubmitting ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : null
+            }
           >
             {editingProduct ? "Actualizar" : "Crear"} Producto
           </Button>

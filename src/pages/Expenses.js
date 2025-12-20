@@ -87,8 +87,11 @@ export const Expenses = () => {
 
   const loadCategories = async () => {
     try {
-      const response = await categoriesAPI.getAll({ type: "expense" });
-      setCategories(response.data);
+      const response = await categoriesAPI.getAll({
+        type: "expense",
+        per_page: -1,
+      });
+      setCategories(response.data.data);
     } catch (error) {
       console.error("Error loading categories:", error);
     }
@@ -510,11 +513,18 @@ export const Expenses = () => {
                 startIcon={<UploadIcon />}
               >
                 Subir Factura
-                <input type="file" hidden onChange={handleFileChange} accept="image/*,application/pdf" />
+                <input
+                  type="file"
+                  hidden
+                  onChange={handleFileChange}
+                  accept="image/*,application/pdf"
+                />
               </Button>
               {receiptFile && (
-                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
-                  <Typography variant="body2" sx={{ mr: 1 }}>{receiptFile.name}</Typography>
+                <Box sx={{ display: "flex", alignItems: "center", mt: 1 }}>
+                  <Typography variant="body2" sx={{ mr: 1 }}>
+                    {receiptFile.name}
+                  </Typography>
                   <IconButton size="small" onClick={() => setReceiptFile(null)}>
                     <ClearIcon />
                   </IconButton>
@@ -536,17 +546,26 @@ export const Expenses = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>
+            Cancelar
+          </Button>
           <Button
             onClick={handleSaveExpense}
             variant="contained"
             disabled={
-              !formData.description || !formData.amount || !formData.category_id || isSubmitting
+              !formData.description ||
+              !formData.amount ||
+              !formData.category_id ||
+              isSubmitting
             }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
-            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+            startIcon={
+              isSubmitting ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : null
+            }
           >
             {editingExpense ? "Actualizar" : "Registrar"} Gasto
           </Button>

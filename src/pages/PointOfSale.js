@@ -410,6 +410,7 @@ export const PointOfSale = () => {
               "&:hover": { boxShadow: 6 },
               opacity: item.type === "product" && item.stock <= 0 ? 0.5 : 1,
               position: "relative",
+              backgroundColor: theme.palette.warning.light,
             }}
             onClick={() => handleItemClick(item)}
           >

@@ -452,21 +452,26 @@ export const Business = () => {
                 }
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth>
-                <InputLabel>Estado</InputLabel>
-                <Select
-                  value={formData.status}
-                  label="Estado"
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, status: e.target.value }))
-                  }
-                >
-                  <MenuItem value="active">Activo</MenuItem>
-                  <MenuItem value="inactive">Inactivo</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
+            {hasPermission("negocios.create") && (
+              <Grid item xs={12} sm={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Estado</InputLabel>
+                  <Select
+                    value={formData.status}
+                    label="Estado"
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        status: e.target.value,
+                      }))
+                    }
+                  >
+                    <MenuItem value="active">Activo</MenuItem>
+                    <MenuItem value="inactive">Inactivo</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
             {hasPermission("negocios.create") && (
               <Grid item xs={12}>
                 <FormControl fullWidth>
@@ -496,7 +501,9 @@ export const Business = () => {
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleCloseDialog} disabled={isSubmitting}>
+            Cancelar
+          </Button>
           <Button
             onClick={handleSaveBusiness}
             variant="contained"
@@ -504,7 +511,11 @@ export const Business = () => {
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
-            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+            startIcon={
+              isSubmitting ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : null
+            }
           >
             {editingBusiness ? "Actualizar" : "Crear"} Negocio
           </Button>

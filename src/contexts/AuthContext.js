@@ -93,12 +93,6 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("auth_token", responseData.token);
       localStorage.setItem("user", JSON.stringify(userForState));
 
-      notificationSwal(
-        "Inicio de sesión exitoso",
-        `¡Bienvenido ${userForState.first_name}!`,
-        "success"
-      );
-
       return true;
     } catch (error) {
       console.error("API login failed, trying mock data:", error);

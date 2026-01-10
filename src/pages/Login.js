@@ -63,13 +63,41 @@ export const Login = () => {
     <Box
       sx={{
         minHeight: "100vh",
-        background: theme.palette.background.default,
+        background: theme.palette.mode === 'dark' ? theme.palette.background.default : "linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         p: 2,
+        position: "relative",
       }}
     >
+      {/* Background decorative elements */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: "10%",
+          right: "10%",
+          width: 200,
+          height: 150,
+          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          borderRadius: 3,
+          opacity: 0.1,
+          transform: "rotate(15deg)",
+        }}
+      />
+      <Box
+        sx={{
+          position: "absolute",
+          bottom: "15%",
+          left: "15%",
+          width: 150,
+          height: 100,
+          background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+          borderRadius: 3,
+          opacity: 0.1,
+          transform: "rotate(-15deg)",
+        }}
+      />
       <Card
         sx={{
           maxWidth: 475,
@@ -99,17 +127,8 @@ export const Login = () => {
                   mr: 1,
                 }}
               >
-                <Logo height={32} />
+                <Logo height={150} />
               </Box>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                  color: theme.palette.primary.main,
-                }}
-              >
-                STOCK MASTER
-              </Typography>
             </Box>
             <Typography
               variant="h4"
@@ -141,7 +160,7 @@ export const Login = () => {
                 type="email"
                 value={formData.email}
                 onChange={handleChange}
-                placeholder="info@codedthemes.com"
+                placeholder="user@oasis.com"
                 variant="outlined"
                 sx={{
                   "& .MuiOutlinedInput-root": {

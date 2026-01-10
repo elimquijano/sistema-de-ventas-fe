@@ -28,6 +28,7 @@ import {
   Grid,
   Pagination,
   CircularProgress,
+  Autocomplete,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -116,6 +117,16 @@ export const Users = () => {
       }
 
       return { ...prevFilters, [name]: value };
+    });
+  };
+
+  const handleChangeAutocomplete = (name, newValue) => {
+    setSearchFilters((prevFilters) => {
+      if (newValue === null) {
+        const { [name]: _, ...newFilters } = prevFilters;
+        return newFilters;
+      }
+      return { ...prevFilters, [name]: newValue.id };
     });
   };
 
@@ -289,7 +300,7 @@ export const Users = () => {
       <Card>
         <CardContent>
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <TextField
                 fullWidth
                 placeholder="Buscar usuarios..."
@@ -305,7 +316,7 @@ export const Users = () => {
                 }}
               />
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <FormControl fullWidth>
                 <InputLabel>Estado</InputLabel>
                 <Select
@@ -321,7 +332,7 @@ export const Users = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
               <FormControl fullWidth>
                 <InputLabel>Rol</InputLabel>
                 <Select
@@ -339,6 +350,24 @@ export const Users = () => {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} md={3}>
+              <Autocomplete
+                fullWidth
+                options={businesses}
+                getOptionLabel={(option) => option.name}
+                value={
+                  businesses.find(
+                    (b) => b.id === searchFilters?.business_id
+                  ) || null
+                }
+                onChange={(event, newValue) =>
+                  handleChangeAutocomplete("business_id", newValue)
+                }
+                renderInput={(params) => (
+                  <TextField {...params} label="Negocio" />
+                )}
+              />
+            </Grid>
           </Grid>
 
           <TableContainer component={Paper} variant="outlined">
@@ -347,6 +376,7 @@ export const Users = () => {
                 <TableRow>
                   <TableCell>Usuario</TableCell>
                   <TableCell>Rol</TableCell>
+                  <TableCell>Negocio</TableCell>
                   <TableCell>Estado</TableCell>
                   <TableCell>Último Inicio de Sesión</TableCell>
                   <TableCell>Creado</TableCell>
@@ -389,6 +419,12 @@ export const Users = () => {
                           />
                         ))}
                       </Box>
+                    </TableCell>
+                    <TableCell>
+                      {user.business_id
+                        ? businesses.find((b) => b.id === user.business_id)
+                            ?.name || "N/A"
+                        : "N/A"}
                     </TableCell>
                     <TableCell>
                       <Chip

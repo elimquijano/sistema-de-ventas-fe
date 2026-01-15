@@ -18,6 +18,15 @@ import {
   Skeleton,
   Chip,
   useMediaQuery,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Paper,
+  Slide,
+  Tabs,
+  Tab,
+  IconButton,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -32,6 +41,9 @@ import {
   PointOfSale,
   Person,
   AccessTime,
+  Assessment,
+  Close as CloseIcon,
+  Print as PrintIcon,
 } from "@mui/icons-material";
 import {
   BarChart,
@@ -51,9 +63,13 @@ import {
   formatDate,
   formatFullName,
 } from "../utils/formatters";
-import { businessAPI } from "../utils/api";
+import { businessAPI, cashRegisterAPI, salesAPI } from "../utils/api";
 import { notificationSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
+
+const Transition = React.forwardRef(function Transition(props, ref) {
+  return <Slide direction="up" ref={ref} {...props} />;
+});
 
 const PIE_CHART_COLORS = ["#4caf50", "#f44336"]; // Verde para ventas, Rojo para gastos
 
@@ -100,7 +116,67 @@ export const BusinessDashboard = () => {
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isInitialMount = useRef(true);
 
+  // Report Dialog States
+  const [openReportsDialog, setOpenReportsDialog] = useState(false);
+  const [reportData, setReportData] = useState(null);
+  const [reportType, setReportType] = useState("sales");
+  const [isPrinting, setIsPrinting] = useState(false);
+
   const currency = business?.currency || "PEN";
+
+  const handleOpenReports = async (cashRegisterId) => {
+    if (!cashRegisterId) return;
+    try {
+      const response = await cashRegisterAPI.getReport(cashRegisterId);
+      const report = response.data;
+      const sales = report.sales || [];
+      const totalSales = sales.length;
+      const cashSalesAmount = sales
+        .filter((s) => s.payment_method === "cash")
+        .reduce((sum, s) => sum + parseFloat(s.total_amount), 0);
+      const expectedCash = parseFloat(report.expected_amount);
+      const productSummary = sales
+        .flatMap((s) => s.items)
+        .filter((i) => i.item_type.includes("Product"))
+        .reduce((summary, item) => {
+          if (summary[item.item_name]) {
+            summary[item.item_name].quantity += item.quantity;
+          } else {
+            summary[item.item_name] = { ...item };
+          }
+          return summary;
+        }, {});
+      setReportData({
+        ...report,
+        sales,
+        totalSales,
+        cashSalesAmount,
+        expectedCash: report.expected_amount,
+        total_in_cash: report.report_current_cash,
+        reportDifference: report.report_difference,
+        productSummary: Object.values(productSummary),
+      });
+      setOpenReportsDialog(true);
+    } catch (error) {
+      console.error("Error loading report:", error);
+      notificationSwal("Error", "No se pudo cargar el reporte.", "error");
+    }
+  };
+
+  const handlePrintReceipt = async (saleId) => {
+    setIsPrinting(true);
+    try {
+      const response = await salesAPI.getSaleReceipt(saleId);
+      const file = new Blob([response.data], { type: "application/pdf" });
+      const fileURL = URL.createObjectURL(file);
+      window.open(fileURL, "_blank");
+    } catch (error) {
+      console.error("Error printing receipt:", error);
+      notificationSwal("Error", "No se pudo generar el recibo.", "error");
+    } finally {
+      setIsPrinting(false);
+    }
+  };
 
   const processChartData = (dashboardData) => {
     setPieData(dashboardData.pie_chart_data);
@@ -436,65 +512,202 @@ export const BusinessDashboard = () => {
                 Cajas De Hoy
               </Typography>
               {cashRegisters?.length > 0 ? (
-                <List dense>
-                  {cashRegisters.map((reg) => (
-                    <ListItem key={reg.id} disableGutters>
-                      <ListItemIcon sx={{ minWidth: 32 }}>
-                        <Person />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={reg.opened_by.full_name}
-                        secondary={
-                          <Chip
-                            size="small"
-                            label={
-                              <>
-                                <AccessTime
-                                  sx={{
-                                    fontSize: "0.9rem",
-                                    verticalAlign: "middle",
-                                  }}
-                                />{" "}
-                                {formatDate(
-                                  reg.status === "open"
-                                    ? reg.created_at
-                                    : reg.closed_at,
-                                  "HH:mm"
-                                )}
-                              </>
-                            }
-                            color={
-                              reg.status === "open" ? "success" : "default"
-                            }
-                          />
-                        }
-                      />
-                      <ListItemText
-                        primary={"Inicial: "}
-                        secondary={formatCurrency(reg.initial_amount)}
-                      />
-                      <ListItemText
-                        primary={"Cierre: "}
-                        secondary={
-                          <Typography
-                            variant="body2"
-                            color={theme.palette.success.main}
+                isMobile ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      overflowX: "auto",
+                      pb: 2,
+                      gap: 2,
+                      "::-webkit-scrollbar": { height: 8 },
+                      "::-webkit-scrollbar-track": {
+                        backgroundColor: "#f1f1f1",
+                        borderRadius: 4,
+                      },
+                      "::-webkit-scrollbar-thumb": {
+                        backgroundColor: "#888",
+                        borderRadius: 4,
+                      },
+                      "::-webkit-scrollbar-thumb:hover": {
+                        backgroundColor: "#555",
+                      },
+                    }}
+                  >
+                    {cashRegisters.map((reg) => (
+                      <Card
+                        key={reg.id}
+                        variant="outlined"
+                        sx={{
+                          minWidth: 280,
+                          flexShrink: 0,
+                          backgroundColor:
+                            reg.status === "open"
+                              ? theme.palette.success.light
+                              : theme.palette.grey[500],
+                        }}
+                      >
+                        <CardContent>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              mb: 1,
+                            }}
                           >
-                            {formatCurrency(reg.final_amount)}
-                          </Typography>
+                            <Box sx={{ display: "flex", alignItems: "center" }}>
+                              <Person sx={{ mr: 1 }} />
+                              <Typography variant="subtitle1" fontWeight="bold">
+                                {reg.opened_by.full_name}
+                              </Typography>
+                            </Box>
+                            <Chip
+                              size="small"
+                              label={formatDate(
+                                reg.status === "open"
+                                  ? reg.created_at
+                                  : reg.closed_at,
+                                "HH:mm"
+                              )}
+                              color={
+                                reg.status === "open" ? "success" : "default"
+                              }
+                            />
+                          </Box>
+                          <Divider sx={{ my: 1 }} />
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              mb: 0.5,
+                            }}
+                          >
+                            <Typography variant="body2">Inicial:</Typography>
+                            <Typography variant="body2" fontWeight="medium">
+                              {formatCurrency(reg.initial_amount, currency)}
+                            </Typography>
+                          </Box>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              mb: 0.5,
+                            }}
+                          >
+                            <Typography variant="body2">Cierre:</Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight="bold"
+                              color="success.main"
+                            >
+                              {formatCurrency(reg.final_amount, currency)}
+                            </Typography>
+                          </Box>
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              mb: 2,
+                            }}
+                          >
+                            <Typography variant="body2">Diferencia:</Typography>
+                            <Typography
+                              variant="body2"
+                              fontWeight="bold"
+                              color="error.main"
+                            >
+                              {formatCurrency(reg.difference, currency)}
+                            </Typography>
+                          </Box>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            fullWidth
+                            startIcon={<Assessment />}
+                            onClick={() => handleOpenReports(reg.id)}
+                          >
+                            Ver Reporte
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </Box>
+                ) : (
+                  <List dense>
+                    {cashRegisters.map((reg) => (
+                      <ListItem
+                        key={reg.id}
+                        disableGutters
+                        secondaryAction={
+                          <IconButton
+                            edge="end"
+                            aria-label="report"
+                            onClick={() => handleOpenReports(reg.id)}
+                            title="Ver Reporte"
+                          >
+                            <Assessment color="primary" />
+                          </IconButton>
                         }
-                      />
-                      <ListItemText
-                        primary={"Crédito: "}
-                        secondary={
-                          <Typography variant="body2" color="error">
-                            {formatCurrency(reg.difference)}
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                  ))}
-                </List>
+                      >
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <Person />
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={reg.opened_by.full_name}
+                          secondary={
+                            <Chip
+                              size="small"
+                              label={
+                                <>
+                                  <AccessTime
+                                    sx={{
+                                      fontSize: "0.9rem",
+                                      verticalAlign: "middle",
+                                    }}
+                                  />{" "}
+                                  {formatDate(
+                                    reg.status === "open"
+                                      ? reg.created_at
+                                      : reg.closed_at,
+                                    "HH:mm"
+                                  )}
+                                </>
+                              }
+                              color={
+                                reg.status === "open" ? "success" : "default"
+                              }
+                            />
+                          }
+                        />
+                        <ListItemText
+                          primary={"Inicial: "}
+                          secondary={formatCurrency(
+                            reg.initial_amount,
+                            currency
+                          )}
+                        />
+                        <ListItemText
+                          primary={"Cierre: "}
+                          secondary={
+                            <Typography
+                              variant="body2"
+                              color={theme.palette.success.main}
+                            >
+                              {formatCurrency(reg.final_amount, currency)}
+                            </Typography>
+                          }
+                        />
+                        <ListItemText
+                          primary={"Diferencia: "}
+                          secondary={
+                            <Typography variant="body2" color="error">
+                              {formatCurrency(reg.difference, currency)}
+                            </Typography>
+                          }
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                )
               ) : (
                 <Typography variant="body2" color="text.secondary">
                   No se han abierto cajas hoy.
@@ -572,6 +785,196 @@ export const BusinessDashboard = () => {
           </Card>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={openReportsDialog}
+        onClose={() => setOpenReportsDialog(false)}
+        maxWidth="md"
+        fullWidth
+        TransitionComponent={Transition}
+      >
+        <DialogTitle sx={{ p: { xs: 1, md: 3 } }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Reportes del Día
+            </Typography>
+            <IconButton onClick={() => setOpenReportsDialog(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ p: { xs: 1, md: 3 } }}>
+          {reportData && (
+            <>
+              <Grid
+                container
+                spacing={isMobile ? 1 : 3}
+                sx={{ mb: { xs: 1, md: 3 } }}
+              >
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "primary.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {reportData.sales.length}
+                    </Typography>
+                    <Typography variant="body2">Ventas Totales</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "success.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(reportData.initial_amount, currency)}
+                    </Typography>
+                    <Typography variant="body2">Dinero Inicial</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "info.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(reportData.total_in_cash, currency)}
+                    </Typography>
+                    <Typography variant="body2">Dinero Actual</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={6} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "warning.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(reportData.expected_amount, currency)}
+                    </Typography>
+                    <Typography variant="body2">Dinero Esperado</Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
+
+              <Tabs
+                value={reportType}
+                onChange={(e, newValue) => setReportType(newValue)}
+                sx={{
+                  borderBottom: 1,
+                  borderColor: "divider",
+                  mb: { xs: 1, md: 3 },
+                }}
+              >
+                <Tab label="Ventas del Día" value="sales" />
+                <Tab label="Resumen de Productos" value="products" />
+              </Tabs>
+
+              {reportType === "sales" && (
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Ventas Realizadas ({reportData.sales.length})
+                  </Typography>
+                  {reportData.sales.length > 0 ? (
+                    <List>
+                      {reportData.sales.map((sale) => (
+                        <ListItem
+                          key={sale.id}
+                          sx={{
+                            border: 1,
+                            borderColor: "divider",
+                            borderRadius: 1,
+                            mb: 1,
+                          }}
+                        >
+                          <ListItemText
+                            primary={`${sale.sale_number} - ${sale.customer_name}`}
+                            secondary={`${sale.items.length} productos - ${
+                              sale.payment_method === "cash"
+                                ? "Pagado"
+                                : "Por cobrar"
+                            }`}
+                          />
+                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                            {formatCurrency(sale.total_amount, currency)}
+                          </Typography>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            sx={{ ml: 2 }}
+                            onClick={() => handlePrintReceipt(sale.id)}
+                            disabled={isPrinting}
+                          >
+                            <PrintIcon />
+                          </IconButton>
+                        </ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ textAlign: "center", py: 4 }}
+                    >
+                      No hay ventas registradas hoy
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+              {reportType === "products" && (
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
+                    Productos Más Vendidos
+                  </Typography>
+                  {reportData.productSummary.length > 0 ? (
+                    <List>
+                      {reportData.productSummary.map((product) => (
+                        <ListItem key={product.item_name}>
+                          <ListItemText
+                            primary={product.item_name}
+                            secondary={`Cantidad vendida: ${product.quantity}`}
+                          />
+                        </ListItem>
+                      ))}
+                    </List>
+                  ) : (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      sx={{ textAlign: "center", py: 4 }}
+                    >
+                      No se han vendido productos hoy.
+                    </Typography>
+                  )}
+                </Box>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

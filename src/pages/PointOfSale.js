@@ -197,9 +197,17 @@ export const PointOfSale = () => {
       checkCashRegisterStatus();
       setOpenInitCashDialog(false);
       setInitCashAmount("");
-      notificationSwal("Caja Abierta", `Caja inicializada con ${formatCurrency(amount, currency)}`, "success");
+      notificationSwal(
+        "Caja Abierta",
+        `Caja inicializada con ${formatCurrency(amount, currency)}`,
+        "success"
+      );
     } catch (error) {
-      notificationSwal("Error", "Error al abrir la caja registradora.", "error");
+      notificationSwal(
+        "Error",
+        "Error al abrir la caja registradora.",
+        "error"
+      );
     }
   };
 
@@ -291,19 +299,33 @@ export const PointOfSale = () => {
 
   const handleItemClick = (itemToAdd) => {
     if (!cashRegister) {
-      notificationSwal("Caja Cerrada", "Debe abrir la caja registradora primero.", "warning");
+      notificationSwal(
+        "Caja Cerrada",
+        "Debe abrir la caja registradora primero.",
+        "warning"
+      );
       return;
     }
     if (itemToAdd.type === "product" && itemToAdd.stock <= 0) {
-      notificationSwal("Sin Stock", "Este producto no tiene stock disponible.", "error");
+      notificationSwal(
+        "Sin Stock",
+        "Este producto no tiene stock disponible.",
+        "error"
+      );
       return;
     }
     setCart((prevCart) => {
-      const existingItem = prevCart.find((item) => item.id === itemToAdd.id && item.type === itemToAdd.type);
+      const existingItem = prevCart.find(
+        (item) => item.id === itemToAdd.id && item.type === itemToAdd.type
+      );
       if (existingItem) {
         const newStock = existingItem.stock - 1;
-        if(itemToAdd.type === 'product' && newStock <0){
-          notificationSwal("Stock insuficiente", `No hay suficiente stock para ${itemToAdd.name}.`, "warning");
+        if (itemToAdd.type === "product" && newStock < 0) {
+          notificationSwal(
+            "Stock insuficiente",
+            `No hay suficiente stock para ${itemToAdd.name}.`,
+            "warning"
+          );
           return prevCart;
         }
         return prevCart.map((item) =>
@@ -315,15 +337,26 @@ export const PointOfSale = () => {
       return [...prevCart, { ...itemToAdd, quantity: 1 }];
     });
   };
-  
+
   const handleRemoveFromCart = (itemId, type) => {
-    setCart((prev) => prev.filter((item) => !(item.id === itemId && item.type === type)));
+    setCart((prev) =>
+      prev.filter((item) => !(item.id === itemId && item.type === type))
+    );
   };
-  
+
   const handleUpdateQuantity = (itemId, type, newQuantity) => {
-    const itemDefinition = [...products, ...services].find(i => i.id === itemId && i.type === type);
-    if(itemDefinition.type === 'product' && newQuantity > itemDefinition.stock){
-      notificationSwal("Stock insuficiente", `Solo quedan ${itemDefinition.stock} unidades de ${itemDefinition.name}.`, "warning");
+    const itemDefinition = [...products, ...services].find(
+      (i) => i.id === itemId && i.type === type
+    );
+    if (
+      itemDefinition.type === "product" &&
+      newQuantity > itemDefinition.stock
+    ) {
+      notificationSwal(
+        "Stock insuficiente",
+        `Solo quedan ${itemDefinition.stock} unidades de ${itemDefinition.name}.`,
+        "warning"
+      );
       return;
     }
 
@@ -332,13 +365,16 @@ export const PointOfSale = () => {
     } else {
       setCart((prev) =>
         prev.map((item) =>
-          item.id === itemId && item.type === type ? { ...item, quantity: newQuantity } : item
+          item.id === itemId && item.type === type
+            ? { ...item, quantity: newQuantity }
+            : item
         )
       );
     }
   };
 
-  const getTotalItems = () => cart.reduce((total, item) => total + item.quantity, 0);
+  const getTotalItems = () =>
+    cart.reduce((total, item) => total + item.quantity, 0);
 
   const handleProcessSale = () => {
     if (!hasPermission("pos.create") || cart.length === 0) return;
@@ -365,34 +401,57 @@ export const PointOfSale = () => {
       payments.map((p) => (p.id === id ? { ...p, [field]: value } : p))
     );
   };
-  
+
   const handleCompleteSale = async () => {
     if (Math.abs(remainingAmount) > 0.001) {
-      notificationSwal("Monto Incorrecto", `El monto pagado no coincide con el total de la venta.`, "error");
+      notificationSwal(
+        "Monto Incorrecto",
+        `El monto pagado no coincide con el total de la venta.`,
+        "error"
+      );
       return;
     }
-    if (payments.some(p => p.payment_method === "credit") && !customerName.trim()) {
-      notificationSwal("Datos Incompletos", "Ingrese el nombre del cliente para ventas a crédito.", "error");
+    if (
+      payments.some((p) => p.payment_method === "credit") &&
+      !customerName.trim()
+    ) {
+      notificationSwal(
+        "Datos Incompletos",
+        "Ingrese el nombre del cliente para ventas a crédito.",
+        "error"
+      );
       return;
     }
 
     const saleData = {
       customer_name: customerName.trim() || "Cliente General",
-      items: cart.map(item => ({ id: item.id, type: item.type, quantity: item.quantity })),
-      payments: payments.map(({ id, ...p }) => ({ ...p, amount: parseFloat(p.amount) })),
+      items: cart.map((item) => ({
+        id: item.id,
+        type: item.type,
+        quantity: item.quantity,
+      })),
+      payments: payments.map(({ id, ...p }) => ({
+        ...p,
+        amount: parseFloat(p.amount),
+      })),
     };
 
     setIsLoading(true);
     try {
       await salesAPI.create(saleData);
-      notificationSwal("Venta Completada", "Venta procesada exitosamente.", "success");
+      notificationSwal(
+        "Venta Completada",
+        "Venta procesada exitosamente.",
+        "success"
+      );
       setCart([]);
       setOpenPaymentDialog(false);
       resetPaymentState();
       checkCashRegisterStatus();
       loadProducts();
     } catch (error) {
-      const msg = error.response?.data?.message || "Error al completar la venta.";
+      const msg =
+        error.response?.data?.message || "Error al completar la venta.";
       notificationSwal("Error", msg, "error");
     } finally {
       setIsLoading(false);
@@ -414,7 +473,14 @@ export const PointOfSale = () => {
             }}
             onClick={() => handleItemClick(item)}
           >
-            <CardContent sx={{ p: 1, height: "100%", display: "flex", flexDirection: "column" }}>
+            <CardContent
+              sx={{
+                p: 1,
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
               {item.type === "product" && (
                 <Chip
                   label={`Stock: ${item.stock}`}
@@ -424,18 +490,44 @@ export const PointOfSale = () => {
                 />
               )}
               <Avatar
-                src={item.image_path ? `${API_STORAGE_URL}/${item.image_path}` : null}
+                src={
+                  item.image_path
+                    ? `${API_STORAGE_URL}/${item.image_path}`
+                    : null
+                }
                 sx={{ width: 80, height: 80, m: "auto" }}
                 variant="rounded"
               >
-                {!item.image_path && (item.type === "product" ? <InventoryIcon /> : <BuildIcon />)}
+                {!item.image_path &&
+                  (item.type === "product" ? <InventoryIcon /> : <BuildIcon />)}
               </Avatar>
               <Box sx={{ textAlign: "center", mt: 1 }}>
-                <Typography variant="body2" sx={{ fontWeight: 700, minHeight: 32 }}>{item.name}</Typography>
-                <Typography variant="h6" color="primary" sx={{ fontWeight: 900 }}>{formatCurrency(item.price, currency)}</Typography>
+                <Typography
+                  variant="body2"
+                  sx={{ fontWeight: 700, minHeight: 32 }}
+                >
+                  {item.name}
+                </Typography>
+                <Typography
+                  variant="h6"
+                  color="primary"
+                  sx={{ fontWeight: 900 }}
+                >
+                  {formatCurrency(item.price, currency)}
+                </Typography>
               </Box>
               {item.type === "product" && item.stock <= 0 && (
-                <Box sx={{ position: "absolute", inset: 0, bgcolor: "rgba(0,0,0,0.7)", color: "white", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: 0,
+                    bgcolor: "rgba(0,0,0,0.7)",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   AGOTADO
                 </Box>
               )}
@@ -621,38 +713,114 @@ export const PointOfSale = () => {
       <Container maxWidth="xl" sx={{ flex: 1, py: 2, overflow: "hidden" }}>
         <Grid container spacing={2} sx={{ height: "100%" }}>
           <Grid item xs={12} md={7}>
-            <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-              <Tabs value={tabValue} onChange={(e, val) => setTabValue(val)} sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Card
+              sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+            >
+              <Tabs
+                value={tabValue}
+                onChange={(e, val) => setTabValue(val)}
+                sx={{ borderBottom: 1, borderColor: "divider" }}
+              >
                 <Tab label={`Productos (${products.length})`} />
                 <Tab label={`Servicios (${services.length})`} />
               </Tabs>
               <Box sx={{ flex: 1, overflowY: "auto" }}>
-                <TabPanel value={tabValue} index={0}>{renderProductGrid(products, "product")}</TabPanel>
-                <TabPanel value={tabValue} index={1}>{renderProductGrid(services, "service")}</TabPanel>
+                <TabPanel value={tabValue} index={0}>
+                  {renderProductGrid(products, "product")}
+                </TabPanel>
+                <TabPanel value={tabValue} index={1}>
+                  {renderProductGrid(services, "service")}
+                </TabPanel>
               </Box>
             </Card>
           </Grid>
           {!isMobile && (
             <Grid item xs={12} md={5}>
-              <Card sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-                <CardContent sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>Carrito</Typography>
-                  <Badge badgeContent={getTotalItems()} color="primary"><ShoppingCartIcon /></Badge>
+              <Card
+                sx={{
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <CardContent
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Carrito
+                  </Typography>
+                  <Badge badgeContent={getTotalItems()} color="primary">
+                    <ShoppingCartIcon />
+                  </Badge>
                 </CardContent>
                 <Divider />
                 <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
                   {cart.length === 0 ? (
-                    <Box sx={{ textAlign: "center", py: 6 }}><ShoppingCartIcon sx={{ fontSize: 64, color: "text.secondary" }} /><Typography color="text.secondary">Carrito vacío</Typography></Box>
+                    <Box sx={{ textAlign: "center", py: 6 }}>
+                      <ShoppingCartIcon
+                        sx={{ fontSize: 64, color: "text.secondary" }}
+                      />
+                      <Typography color="text.secondary">
+                        Carrito vacío
+                      </Typography>
+                    </Box>
                   ) : (
                     <List>
                       {cart.map((item) => (
-                        <ListItem key={`${item.type}-${item.id}`} sx={{ p: 0, mb: 1 }}>
-                          <ListItemText primary={item.name} secondary={formatCurrency(item.price * item.quantity, currency)} />
-                          <Stack direction="row" alignItems="center" spacing={1}>
-                            <IconButton size="small" onClick={() => handleUpdateQuantity(item.id, item.type, item.quantity - 1)}><RemoveIcon /></IconButton>
+                        <ListItem
+                          key={`${item.type}-${item.id}`}
+                          sx={{ p: 0, mb: 1 }}
+                        >
+                          <ListItemText
+                            primary={item.name}
+                            secondary={formatCurrency(
+                              item.price * item.quantity,
+                              currency
+                            )}
+                          />
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            spacing={1}
+                          >
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                handleUpdateQuantity(
+                                  item.id,
+                                  item.type,
+                                  item.quantity - 1
+                                )
+                              }
+                            >
+                              <RemoveIcon />
+                            </IconButton>
                             <Typography>{item.quantity}</Typography>
-                            <IconButton size="small" onClick={() => handleUpdateQuantity(item.id, item.type, item.quantity + 1)}><AddIcon /></IconButton>
-                            <IconButton size="small" color="error" onClick={() => handleRemoveFromCart(item.id, item.type)}><DeleteIcon /></IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() =>
+                                handleUpdateQuantity(
+                                  item.id,
+                                  item.type,
+                                  item.quantity + 1
+                                )
+                              }
+                            >
+                              <AddIcon />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() =>
+                                handleRemoveFromCart(item.id, item.type)
+                              }
+                            >
+                              <DeleteIcon />
+                            </IconButton>
                           </Stack>
                         </ListItem>
                       ))}
@@ -661,13 +829,42 @@ export const PointOfSale = () => {
                 </Box>
                 <Divider />
                 <CardContent>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700 }}>Total:</Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 900, color: "primary.main" }}>{formatCurrency(totalAmount, currency)}</Typography>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      mb: 2,
+                    }}
+                  >
+                    <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      Total:
+                    </Typography>
+                    <Typography
+                      variant="h5"
+                      sx={{ fontWeight: 900, color: "primary.main" }}
+                    >
+                      {formatCurrency(totalAmount, currency)}
+                    </Typography>
                   </Box>
                   <Stack direction="row" spacing={1}>
-                    <Button fullWidth variant="outlined" startIcon={<ClearIcon />} onClick={() => setCart([])} disabled={!cart.length}>Limpiar</Button>
-                    <Button fullWidth variant="contained" startIcon={<PaymentIcon />} onClick={handleProcessSale} disabled={!cart.length || !cashRegister}>Cobrar</Button>
+                    <Button
+                      fullWidth
+                      variant="outlined"
+                      startIcon={<ClearIcon />}
+                      onClick={() => setCart([])}
+                      disabled={!cart.length}
+                    >
+                      Limpiar
+                    </Button>
+                    <Button
+                      fullWidth
+                      variant="contained"
+                      startIcon={<PaymentIcon />}
+                      onClick={handleProcessSale}
+                      disabled={!cart.length || !cashRegister}
+                    >
+                      Cobrar
+                    </Button>
                   </Stack>
                 </CardContent>
               </Card>
@@ -675,86 +872,276 @@ export const PointOfSale = () => {
           )}
         </Grid>
       </Container>
-      
-      <Drawer anchor="right" open={cartDrawerOpen} onClose={() => setCartDrawerOpen(false)}>
-        <Box sx={{ width: isMobile ? '100vw' : 320, p:2, display: 'flex', flexDirection: 'column', height: '100%' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Typography variant="h6" sx={{ fontWeight: 700 }}>Carrito</Typography>
-                <IconButton onClick={() => setCartDrawerOpen(false)}><CloseIcon /></IconButton>
+
+      <Drawer
+        anchor="right"
+        open={cartDrawerOpen}
+        onClose={() => setCartDrawerOpen(false)}
+      >
+        <Box
+          sx={{
+            width: isMobile ? "100vw" : 320,
+            p: 2,
+            display: "flex",
+            flexDirection: "column",
+            height: "100%",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Carrito
+            </Typography>
+            <IconButton onClick={() => setCartDrawerOpen(false)}>
+              <CloseIcon />
+            </IconButton>
+          </Box>
+          <Divider sx={{ my: 1 }} />
+          <Box sx={{ flex: 1, overflowY: "auto" }}>
+            {cart.length === 0 ? (
+              <Box sx={{ textAlign: "center", py: 6 }}>
+                <ShoppingCartIcon
+                  sx={{ fontSize: 64, color: "text.secondary" }}
+                />
+                <Typography color="text.secondary">Carrito vacío</Typography>
+              </Box>
+            ) : (
+              <List>
+                {cart.map((item) => (
+                  <ListItem
+                    key={`${item.type}-${item.id}`}
+                    sx={{ p: 0, mb: 1 }}
+                  >
+                    <ListItemText
+                      primary={item.name}
+                      secondary={formatCurrency(
+                        item.price * item.quantity,
+                        currency
+                      )}
+                    />
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          handleUpdateQuantity(
+                            item.id,
+                            item.type,
+                            item.quantity - 1
+                          )
+                        }
+                      >
+                        <RemoveIcon />
+                      </IconButton>
+                      <Typography>{item.quantity}</Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          handleUpdateQuantity(
+                            item.id,
+                            item.type,
+                            item.quantity + 1
+                          )
+                        }
+                      >
+                        <AddIcon />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => handleRemoveFromCart(item.id, item.type)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Stack>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Box>
+          <Divider sx={{ my: 1 }} />
+          <Box>
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}
+            >
+              <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                Total:
+              </Typography>
+              <Typography
+                variant="h5"
+                sx={{ fontWeight: 900, color: "primary.main" }}
+              >
+                {formatCurrency(totalAmount, currency)}
+              </Typography>
             </Box>
-            <Divider sx={{ my: 1 }}/>
-            <Box sx={{ flex: 1, overflowY: "auto" }}>
-                {cart.length === 0 ? (
-                  <Box sx={{ textAlign: "center", py: 6 }}><ShoppingCartIcon sx={{ fontSize: 64, color: "text.secondary" }} /><Typography color="text.secondary">Carrito vacío</Typography></Box>
-                ) : (
-                  <List>
-                    {cart.map((item) => (
-                      <ListItem key={`${item.type}-${item.id}`} sx={{ p: 0, mb: 1 }}>
-                        <ListItemText primary={item.name} secondary={formatCurrency(item.price * item.quantity, currency)} />
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <IconButton size="small" onClick={() => handleUpdateQuantity(item.id, item.type, item.quantity - 1)}><RemoveIcon /></IconButton>
-                          <Typography>{item.quantity}</Typography>
-                          <IconButton size="small" onClick={() => handleUpdateQuantity(item.id, item.type, item.quantity + 1)}><AddIcon /></IconButton>
-                          <IconButton size="small" color="error" onClick={() => handleRemoveFromCart(item.id, item.type)}><DeleteIcon /></IconButton>
-                        </Stack>
-                      </ListItem>
-                    ))}
-                  </List>
-                )}
-              </Box>
-              <Divider sx={{ my: 1 }}/>
-              <Box>
-                <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
-                  <Typography variant="h5" sx={{ fontWeight: 700 }}>Total:</Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: "primary.main" }}>{formatCurrency(totalAmount, currency)}</Typography>
-                </Box>
-                <Stack direction="row" spacing={1}>
-                  <Button fullWidth variant="outlined" startIcon={<ClearIcon />} onClick={() => setCart([])} disabled={!cart.length}>Limpiar</Button>
-                  <Button fullWidth variant="contained" startIcon={<PaymentIcon />} onClick={() => {
-                      setCartDrawerOpen(false);
-                      handleProcessSale();
-                  }} disabled={!cart.length || !cashRegister}>Cobrar</Button>
-                </Stack>
-              </Box>
+            <Stack direction="row" spacing={1}>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<ClearIcon />}
+                onClick={() => setCart([])}
+                disabled={!cart.length}
+              >
+                Limpiar
+              </Button>
+              <Button
+                fullWidth
+                variant="contained"
+                startIcon={<PaymentIcon />}
+                onClick={() => {
+                  setCartDrawerOpen(false);
+                  handleProcessSale();
+                }}
+                disabled={!cart.length || !cashRegister}
+              >
+                Cobrar
+              </Button>
+            </Stack>
+          </Box>
         </Box>
       </Drawer>
 
-      <Dialog open={openPaymentDialog} onClose={() => setOpenPaymentDialog(false)} maxWidth="sm" fullWidth TransitionComponent={Transition}>
+      <Dialog
+        open={openPaymentDialog}
+        onClose={() => setOpenPaymentDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        TransitionComponent={Transition}
+      >
         <DialogTitle sx={{ textAlign: "center", position: "relative" }}>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>Procesar Venta</Typography>
-          <IconButton onClick={() => setOpenPaymentDialog(false)} sx={{ position: "absolute", right: 8, top: 8 }}><CloseIcon /></IconButton>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            Procesar Venta
+          </Typography>
+          <IconButton
+            onClick={() => setOpenPaymentDialog(false)}
+            sx={{ position: "absolute", right: 8, top: 8 }}
+          >
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
-            <Paper variant="outlined" sx={{ p: 2, textAlign: "center", bgcolor: "grey.100" }}>
-              <Typography variant="h4" sx={{ fontWeight: 900, color: "primary.main" }}>{formatCurrency(totalAmount, currency)}</Typography>
+            <Paper
+              variant="outlined"
+              sx={{ p: 2, textAlign: "center", bgcolor: "grey.100" }}
+            >
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 900, color: "primary.main" }}
+              >
+                {formatCurrency(totalAmount, currency)}
+              </Typography>
               <Typography variant="body1">Total a Pagar</Typography>
             </Paper>
-            <TextField fullWidth label="Nombre del Cliente (Opcional)" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Cliente General" />
+            <TextField
+              fullWidth
+              label="Nombre del Cliente (Opcional)"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Cliente General"
+            />
             <Divider>Métodos de Pago</Divider>
-            {payments.map(p => (
+            {payments.map((p) => (
               <Paper key={p.id} variant="outlined" sx={{ p: 2 }}>
                 <Stack spacing={2}>
-                  <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>{PAYMENT_METHODS.find(m => m.value === p.payment_method)?.label}</Typography>
-                    <IconButton size="small" onClick={() => handleRemovePayment(p.id)}><DeleteForeverIcon color="error" /></IconButton>
+                  <Box
+                    sx={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      {
+                        PAYMENT_METHODS.find(
+                          (m) => m.value === p.payment_method
+                        )?.label
+                      }
+                    </Typography>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRemovePayment(p.id)}
+                    >
+                      <DeleteForeverIcon color="error" />
+                    </IconButton>
                   </Box>
-                  <TextField fullWidth label="Monto" type="number" value={p.amount} onChange={(e) => handlePaymentChange(p.id, "amount", e.target.value)} />
-                  <TextField fullWidth label="Referencia (Opcional)" value={p.reference} onChange={(e) => handlePaymentChange(p.id, "reference", e.target.value)} />
+                  <TextField
+                    fullWidth
+                    label="Monto"
+                    type="number"
+                    value={p.amount}
+                    onChange={(e) =>
+                      handlePaymentChange(p.id, "amount", e.target.value)
+                    }
+                  />
+                  <TextField
+                    fullWidth
+                    label="Referencia (Opcional)"
+                    value={p.reference}
+                    onChange={(e) =>
+                      handlePaymentChange(p.id, "reference", e.target.value)
+                    }
+                  />
                 </Stack>
               </Paper>
             ))}
 
             {remainingAmount > 0.001 && (
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>Añadir Pago:</Typography>
-                <Grid container spacing={1}>
-                  {PAYMENT_METHODS.map(method => (
-                    <Grid item xs={4} key={method.value}>
-                      <Button fullWidth variant="outlined" onClick={() => handleAddPayment(method.value)} startIcon={method.icon}>{method.label}</Button>
-                    </Grid>
-                  ))}
-                </Grid>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Añadir Pago:
+                </Typography>
+                {isMobile ? (
+                  <Box
+                    sx={{
+                      display: "flex",
+                      overflowX: "auto",
+                      gap: 1,
+                      pb: 1,
+                      "::-webkit-scrollbar": { height: 4 },
+                      "::-webkit-scrollbar-thumb": {
+                        backgroundColor: "#ccc",
+                        borderRadius: 4,
+                      },
+                    }}
+                  >
+                    {PAYMENT_METHODS.map((method) => (
+                      <Button
+                        key={method.value}
+                        variant="outlined"
+                        onClick={() => handleAddPayment(method.value)}
+                        startIcon={method.icon}
+                        size="small"
+                        sx={{
+                          minWidth: 130,
+                          flexShrink: 0,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {method.label}
+                      </Button>
+                    ))}
+                  </Box>
+                ) : (
+                  <Grid container spacing={1}>
+                    {PAYMENT_METHODS.map((method) => (
+                      <Grid item xs={4} key={method.value}>
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          onClick={() => handleAddPayment(method.value)}
+                          startIcon={method.icon}
+                        >
+                          {method.label}
+                        </Button>
+                      </Grid>
+                    ))}
+                  </Grid>
+                )}
               </Box>
             )}
 
@@ -762,38 +1149,86 @@ export const PointOfSale = () => {
 
             <Stack direction="row" justifyContent="space-between">
               <Typography variant="h6">Faltante:</Typography>
-              <Typography variant="h6" color={remainingAmount > 0 ? "error.main" : "success.main"} sx={{ fontWeight: 700 }}>{formatCurrency(remainingAmount, currency)}</Typography>
+              <Typography
+                variant="h6"
+                color={remainingAmount > 0 ? "error.main" : "success.main"}
+                sx={{ fontWeight: 700 }}
+              >
+                {formatCurrency(remainingAmount, currency)}
+              </Typography>
             </Stack>
 
-            {payments.some(p => p.payment_method === 'cash') && (
+            {payments.some((p) => p.payment_method === "cash") && (
               <>
-                <TextField fullWidth label="Efectivo Recibido" type="number" value={cashReceived} onChange={e => setCashReceived(e.target.value)} />
+                <Divider>Calcule su Vuelto Rápido</Divider>
+                <TextField
+                  fullWidth
+                  label="Efectivo Recibido"
+                  type="number"
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value)}
+                />
                 <Stack direction="row" justifyContent="space-between">
                   <Typography variant="h6">Vuelto:</Typography>
-                  <Typography variant="h6" color="info.main" sx={{ fontWeight: 700 }}>{formatCurrency(cashChange, currency)}</Typography>
+                  <Typography
+                    variant="h6"
+                    color="info.main"
+                    sx={{ fontWeight: 700 }}
+                  >
+                    {formatCurrency(cashChange, currency)}
+                  </Typography>
                 </Stack>
               </>
             )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button fullWidth size="large" variant="contained" onClick={handleCompleteSale} disabled={isLoading || Math.abs(remainingAmount) > 0.001}>
+          <Button
+            fullWidth
+            size="large"
+            variant="contained"
+            onClick={handleCompleteSale}
+            disabled={isLoading || Math.abs(remainingAmount) > 0.001}
+          >
             {isLoading ? "Procesando..." : "Completar Venta"}
           </Button>
         </DialogActions>
       </Dialog>
-      
-      <Dialog open={openInitCashDialog} onClose={() => setOpenInitCashDialog(false)} maxWidth="sm" fullWidth>
+
+      <Dialog
+        open={openInitCashDialog}
+        onClose={() => setOpenInitCashDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Inicializar Caja</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
-            <FormControl fullWidth><InputLabel>Moneda</InputLabel><Select value={currency} label="Moneda" onChange={(e) => setCurrency(e.target.value)}><MenuItem value="PEN">Soles (PEN)</MenuItem><MenuItem value="USD">Dólares (USD)</MenuItem></Select></FormControl>
-            <TextField fullWidth label="Monto inicial" type="number" value={initCashAmount} onChange={(e) => setInitCashAmount(e.target.value)} />
+            <FormControl fullWidth>
+              <InputLabel>Moneda</InputLabel>
+              <Select
+                value={currency}
+                label="Moneda"
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                <MenuItem value="PEN">Soles (PEN)</MenuItem>
+                <MenuItem value="USD">Dólares (USD)</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              label="Monto inicial"
+              type="number"
+              value={initCashAmount}
+              onChange={(e) => setInitCashAmount(e.target.value)}
+            />
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenInitCashDialog(false)}>Cancelar</Button>
-          <Button onClick={handleInitializeCash} variant="contained">Abrir Caja</Button>
+          <Button onClick={handleInitializeCash} variant="contained">
+            Abrir Caja
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -923,7 +1358,7 @@ export const PointOfSale = () => {
                           <ListItemText
                             primary={`${sale.sale_number} - ${sale.customer_name}`}
                             secondary={`${sale.items.length} productos - ${
-                              sale.payment_method === "cash"
+                              sale.status === "completed"
                                 ? "Pagado"
                                 : "Por cobrar"
                             }`}
@@ -986,7 +1421,6 @@ export const PointOfSale = () => {
           )}
         </DialogContent>
       </Dialog>
-
     </Box>
   );
 };

@@ -799,7 +799,7 @@ export const DashboardLayout = () => {
         component="main"
         sx={{
           flexGrow: 1,
-          p: { xs: 1, md: 3 },
+          p: { xs: 2, md: 3 },
           width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
           mt: "64px",
           backgroundColor: theme.palette.background.default,

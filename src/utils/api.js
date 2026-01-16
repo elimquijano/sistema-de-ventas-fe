@@ -285,6 +285,7 @@ export const categoriesAPI = {
 };
 
 export const cashRegisterAPI = {
+  getAll: (params = {}) => api.get("/cash-registers", { params }),
   getCurrent: () => api.get("/cash-registers/current"),
   create: (data) => api.post("/cash-registers", data),
   close: (id, data) => api.post(`/cash-registers/${id}/close`, data),

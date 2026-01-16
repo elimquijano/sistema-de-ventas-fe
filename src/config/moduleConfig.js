@@ -19,6 +19,7 @@ import { BusinessDashboard } from "../pages/BusinessDashboard";
 import { Categories } from "../pages/Categories";
 import { Loans } from "../pages/Loans";
 import { Purchases } from "../pages/Purchases";
+import { CashRegisters } from "../pages/CashRegisters";
 
 // Importar iconos de Material-UI
 import {
@@ -65,6 +66,7 @@ export const componentMap = {
   Categories,
   Loans,
   Purchases,
+  CashRegisters,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES

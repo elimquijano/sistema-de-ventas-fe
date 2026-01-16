@@ -18,6 +18,7 @@ import { Credits } from "../pages/Credits";
 import { BusinessDashboard } from "../pages/BusinessDashboard";
 import { Categories } from "../pages/Categories";
 import { Loans } from "../pages/Loans";
+import { Purchases } from "../pages/Purchases";
 
 // Importar iconos de Material-UI
 import {
@@ -42,7 +43,6 @@ import {
   Assessment,
   Store,
 } from "@mui/icons-material";
-import { Purchases } from "../pages/Purchases";
 
 // Mapeo de componentes - AQUÍ AGREGAS NUEVOS COMPONENTES
 export const componentMap = {
@@ -64,7 +64,7 @@ export const componentMap = {
   Credits,
   Categories,
   Loans,
-  Purchases
+  Purchases,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES

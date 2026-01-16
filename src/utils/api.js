@@ -177,12 +177,19 @@ export const businessAPI = {
   getStats: (id, period) =>
     api.get(`/businesses/${id}/dashboard`, { params: { period } }),
   searchProducts: (term) => api.get(`/products/search?term=${term}`),
-  createPurchase: (purchaseData) =>
+};
+
+export const purchasesAPI = {
+  getAll: (params = {}) => api.get("/purchases", { params }),
+  getById: (id) => api.get(`/purchases/${id}`),
+  create: (purchaseData) =>
     api.post("/purchases", purchaseData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
     }),
+  update: (id, purchaseData) => api.put(`/purchases/${id}`, purchaseData),
+  delete: (id) => api.delete(`/purchases/${id}`),
 };
 
 export const productsAPI = {

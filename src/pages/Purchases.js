@@ -1,369 +1,598 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
-  Grid,
   Card,
   CardContent,
   Typography,
-  TextField,
   Button,
-  IconButton,
-  List,
-  ListItem,
-  ListItemText,
-  Divider,
-  Autocomplete,
-  CircularProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Paper,
-  Chip,
-  useTheme,
+  IconButton,
+  TextField,
+  InputAdornment,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  FormControlLabel,
-  Switch,
-} from '@mui/material';
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Grid,
+  Pagination,
+  CircularProgress,
+  Stack,
+  Divider,
+  List,
+  ListItem,
+  ListItemText,
+  Chip,
+} from "@mui/material";
 import {
-  AddShoppingCart,
-  Delete,
-  UploadFile,
-  Receipt,
-  Save,
-} from '@mui/icons-material';
-import { productsAPI, businessAPI } from '../utils/api'; // Asumo que businessAPI tiene el endpoint de compras
-import { useAuth } from '../contexts/AuthContext';
-import { notificationSwal } from '../utils/swal-helpers';
-import { formatCurrency } from '../utils/formatters';
-
-// Componente para el modal de creación rápida de productos
-const CreateProductModal = ({ open, onClose, onProductCreated, businessId }) => {
-  const [newProduct, setNewProduct] = useState({ name: '', cost: '', price: '', stock: 0, min_stock: 5, status: 'active' });
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      const res = await productsAPI.create({ ...newProduct, business_id: businessId });
-      onProductCreated(res.data);
-      notificationSwal('Éxito', 'Producto creado correctamente', 'success');
-      onClose();
-    } catch (error) {
-      console.error("Error creating product:", error);
-      notificationSwal('Error', 'No se pudo crear el producto', 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Crear Nuevo Producto</DialogTitle>
-      <DialogContent>
-        <TextField
-          autoFocus
-          margin="dense"
-          label="Nombre del Producto"
-          fullWidth
-          variant="outlined"
-          onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-          disabled={isSaving}
-        />
-        <TextField
-          margin="dense"
-          label="Costo"
-          type="number"
-          fullWidth
-          variant="outlined"
-          onChange={(e) => setNewProduct({ ...newProduct, cost: e.target.value })}
-          disabled={isSaving}
-        />
-        <TextField
-          margin="dense"
-          label="Precio de Venta"
-          type="number"
-          fullWidth
-          variant="outlined"
-          onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
-          disabled={isSaving}
-        />
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={isSaving}>Cancelar</Button>
-        <Button onClick={handleSave} variant="contained" disabled={isSaving}>
-          {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Guardar'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-};
+  Search as SearchIcon,
+  Visibility as ViewIcon,
+  Delete as DeleteIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  GetApp as ExportIcon,
+} from "@mui/icons-material";
+import { useAuth } from "../contexts/AuthContext";
+import { formatCurrency, formatDate } from "../utils/formatters";
+import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
+import { purchasesAPI } from "../utils/api";
+import { CreatePurchase } from "../components/CreatePurchase";
+import { exportToExcel } from "../utils/excelExport";
 
 export const Purchases = () => {
-  const theme = useTheme();
-  const { user } = useAuth();
-  const [items, setItems] = useState([]);
-  const [supplier, setSupplier] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState('');
-  const [receiptFile, setReceiptFile] = useState(null);
-  const [generateReceipt, setGenerateReceipt] = useState(false);
-  const [total, setTotal] = useState(0);
+  const { hasPermission } = useAuth();
+  const [purchases, setPurchases] = useState([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchFilters, setSearchFilters] = useState({});
+  const [datePreset, setDatePreset] = useState("all");
+  const [openViewDialog, setOpenViewDialog] = useState(false);
+  const [selectedPurchase, setSelectedPurchase] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [open, setOpen] = useState(false);
-  const [options, setOptions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
-  const [cost, setCost] = useState('');
-  
-  const [isSaving, setIsSaving] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // New states for Create and Edit
+  const [openCreateDialog, setOpenCreateDialog] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
+  const [editingPurchase, setEditingPurchase] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    supplier_name: "",
+    purchase_date: "",
+    notes: "",
+  });
 
   useEffect(() => {
-    const newTotal = items.reduce((sum, item) => sum + item.subtotal, 0);
-    setTotal(newTotal);
-  }, [items]);
+    loadPurchases();
+  }, [page, searchFilters]);
 
-  const handleSearch = useCallback(async (term) => {
-    if (term.length < 2) {
-      setOptions([]);
-      return;
-    }
-    setLoading(true);
+  const loadPurchases = async () => {
+    setIsLoading(true);
     try {
-      const response = await businessAPI.searchProducts(term); // Asumo que existe este método
-      setOptions(response.data);
+      const response = await purchasesAPI.getAll({ page, ...searchFilters });
+      setPurchases(response.data.data);
+      setTotalPages(response.data.last_page);
     } catch (error) {
-      console.error("Error searching products:", error);
+      console.error("Error loading purchases:", error);
+      notificationSwal(
+        "Error",
+        "Hubo un error al cargar las compras.",
+        "error"
+      );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, []);
+  };
 
-  const handleAddItem = () => {
-    if (!selectedProduct || quantity <= 0 || cost < 0) {
-      notificationSwal('Atención', 'Selecciona un producto y define una cantidad y costo válidos.', 'warning');
-      return;
-    }
+  const handleDatePresetChange = (event) => {
+    const preset = event.target.value;
+    setDatePreset(preset);
 
-    const newItem = {
-      ...selectedProduct,
-      quantity: parseInt(quantity, 10),
-      cost: parseFloat(cost),
-      subtotal: parseInt(quantity, 10) * parseFloat(cost),
+    const today = new Date();
+    let date_from = "";
+    let date_to = "";
+
+    const formatDateInput = (date) => {
+      return date.toISOString().split("T")[0];
     };
 
-    setItems([...items, newItem]);
-    setSelectedProduct(null);
-    setQuantity(1);
-    setCost('');
-    setOptions([]);
-  };
-
-  const handleRemoveItem = (index) => {
-    const newItems = items.filter((_, i) => i !== index);
-    setItems(newItems);
-  };
-
-  const handleProductCreated = (product) => {
-    setSelectedProduct(product);
-    setCost(product.cost);
-  };
-
-  const handleSavePurchase = async () => {
-    if (items.length === 0) {
-        notificationSwal('Error', 'Debes añadir al menos un producto a la compra.', 'error');
-        return;
+    if (preset === "today") {
+      date_from = formatDateInput(today);
+      date_to = formatDateInput(today);
+    } else if (preset === "yesterday") {
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      date_from = formatDateInput(yesterday);
+      date_to = formatDateInput(yesterday);
+    } else if (preset === "this_month") {
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      date_from = formatDateInput(firstDay);
+      date_to = formatDateInput(lastDay);
     }
 
-    setIsSaving(true);
-    const formData = new FormData();
-    formData.append('supplier_name', supplier);
-    formData.append('purchase_date', purchaseDate);
-    formData.append('notes', notes);
-    formData.append('generate_receipt', generateReceipt ? '1' : '0');
-    if (receiptFile) {
-        formData.append('receipt_file', receiptFile);
-    }
-
-    items.forEach((item, index) => {
-        formData.append(`items[${index}][id]`, item.id || '');
-        formData.append(`items[${index}][name]`, item.name);
-        formData.append(`items[${index}][quantity]`, item.quantity);
-        formData.append(`items[${index}][cost]`, item.cost);
+    setSearchFilters((prev) => {
+      const newFilters = { ...prev };
+      if (preset === "all" || preset === "custom") {
+        delete newFilters.date_from;
+        delete newFilters.date_to;
+      } else {
+        newFilters.date_from = date_from;
+        newFilters.date_to = date_to;
+      }
+      return newFilters;
     });
+    setPage(1);
+  };
 
+  const handleChangeFilter = (event) => {
+    const { name, value } = event.target;
+    setSearchFilters((prevFilters) => {
+      const newFilters = { ...prevFilters };
+      if (value === "") {
+        delete newFilters[name];
+      } else {
+        newFilters[name] = value;
+      }
+      return newFilters;
+    });
+    setPage(1);
+  };
+
+  const handleViewPurchase = (purchase) => {
+    setSelectedPurchase(purchase);
+    setOpenViewDialog(true);
+  };
+
+  const handleDeletePurchase = async (purchaseId) => {
+    const userConfirmed = await confirmSwal(
+      "¿Estás seguro?",
+      "Esta acción eliminará la compra permanentemente y revertirá el stock de los productos.",
+      { confirmButtonText: "Sí, eliminar", icon: "warning" }
+    );
+
+    if (userConfirmed) {
+      setIsSubmitting(true);
+      try {
+        await purchasesAPI.delete(purchaseId);
+        notificationSwal(
+          "Compra Eliminada",
+          "La compra ha sido eliminada exitosamente.",
+          "success"
+        );
+        loadPurchases();
+      } catch (error) {
+        console.error("Error deleting purchase:", error);
+        notificationSwal("Error", "Error al eliminar la compra.", "error");
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleExportToExcel = () => {
+    const dataToExport = purchases.map((purchase) => ({
+      Número: purchase.purchase_number,
+      Proveedor: purchase.supplier_name || "N/A",
+      Total: purchase.total_amount,
+      Fecha: formatDate(purchase.purchase_date),
+      "Registrado Por": purchase.creator?.full_name || "N/A",
+      Notas: purchase.notes || "N/A",
+    }));
+    exportToExcel(dataToExport, "compras_reporte", "Compras");
+  };
+
+  const handleEditPurchase = (purchase) => {
+    setEditingPurchase(purchase);
+    setEditFormData({
+      supplier_name: purchase.supplier_name || "",
+      purchase_date: purchase.purchase_date
+        ? purchase.purchase_date.split("T")[0]
+        : "",
+      notes: purchase.notes || "",
+    });
+    setOpenEditDialog(true);
+  };
+
+  const handleSaveEditedPurchase = async () => {
+    setIsSubmitting(true);
     try {
-        await businessAPI.createPurchase(formData); // Asumo que existe este método
-        notificationSwal('Éxito', 'La compra ha sido registrada correctamente.', 'success');
-        // Reset form
-        setItems([]);
-        setSupplier('');
-        setNotes('');
-        setReceiptFile(null);
-        setGenerateReceipt(false);
+      await purchasesAPI.update(editingPurchase.id, editFormData);
+      notificationSwal("Éxito", "Compra actualizada correctamente.", "success");
+      setOpenEditDialog(false);
+      loadPurchases();
     } catch (error) {
-        console.error("Error saving purchase:", error);
-        notificationSwal('Error', 'Hubo un problema al registrar la compra.', 'error');
+      console.error("Error updating purchase:", error);
+      notificationSwal("Error", "No se pudo actualizar la compra.", "error");
     } finally {
-        setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
   return (
     <Box>
-      <CreateProductModal 
-        open={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onProductCreated={handleProductCreated}
-        businessId={user.business_id}
-      />
-      <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-        Registrar Nueva Compra
-      </Typography>
-      <Grid container spacing={4}>
-        {/* Columna Izquierda: Añadir productos */}
-        <Grid item xs={12} md={5}>
-          <Card component={Paper} elevation={3}>
-            <CardContent>
-              <Typography variant="h6" sx={{ mb: 2 }}>Añadir Producto a la Compra</Typography>
-              <Autocomplete
-                open={open}
-                onOpen={() => setOpen(true)}
-                onClose={() => setOpen(false)}
-                isOptionEqualToValue={(option, value) => option.id === value.id}
-                getOptionLabel={(option) => option.name}
-                options={options}
-                loading={loading}
-                value={selectedProduct}
-                onChange={(event, newValue) => {
-                  setSelectedProduct(newValue);
-                  if (newValue) {
-                    setCost(newValue.cost);
-                  }
-                }}
-                onInputChange={(event, newInputValue) => {
-                  handleSearch(newInputValue);
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Buscar producto por nombre o código"
-                    InputProps={{
-                      ...params.InputProps,
-                      endAdornment: (
-                        <>
-                          {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                          {params.InputProps.endAdornment}
-                        </>
-                      ),
-                    }}
-                  />
-                )}
-              />
-              <Button variant="text" onClick={() => setIsModalOpen(true)} sx={{ mt: 1 }}>
-                ¿No encuentras el producto? Créalo aquí
-              </Button>
-              <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={6}>
-                  <TextField
-                    label="Cantidad"
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    fullWidth
-                    disabled={isSaving}
-                  />
-                </Grid>
-                <Grid item xs={6}>
-                  <TextField
-                    label="Costo Unitario"
-                    type="number"
-                    value={cost}
-                    onChange={(e) => setCost(e.target.value)}
-                    fullWidth
-                    disabled={isSaving}
-                  />
-                </Grid>
-              </Grid>
-              <Button
-                variant="contained"
-                startIcon={<AddShoppingCart />}
-                onClick={handleAddItem}
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
+        <Typography variant="h4" sx={{ fontWeight: 600 }}>
+          Compras
+        </Typography>
+        <Box sx={{ display: "flex", gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<ExportIcon />}
+            onClick={handleExportToExcel}
+            disabled={purchases.length === 0}
+          >
+            Exportar
+          </Button>
+
+          {hasPermission("compras.create") && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenCreateDialog(true)}
+            >
+              Nueva Compra
+            </Button>
+          )}
+        </Box>
+      </Box>
+
+      <Card>
+        <CardContent>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={12} md={4}>
+              <TextField
                 fullWidth
-                sx={{ mt: 2, py: 1.5 }}
-                disabled={isSaving}
-              >
-                Añadir a la Compra
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
+                placeholder="Buscar por número o proveedor..."
+                name="search"
+                value={searchFilters.search || ""}
+                onChange={handleChangeFilter}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth>
+                <InputLabel>Rango de Fecha</InputLabel>
+                <Select
+                  value={datePreset}
+                  label="Rango de Fecha"
+                  onChange={handleDatePresetChange}
+                >
+                  <MenuItem value="all">Todos</MenuItem>
+                  <MenuItem value="today">Hoy</MenuItem>
+                  <MenuItem value="yesterday">Ayer</MenuItem>
+                  <MenuItem value="this_month">Este Mes</MenuItem>
+                  <MenuItem value="custom">Personalizado</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            {datePreset === "custom" && (
+              <>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Desde"
+                    type="date"
+                    name="date_from"
+                    value={searchFilters.date_from || ""}
+                    onChange={handleChangeFilter}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    fullWidth
+                    label="Hasta"
+                    type="date"
+                    name="date_to"
+                    value={searchFilters.date_to || ""}
+                    onChange={handleChangeFilter}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+              </>
+            )}
+          </Grid>
 
-        {/* Columna Derecha: Resumen de la compra */}
-        <Grid item xs={12} md={7}>
-          <Card component={Paper} elevation={3}>
-            <CardContent>
-              <Typography variant="h6">Resumen de la Compra</Typography>
-              <List>
-                {items.map((item, index) => (
-                  <ListItem key={index} divider secondaryAction={
-                    <IconButton edge="end" aria-label="delete" onClick={() => handleRemoveItem(index)}>
-                      <Delete />
-                    </IconButton>
-                  }>
-                    <ListItemText
-                      primary={item.name}
-                      secondary={`${item.quantity} x ${formatCurrency(item.cost)}`}
-                    />
-                    <Typography variant="body1" fontWeight="bold">{formatCurrency(item.subtotal)}</Typography>
-                  </ListItem>
-                ))}
-                {items.length === 0 && (
-                    <Typography sx={{textAlign: 'center', p: 2, color: 'text.secondary'}}>Aún no has añadido productos.</Typography>
+          <TableContainer component={Paper} variant="outlined">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Número</TableCell>
+                  <TableCell>Proveedor</TableCell>
+                  <TableCell>Total</TableCell>
+                  <TableCell>Fecha</TableCell>
+                  <TableCell>Registrado Por</TableCell>
+                  <TableCell align="right">Acciones</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      <CircularProgress />
+                    </TableCell>
+                  </TableRow>
+                ) : purchases.length > 0 ? (
+                  purchases.map((purchase) => (
+                    <TableRow key={purchase.id}>
+                      <TableCell>{purchase.purchase_number}</TableCell>
+                      <TableCell>{purchase.supplier_name || "-"}</TableCell>
+                      <TableCell>
+                        {formatCurrency(purchase.total_amount)}
+                      </TableCell>
+                      <TableCell>
+                        {formatDate(purchase.purchase_date)}
+                      </TableCell>
+                      <TableCell>{purchase.creator?.full_name}</TableCell>
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleViewPurchase(purchase)}
+                        >
+                          <ViewIcon />
+                        </IconButton>
+                        {hasPermission("compras.edit") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleEditPurchase(purchase)}
+                          >
+                            <EditIcon />
+                          </IconButton>
+                        )}
+                        {hasPermission("compras.delete") && (
+                          <IconButton
+                            size="small"
+                            onClick={() => handleDeletePurchase(purchase.id)}
+                            color="error"
+                            disabled={isSubmitting}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center">
+                      No se encontraron compras.
+                    </TableCell>
+                  </TableRow>
                 )}
-              </List>
-              <Divider />
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
-                <Typography variant="h5" fontWeight="bold">Total: {formatCurrency(total)}</Typography>
-              </Box>
-            </CardContent>
-          </Card>
+              </TableBody>
+            </Table>
+          </TableContainer>
 
-          <Card component={Paper} elevation={3} sx={{ mt: 3 }}>
-            <CardContent>
-                <Typography variant="h6" sx={{ mb: 2 }}>Datos del Gasto y Factura</Typography>
-                <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6}>
-                        <TextField label="Nombre del Proveedor" value={supplier} onChange={e => setSupplier(e.target.value)} fullWidth disabled={isSaving} />
+          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+            <Pagination
+              count={totalPages}
+              page={page}
+              onChange={(event, value) => setPage(value)}
+              color="primary"
+            />
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* View Details Dialog */}
+      <Dialog
+        open={openViewDialog}
+        onClose={() => setOpenViewDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          Detalles de Compra - {selectedPurchase?.purchase_number}
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedPurchase && (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>
+                  Información General
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Proveedor
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {selectedPurchase.supplier_name || "N/A"}
+                      </Typography>
                     </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <TextField type="date" label="Fecha de Compra" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} fullWidth InputLabelProps={{ shrink: true }} disabled={isSaving} />
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Fecha de Compra
+                      </Typography>
+                      <Typography variant="body1">
+                        {formatDate(selectedPurchase.purchase_date)}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Registrado Por
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedPurchase.creator?.full_name}
+                      </Typography>
                     </Grid>
                     <Grid item xs={12}>
-                        <TextField label="Notas / Descripción" value={notes} onChange={e => setNotes(e.target.value)} fullWidth multiline rows={2} disabled={isSaving} />
+                      <Typography variant="body2" color="text.secondary">
+                        Notas
+                      </Typography>
+                      <Typography variant="body1">
+                        {selectedPurchase.notes || "Sin notas"}
+                      </Typography>
                     </Grid>
-                    <Grid item xs={12} sm={6} sx={{display: 'flex', alignItems: 'center'}}>
-                        <Button variant="outlined" component="label" startIcon={<UploadFile />} disabled={isSaving}>
-                            Subir Factura
-                            <input type="file" hidden onChange={e => setReceiptFile(e.target.files[0])} />
-                        </Button>
-                        {receiptFile && <Chip label={receiptFile.name} onDelete={() => setReceiptFile(null)} sx={{ml: 1}}/>}
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <FormControlLabel control={<Switch checked={generateReceipt} onChange={e => setGenerateReceipt(e.target.checked)} disabled={isSaving} />} label="Generar Recibo PDF" />
-                    </Grid>
-                </Grid>
-            </CardContent>
-          </Card>
+                  </Grid>
+                </Paper>
+              </Grid>
 
-          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-            <Button variant="contained" color="primary" size="large" startIcon={<Save />} onClick={handleSavePurchase} disabled={isSaving || items.length === 0}>
-              {isSaving ? <CircularProgress size={24} color="inherit" /> : 'Finalizar y Registrar Compra'}
-            </Button>
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" gutterBottom>
+                  Productos
+                </Typography>
+                <List
+                  dense
+                  component={Paper}
+                  variant="outlined"
+                  sx={{ maxHeight: 300, overflow: "auto" }}
+                >
+                  {selectedPurchase.items?.map((item, index) => (
+                    <React.Fragment key={index}>
+                      <ListItem>
+                        <ListItemText
+                          primary={item.product_name}
+                          secondary={`Cant: ${item.quantity} x ${formatCurrency(
+                            item.cost
+                          )}`}
+                        />
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {formatCurrency(item.subtotal)}
+                        </Typography>
+                      </ListItem>
+                      {index < selectedPurchase.items.length - 1 && <Divider />}
+                    </React.Fragment>
+                  ))}
+                </List>
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mt: 2,
+                    pt: 2,
+                    borderTop: 1,
+                    borderColor: "divider",
+                  }}
+                >
+                  <Typography variant="h6">Total:</Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 700, color: "primary.main" }}
+                  >
+                    {formatCurrency(selectedPurchase.total_amount)}
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenViewDialog(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Create Purchase Modal (Super Wide) */}
+      <Dialog
+        open={openCreateDialog}
+        onClose={() => setOpenCreateDialog(false)}
+        maxWidth="xl"
+        fullWidth
+      >
+        <DialogTitle>Registrar Nueva Compra</DialogTitle>
+        <DialogContent>
+          <CreatePurchase
+            onSuccess={() => {
+              setOpenCreateDialog(false);
+              loadPurchases();
+            }}
+            onCancel={() => setOpenCreateDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Purchase Modal (Restricted Fields) */}
+      <Dialog
+        open={openEditDialog}
+        onClose={() => setOpenEditDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Editar Compra - {editingPurchase?.purchase_number}
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 2, display: "flex", flexDirection: "column", gap: 2 }}>
+            <TextField
+              label="Proveedor"
+              fullWidth
+              value={editFormData.supplier_name}
+              onChange={(e) =>
+                setEditFormData({
+                  ...editFormData,
+                  supplier_name: e.target.value,
+                })
+              }
+            />
+            <TextField
+              label="Fecha de Compra"
+              type="date"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              value={editFormData.purchase_date}
+              onChange={(e) =>
+                setEditFormData({
+                  ...editFormData,
+                  purchase_date: e.target.value,
+                })
+              }
+            />
+            <TextField
+              label="Notas"
+              fullWidth
+              multiline
+              rows={3}
+              value={editFormData.notes}
+              onChange={(e) =>
+                setEditFormData({ ...editFormData, notes: e.target.value })
+              }
+            />
           </Box>
-        </Grid>
-      </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setOpenEditDialog(false)}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleSaveEditedPurchase}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : (
+              "Guardar Cambios"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

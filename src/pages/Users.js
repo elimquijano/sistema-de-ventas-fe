@@ -265,7 +265,7 @@ export const Users = () => {
           minHeight: 400,
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }

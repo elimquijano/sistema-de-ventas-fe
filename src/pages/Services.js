@@ -237,7 +237,7 @@ export const Services = () => {
           minHeight: 400,
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }

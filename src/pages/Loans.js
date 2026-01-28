@@ -283,7 +283,7 @@ export const Loans = () => {
           </Grid>
 
           {loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}><CircularProgress /></Box>
+            <Box sx={{ display: 'flex', justifyContent: 'center', my: 5 }}>{/* <CircularProgress /> */}</Box>
           ) : (
             <TableContainer component={Paper} variant="outlined">
               <Table>

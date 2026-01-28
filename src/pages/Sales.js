@@ -375,7 +375,7 @@ export const Sales = () => {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
-                      <CircularProgress />
+                      {/* <CircularProgress /> */}
                     </TableCell>
                   </TableRow>
                 ) : (

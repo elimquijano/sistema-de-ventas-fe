@@ -201,7 +201,7 @@ export const Credits = () => {
           minHeight: 400,
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }

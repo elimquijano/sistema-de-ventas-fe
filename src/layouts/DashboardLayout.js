@@ -820,7 +820,7 @@ export const DashboardLayout = () => {
               height: "calc(100vh - 64px)",
             }}
           >
-            <CircularProgress />
+            {/* <CircularProgress /> */}
           </Box>
         ) : // Si menuModules está vacío después de cargar, significa que el usuario no tiene acceso a NADA.
         menuModules.length > 0 ? (

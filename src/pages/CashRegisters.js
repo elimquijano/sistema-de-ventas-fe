@@ -262,7 +262,7 @@ export const CashRegisters = () => {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={8} align="center">
-                      <CircularProgress />
+                      {/* <CircularProgress /> */}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -386,7 +386,7 @@ export const CashRegisters = () => {
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
                       {formatCurrency(reportData.total_in_cash, reportData.currency)}
                     </Typography>
-                    <Typography variant="body2">Dinero Actual</Typography>
+                    <Typography variant="body2">Efectivo en Caja</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} md={3}>
@@ -401,7 +401,7 @@ export const CashRegisters = () => {
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
                       {formatCurrency(reportData.expected_amount, reportData.currency)}
                     </Typography>
-                    <Typography variant="body2">Dinero Esperado</Typography>
+                    <Typography variant="body2">Total General</Typography>
                   </Paper>
                 </Grid>
               </Grid>

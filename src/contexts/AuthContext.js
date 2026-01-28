@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { authAPI } from "../utils/api";
 import { notificationSwal } from "../utils/swal-helpers";
+import { loaderEvents } from "../utils/loaderEvents";
 
 const AuthContext = createContext(undefined);
 
@@ -28,6 +29,7 @@ export const AuthProvider = ({ children }) => {
       return;
     }
 
+    loaderEvents.emit("show", "Verificando sesión...");
     try {
       // Verificar si el token es válido consultando al servidor
       const response = await authAPI.me();
@@ -65,6 +67,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
       setIsInitialized(true);
+      loaderEvents.emit("hide");
     }
   };
 

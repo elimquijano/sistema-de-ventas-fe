@@ -18,7 +18,7 @@ export const ProtectedRoute = ({ children, permission }) => {
           minHeight: '100vh',
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }

@@ -342,7 +342,7 @@ export const UserPermissions = () => {
           minHeight: 400,
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }

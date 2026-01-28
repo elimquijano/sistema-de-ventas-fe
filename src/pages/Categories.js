@@ -169,7 +169,7 @@ export const Categories = () => {
           minHeight: 400,
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }

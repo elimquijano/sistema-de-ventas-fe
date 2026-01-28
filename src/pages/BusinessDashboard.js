@@ -264,7 +264,7 @@ export const BusinessDashboard = () => {
           minHeight: 400,
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }
@@ -859,7 +859,7 @@ export const BusinessDashboard = () => {
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
                       {formatCurrency(reportData.total_in_cash, currency)}
                     </Typography>
-                    <Typography variant="body2">Dinero Actual</Typography>
+                    <Typography variant="body2">Efectivo en Caja</Typography>
                   </Paper>
                 </Grid>
                 <Grid item xs={6} md={3}>
@@ -874,7 +874,7 @@ export const BusinessDashboard = () => {
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
                       {formatCurrency(reportData.expected_amount, currency)}
                     </Typography>
-                    <Typography variant="body2">Dinero Esperado</Typography>
+                    <Typography variant="body2">Total General</Typography>
                   </Paper>
                 </Grid>
               </Grid>
@@ -912,7 +912,7 @@ export const BusinessDashboard = () => {
                           <ListItemText
                             primary={`${sale.sale_number} - ${sale.customer_name}`}
                             secondary={`${sale.items.length} productos - ${
-                              sale.payment_method === "cash"
+                              sale.status === "completed"
                                 ? "Pagado"
                                 : "Por cobrar"
                             }`}

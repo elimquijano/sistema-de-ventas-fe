@@ -15,7 +15,7 @@ export const PublicRoute = ({ children }) => {
           minHeight: '100vh',
         }}
       >
-        <CircularProgress />
+        {/* <CircularProgress /> */}
       </Box>
     );
   }

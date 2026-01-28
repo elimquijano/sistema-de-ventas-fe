@@ -331,7 +331,7 @@ export const Purchases = () => {
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={6} align="center">
-                      <CircularProgress />
+                      {/* <CircularProgress /> */}
                     </TableCell>
                   </TableRow>
                 ) : purchases.length > 0 ? (

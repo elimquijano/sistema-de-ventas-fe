@@ -343,7 +343,7 @@ export const Expenses = () => {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7} align="center">
-                      <CircularProgress />
+                      {/* <CircularProgress /> */}
                     </TableCell>
                   </TableRow>
                 ) : (

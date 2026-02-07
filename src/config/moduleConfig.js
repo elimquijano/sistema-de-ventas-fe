@@ -20,6 +20,7 @@ import { Categories } from "../pages/Categories";
 import { Loans } from "../pages/Loans";
 import { Purchases } from "../pages/Purchases";
 import { CashRegisters } from "../pages/CashRegisters";
+import { Clients } from "../pages/Clients";
 
 // Importar iconos de Material-UI
 import {
@@ -67,6 +68,7 @@ export const componentMap = {
   Loans,
   Purchases,
   CashRegisters,
+  Clients,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES

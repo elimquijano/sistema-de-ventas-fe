@@ -303,6 +303,34 @@ export const categoriesAPI = {
   delete: (id) => api.delete(`/categories/${id}`, { loaderMessage: "Eliminando categoría..." }),
 };
 
+export const clientsAPI = {
+  getAll: (params = {}) => api.get("/clients", { params, loaderMessage: "Cargando clientes..." }),
+  getById: (id) => api.get(`/clients/${id}`, { loaderMessage: "Obteniendo detalles del cliente..." }),
+  create: (clientData) =>
+    api.post("/clients", clientData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      loaderMessage: "Creando cliente..."
+    }),
+  update: (id, clientData) => {
+    // Para Laravel multipart PUT, usamos POST con _method=PUT
+    if (clientData instanceof FormData) {
+      if (!clientData.has("_method")) {
+        clientData.append("_method", "PUT");
+      }
+      return api.post(`/clients/${id}`, clientData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        loaderMessage: "Actualizando cliente..."
+      });
+    }
+    return api.put(`/clients/${id}`, clientData, { loaderMessage: "Actualizando cliente..." });
+  },
+  delete: (id) => api.delete(`/clients/${id}`, { loaderMessage: "Eliminando cliente..." }),
+};
+
 export const cashRegisterAPI = {
   getAll: (params = {}) => api.get("/cash-registers", { params, loaderMessage: "Cargando cajas..." }),
   getCurrent: () => api.get("/cash-registers/current", { loaderMessage: "Verificando caja abierta..." }),

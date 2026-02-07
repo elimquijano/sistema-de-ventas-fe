@@ -2,7 +2,17 @@
 export const formatDate = (date, format = 'DD/MM/YYYY') => {
   if (!date) return '';
   
-  const d = new Date(date);
+  let d;
+  // Si la fecha es solo YYYY-MM-DD, la parseamos manualmente para evitar desfase UTC
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-').map(Number);
+    d = new Date(year, month - 1, day);
+  } else {
+    d = new Date(date);
+  }
+
+  if (isNaN(d.getTime())) return '';
+
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();

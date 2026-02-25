@@ -21,6 +21,7 @@ import { Loans } from "../pages/Loans";
 import { Purchases } from "../pages/Purchases";
 import { CashRegisters } from "../pages/CashRegisters";
 import { Clients } from "../pages/Clients";
+import LocationTracker from "../pages/LocationTracker";
 
 // Importar iconos de Material-UI
 import {
@@ -54,7 +55,7 @@ export const componentMap = {
   UserPermissions,
   Modules,
   SettingsPage,
-  
+
   // Nuevos componentes del sistema de ventas
   BusinessDashboard,
   Business,
@@ -69,6 +70,7 @@ export const componentMap = {
   Purchases,
   CashRegisters,
   Clients,
+  LocationTracker,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES

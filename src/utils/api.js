@@ -54,9 +54,18 @@ api.interceptors.response.use(
 
     const originalRequest = error.config;
 
-    // Si el token ha expirado (401) y no hemos intentado refrescar
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Evitar loop infinito si el refresh falla
+    if (originalRequest.url.includes("/auth/refresh")) {
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+      return Promise.reject(error);
+    }
+
+    // Si el token ha expirado (401) y no hemos excedido los reintentos (max 3)
+    if (error.response?.status === 401 && (originalRequest._retryCount || 0) < 3) {
       originalRequest._retry = true;
+      originalRequest._retryCount = (originalRequest._retryCount || 0) + 1;
 
       try {
         // Intentar refrescar el token

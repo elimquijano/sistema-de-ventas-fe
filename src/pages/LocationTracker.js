@@ -12,6 +12,7 @@ import {
   LayersControl,
   ZoomControl,
   Popup,
+  Circle,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -49,7 +50,7 @@ import {
   Home,
 } from "@mui/icons-material";
 import { notificationSwal } from "../utils/swal-helpers";
-import api, { clientsAPI } from "../utils/api";
+import { clientsAPI } from "../utils/api";
 
 // --- CONFIGURACIÓN DE ÍCONOS ---
 
@@ -126,6 +127,7 @@ export default function LocationTracker() {
   const [viewImageModal, setViewImageModal] = useState({ open: false, url: "", title: "" });
 
   const mapRef = useRef();
+  const lastCenteredLocation = useRef(null);
   const autocompleteInputRef = useRef();
   const fileInputRef = useRef();
   const searchTimeoutRef = useRef(null); // Ref para debounce
@@ -172,22 +174,49 @@ export default function LocationTracker() {
   useEffect(() => {
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
+        const { latitude, longitude, accuracy } = position.coords;
         setUserLocation({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
+          lat: latitude,
+          lng: longitude,
+          accuracy: accuracy,
         });
       },
-      (error) => console.error("Error obteniendo ubicación:", error),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      (error) => {
+        console.error("Error obteniendo ubicación:", error);
+        // Si hay error, intentar forzar una lectura única como respaldo
+        navigator.geolocation.getCurrentPosition(
+          (pos) => setUserLocation({ 
+            lat: pos.coords.latitude, 
+            lng: pos.coords.longitude, 
+            accuracy: pos.coords.accuracy 
+          }),
+          null,
+          { enableHighAccuracy: true }
+        );
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
-    if (mode === "register" && registerMode === "tracking" && userLocation) {
-      map.flyTo([userLocation.lat, userLocation.lng], 17);
+    if (!map || !userLocation) return;
+
+    if (mode === "register" && registerMode === "tracking") {
+      const currentPos = L.latLng(userLocation.lat, userLocation.lng);
+      
+      if (!lastCenteredLocation.current) {
+        map.flyTo(currentPos, 17);
+        lastCenteredLocation.current = currentPos;
+      } else {
+        const distance = currentPos.distanceTo(lastCenteredLocation.current);
+        // Solo centrar si se ha movido más de 5 metros para evitar vibraciones visuales
+        if (distance > 5) {
+          map.flyTo(currentPos, 17);
+          lastCenteredLocation.current = currentPos;
+        }
+      }
     }
   }, [mode, registerMode, userLocation]);
 
@@ -237,6 +266,16 @@ export default function LocationTracker() {
     let locToSave;
     if (registerMode === "tracking" && userLocation) {
       locToSave = userLocation;
+      // Advertir si la precisión es baja (> 80 metros)
+      if (userLocation.accuracy > 80) {
+        notificationSwal(
+          "Aviso de Precisión",
+          `La señal GPS es débil (margen de error: ${Math.round(
+            userLocation.accuracy
+          )}m). Considera esperar unos segundos o usar el modo manual para mayor exactitud.`,
+          "warning"
+        );
+      }
     } else if (registerMode === "manual" && mapRef.current) {
       locToSave = mapRef.current.getCenter();
     }
@@ -407,12 +446,36 @@ export default function LocationTracker() {
             {mode === "register" &&
               registerMode === "tracking" &&
               userLocation && (
-                <Marker position={userLocation} icon={personPinIcon} />
+                <>
+                  <Marker position={userLocation} icon={personPinIcon} />
+                  <Circle
+                    center={userLocation}
+                    radius={userLocation.accuracy || 0}
+                    pathOptions={{
+                      color: theme.palette.primary.main,
+                      fillColor: theme.palette.primary.main,
+                      fillOpacity: 0.1,
+                      weight: 1,
+                    }}
+                  />
+                </>
               )}
             {mode === "search" && (
               <>
                 {userLocation && (
-                  <Marker position={userLocation} icon={motorcycleIcon} />
+                  <>
+                    <Marker position={userLocation} icon={motorcycleIcon} />
+                    <Circle
+                      center={userLocation}
+                      radius={userLocation.accuracy || 0}
+                      pathOptions={{
+                        color: theme.palette.secondary.main,
+                        fillColor: theme.palette.secondary.main,
+                        fillOpacity: 0.1,
+                        weight: 1,
+                      }}
+                    />
+                  </>
                 )}
                 {clientsToDisplay.map((client) => (
                   <Marker

@@ -330,102 +330,83 @@ export const Clients = () => {
             }
             eventHandlers={{ click: () => setSelectedClient(client) }}
           >
-            <Popup minWidth={250}>
-              <Box sx={{ p: 1 }}>
+            <Popup minWidth={200} closeButton={false}>
+              <Box sx={{ p: 0.5 }}>
                 <Typography
-                  variant="subtitle1"
-                  sx={{ fontWeight: 700, color: "primary.main" }}
+                  variant="subtitle2"
+                  sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.2, mb: 0.5 }}
                 >
                   {client.name}
                 </Typography>
-                <Divider sx={{ my: 1 }} />
 
-                <Stack spacing={1}>
+                <Stack spacing={0.5}>
                   <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <PhoneIcon fontSize="small" color="action" />
-                    <Typography variant="body2">
-                      {client.phone || "Sin teléfono"}
+                    <PhoneIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                    <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                      {client.phone || "---"}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <HomeIcon fontSize="small" color="action" />
-                    <Typography variant="body2" sx={{ whiteSpace: "normal" }}>
-                      {client.address}
+                  
+                  <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                    <HomeIcon sx={{ fontSize: 14, color: "text.secondary", mt: 0.2 }} />
+                    <Typography variant="caption" sx={{ lineHeight: 1.2, color: "text.primary" }}>
+                      {client.address} {client.address_detail && `• ${client.address_detail}`}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: "flex", gap: 2, mt: 1 }}>
-                    <Box
-                      sx={{
-                        textAlign: "center",
-                        flex: 1,
-                        bgcolor: "grey.100",
-                        p: 0.5,
-                        borderRadius: 1,
-                      }}
-                    >
-                      <TimeIcon fontSize="small" color="secondary" />
-                      <Typography variant="caption" display="block">
-                        Tiempo Est.
-                      </Typography>
-                      <Typography variant="body2" fontWeight="600">
-                        {client.estimated_time || "N/A"}
-                      </Typography>
-                    </Box>
-                    <Box
-                      sx={{
-                        textAlign: "center",
-                        flex: 1,
-                        bgcolor: "grey.100",
-                        p: 0.5,
-                        borderRadius: 1,
-                      }}
-                    >
-                      <RouteIcon fontSize="small" color="secondary" />
-                      <Typography variant="caption" display="block">
-                        Distancia
-                      </Typography>
-                      <Typography variant="body2" fontWeight="600">
-                        {client.approximate_distance || "N/A"}
-                      </Typography>
-                    </Box>
-                  </Box>
+
+                  <Grid container spacing={0.5} sx={{ mt: 0.5 }}>
+                    <Grid item xs={6}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
+                        <TimeIcon sx={{ fontSize: 12, color: "secondary.main" }} />
+                        <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
+                          {client.estimated_time || "N/A"}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
+                        <RouteIcon sx={{ fontSize: 12, color: "secondary.main" }} />
+                        <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
+                          {client.approximate_distance || "N/A"}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
                 </Stack>
 
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    mt: 2,
-                    gap: 1,
-                  }}
-                >
-                  {client.image_path && (
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      startIcon={<ViewIcon />}
-                      onClick={() => setOpenImageDialog(true)}
-                    >
-                      Ver Foto
-                    </Button>
-                  )}
-                  {hasPermission("clientes.edit") && (
-                    <IconButton
-                      size="small"
-                      onClick={() => handleOpenCRUD(client)}
-                      color="primary"
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  )}
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1, pt: 1, borderTop: "1px dashed", borderColor: "grey.300", gap: 0.5 }}>
+                  <Box sx={{ display: "flex", gap: 0.5 }}>
+                    {client.image_path && (
+                      <IconButton
+                        size="small"
+                        onClick={() => setOpenImageDialog(true)}
+                        sx={{ bgcolor: "primary.light", color: "primary.contrastText", p: 0.5, "&:hover": { bgcolor: "primary.main" } }}
+                      >
+                        <ViewIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    )}
+                    {hasPermission("clientes.edit") && (
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenCRUD(client)}
+                        sx={{ bgcolor: "grey.100", p: 0.5 }}
+                      >
+                        <EditIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    )}
+                  </Box>
+                  
                   <Button
                     size="small"
                     variant="contained"
                     color="secondary"
+                    disableElevation
                     onClick={() => {
                       const url = `https://www.google.com/maps/dir/?api=1&destination=${client.latitude},${client.longitude}&travelmode=driving`;
                       window.open(url, "_blank");
                     }}
+                    sx={{ fontSize: "0.65rem", py: 0, px: 1, minWidth: "auto", height: 24, borderRadius: 1 }}
+                    startIcon={<MyLocationIcon sx={{ fontSize: "12px !important" }} />}
                   >
                     GPS
                   </Button>

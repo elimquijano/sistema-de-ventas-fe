@@ -71,19 +71,52 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
 });
 
-const clientIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/128/5674/5674903.png",
-  iconSize: [40, 40],
-  iconAnchor: [20, 40],
-  popupAnchor: [0, -40],
-});
+// Función para crear el marcador tipo bandera (estilo inDrive)
+const createFlagIcon = (name, isActive = false, theme) => {
+  const color = isActive ? theme.palette.secondary.main : theme.palette.primary.main;
+  
+  return L.divIcon({
+    html: renderToString(
+      <div style={{
+        display: "inline-flex",
+        alignItems: "flex-end",
+        position: "relative",
+        filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.3))",
+        pointerEvents: "none"
+      }}>
+        {/* Asta / Punta */}
+        <div style={{
+          width: "2px",
+          height: "14px",
+          backgroundColor: color,
+          borderRadius: "0 0 2px 2px",
+          flexShrink: 0
+        }} />
+        {/* Bandera / Rectángulo */}
+        <div style={{
+          backgroundColor: color,
+          color: "white",
+          padding: "2px 8px",
+          borderRadius: "6px 6px 6px 0",
+          fontSize: "11px",
+          fontWeight: "bold",
+          whiteSpace: "nowrap",
+          marginBottom: "10px",
+          marginLeft: "-1px",
+          boxShadow: "0 1px 2px rgba(0,0,0,0.2)"
+        }}>
+          {name}
+        </div>
+      </div>
+    ),
+    className: "custom-flag-icon",
+    iconSize: null,
+    iconAnchor: [1, 24], 
+    popupAnchor: [10, -25]
+  });
+};
 
-const activeClientIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/128/8587/8587894.png",
-  iconSize: [45, 45],
-  iconAnchor: [22, 45],
-  popupAnchor: [0, -45],
-});
+const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 
 // --- COMPONENTE PRINCIPAL ---
 export const Clients = () => {
@@ -102,6 +135,7 @@ export const Clients = () => {
   const [openLocationDialog, setOpenLocationDialog] = useState(false);
   const [openImageDialog, setOpenImageDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFetchingMapbox, setIsFetchingMapbox] = useState(false);
 
   // Estados de Formulario
   const [editingClient, setEditingClient] = useState(null);
@@ -109,8 +143,11 @@ export const Clients = () => {
   const [formData, setFormData] = useState({
     name: "",
     address: "",
+    address_detail: "",
     phone: "",
     image: null,
+    estimated_time: "",
+    approximate_distance: "",
   });
 
   // Estados de Ubicación (Modal de ajuste)
@@ -125,7 +162,6 @@ export const Clients = () => {
     try {
       setLoading(true);
       const response = await clientsAPI.getAll({ per_page: -1 });
-      // Filtramos solo los que tengan coordenadas válidas
       const validClients = (response.data.data || []).filter(
         (c) => c.latitude && c.longitude,
       );
@@ -161,16 +197,59 @@ export const Clients = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, [locationMode, openLocationDialog]);
 
-  // --- MANEJADORES DE UI ---
+  // --- MAPBOX HELPERS ---
+  const fetchMapboxData = async (lat, lng) => {
+    if (!MAPBOX_TOKEN) return;
+    setIsFetchingMapbox(true);
+    try {
+      // 1. Obtener dirección (Geocoding)
+      const geoRes = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=es`
+      );
+      const geoData = await geoRes.json();
+      const address = geoData.features?.[0]?.place_name || "";
 
+      let time = "";
+      let dist = "";
+
+      // 2. Obtener Tiempo/Distancia si tenemos la ubicación del usuario
+      if (userLocation) {
+        const dirRes = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation.lng},${userLocation.lat};${lng},${lat}?access_token=${MAPBOX_TOKEN}`
+        );
+        const dirData = await dirRes.json();
+        if (dirData.routes?.[0]) {
+          const route = dirData.routes[0];
+          time = `${Math.round(route.duration / 60)} min`;
+          dist = `${(route.distance / 1000).toFixed(1)} km`;
+        }
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        address: address.split(",")[0] + (address.split(",")[1] || ""),
+        estimated_time: time,
+        approximate_distance: dist
+      }));
+    } catch (error) {
+      console.error("Error fetching Mapbox data:", error);
+    } finally {
+      setIsFetchingMapbox(false);
+    }
+  };
+
+  // --- MANEJADORES DE UI ---
   const handleOpenCRUD = (client = null) => {
     if (client) {
       setEditingClient(client);
       setFormData({
         name: client.name || "",
         address: client.address || "",
+        address_detail: client.address_detail || "",
         phone: client.phone || "",
         image: null,
+        estimated_time: client.estimated_time || "",
+        approximate_distance: client.approximate_distance || "",
       });
       setImagePreview(client.image_path);
       setTempLocation({
@@ -179,7 +258,15 @@ export const Clients = () => {
       });
     } else {
       setEditingClient(null);
-      setFormData({ name: "", address: "", phone: "", image: null });
+      setFormData({ 
+        name: "", 
+        address: "", 
+        address_detail: "", 
+        phone: "", 
+        image: null,
+        estimated_time: "",
+        approximate_distance: "",
+      });
       setImagePreview(null);
       setTempLocation(userLocation || { lat: -12.0464, lng: -77.0428 });
     }
@@ -198,10 +285,13 @@ export const Clients = () => {
     const data = new FormData();
     data.append("name", formData.name);
     data.append("address", formData.address);
+    data.append("address_detail", formData.address_detail);
     data.append("phone", formData.phone);
+    data.append("estimated_time", formData.estimated_time);
+    data.append("approximate_distance", formData.approximate_distance);
+    
     if (formData.image) data.append("image", formData.image);
 
-    // Ubicación obligatoria
     if (tempLocation) {
       data.append("latitude", tempLocation.lat);
       data.append("longitude", tempLocation.lng);
@@ -211,11 +301,7 @@ export const Clients = () => {
     try {
       if (editingClient) {
         await clientsAPI.update(editingClient.id, data);
-        notificationSwal(
-          "Éxito",
-          "Cliente actualizado correctamente",
-          "success",
-        );
+        notificationSwal("Éxito", "Cliente actualizado correctamente", "success");
       } else {
         await clientsAPI.create(data);
         notificationSwal("Éxito", "Cliente creado correctamente", "success");
@@ -246,21 +332,25 @@ export const Clients = () => {
     }
   };
 
-  // --- MANEJO DE UBICACIÓN ---
   const handleOpenLocationPicker = () => {
     setLocationMode(editingClient ? "manual" : "tracking");
     setOpenLocationDialog(true);
   };
 
   const handleConfirmLocation = () => {
+    let finalCoords = tempLocation;
     if (locationMode === "manual" && locationMapRef.current) {
       const center = locationMapRef.current.getCenter();
-      setTempLocation({ lat: center.lat, lng: center.lng });
+      finalCoords = { lat: center.lat, lng: center.lng };
+    }
+    
+    if (finalCoords) {
+      setTempLocation(finalCoords);
+      fetchMapboxData(finalCoords.lat, finalCoords.lng);
     }
     setOpenLocationDialog(false);
   };
 
-  // Animación del mapa principal
   const flyToClient = (client) => {
     if (mapRef.current && client.latitude && client.longitude) {
       mapRef.current.flyTo([client.latitude, client.longitude], 18);
@@ -268,7 +358,6 @@ export const Clients = () => {
     }
   };
 
-  // --- ICONOS DINÁMICOS ---
   const userMarkerIcon = useMemo(
     () =>
       new L.divIcon({
@@ -286,7 +375,6 @@ export const Clients = () => {
 
   return (
     <Box sx={{ height: "calc(100vh - 100px)", position: "relative", m: -1 }}>
-      {/* --- MAPA PRINCIPAL --- */}
       <MapContainer
         center={[-12.0464, -77.0428]}
         zoom={13}
@@ -313,21 +401,17 @@ export const Clients = () => {
           </BaseLayer>
         </LayersControl>
 
-        {/* Marcador de Usuario */}
         {userLocation && (
           <Marker position={userLocation} icon={userMarkerIcon}>
             <Tooltip>Tu ubicación</Tooltip>
           </Marker>
         )}
 
-        {/* Marcadores de Clientes */}
         {clients.map((client) => (
           <Marker
             key={client.id}
             position={[client.latitude, client.longitude]}
-            icon={
-              selectedClient?.id === client.id ? activeClientIcon : clientIcon
-            }
+            icon={createFlagIcon(client.name, selectedClient?.id === client.id, theme)}
             eventHandlers={{ click: () => setSelectedClient(client) }}
           >
             <Popup minWidth={200} closeButton={false}>
@@ -417,33 +501,18 @@ export const Clients = () => {
         ))}
       </MapContainer>
 
-      {/* --- UI FLOTANTE --- */}
-
-      {/* Buscador superior */}
-      <Box
-        sx={{
-          position: "absolute",
-          top: 20,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 1000,
-          width: "90%",
-          maxWidth: 500,
-        }}
-      >
-        <Paper
-          elevation={4}
-          sx={{
-            p: 0.5,
-            borderRadius: 3,
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
+      <Box sx={{ position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1000, width: "90%", maxWidth: 500 }}>
+        <Paper elevation={4} sx={{ p: 0.5, borderRadius: 3, display: "flex", alignItems: "center" }}>
           <Autocomplete
             fullWidth
             options={clients}
-            getOptionLabel={(option) => option.name}
+            getOptionLabel={(option) => `${option.name} ${option.phone || ""}`}
+            renderOption={(props, option) => (
+              <Box component="li" {...props} sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", py: 0.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{option.name}</Typography>
+                <Typography variant="caption" color="text.secondary">{option.phone || "Sin teléfono"}</Typography>
+              </Box>
+            )}
             onChange={(e, val) => val && flyToClient(val)}
             renderInput={(params) => (
               <TextField
@@ -453,11 +522,7 @@ export const Clients = () => {
                 InputProps={{
                   ...params.InputProps,
                   disableUnderline: true,
-                  startAdornment: (
-                    <SearchIcon
-                      sx={{ ml: 2, mr: 1, color: "text.secondary" }}
-                    />
-                  ),
+                  startAdornment: <SearchIcon sx={{ ml: 2, mr: 1, color: "text.secondary" }} />,
                 }}
                 sx={{ ml: 1 }}
               />
@@ -466,123 +531,55 @@ export const Clients = () => {
         </Paper>
       </Box>
 
-      {/* Botones de acción inferiores */}
-      <Box
-        sx={{
-          position: "absolute",
-          bottom: 25,
-          left: "50%",
-          transform: "translateX(-50%)",
-          zIndex: 1000,
-          display: "flex",
-          gap: 2,
-        }}
-      >
+      <Box sx={{ position: "absolute", bottom: 25, left: "50%", transform: "translateX(-50%)", zIndex: 1000, display: "flex", gap: 2 }}>
         {hasPermission("clientes.create") && (
           <Fab
             variant="extended"
             color="primary"
             onClick={() => handleOpenCRUD()}
-            sx={{
-              px: 4,
-              background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
-            }}
+            sx={{ px: 4, background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)" }}
           >
             <AddIcon sx={{ mr: 1 }} /> Agregar Cliente
           </Fab>
         )}
-        <Fab
-          color="secondary"
-          onClick={() =>
-            userLocation &&
-            mapRef.current?.flyTo([userLocation.lat, userLocation.lng], 16)
-          }
-        >
+        <Fab color="secondary" onClick={() => userLocation && mapRef.current?.flyTo([userLocation.lat, userLocation.lng], 16)}>
           <MyLocationIcon />
         </Fab>
       </Box>
 
-      {/* --- DIÁLOGOS --- */}
-
-      {/* CRUD Modal */}
-      <Dialog
-        open={openCRUDDialog}
-        onClose={() => setOpenCRUDDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ fontWeight: 700 }}>
+      <Dialog open={openCRUDDialog} onClose={() => setOpenCRUDDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           {editingClient ? "Editar Cliente" : "Nuevo Cliente"}
+          {isFetchingMapbox && <CircularProgress size={20} />}
         </DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Nombre / Negocio"
-                value={formData.name}
-                onChange={(e) =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-              />
+              <TextField fullWidth label="Nombre / Negocio" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Teléfono"
-                value={formData.phone}
-                onChange={(e) =>
-                  setFormData({ ...formData, phone: e.target.value })
-                }
-              />
+              <TextField fullWidth label="Teléfono" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Button
-                fullWidth
-                variant="outlined"
-                startIcon={<EditLocationAlt />}
-                onClick={handleOpenLocationPicker}
-                sx={{ height: "56px" }}
-                color={tempLocation ? "success" : "primary"}
-              >
+              <Button fullWidth variant="outlined" startIcon={<EditLocationAlt />} onClick={handleOpenLocationPicker} sx={{ height: "56px" }} color={tempLocation ? "success" : "primary"}>
                 {tempLocation ? "Ubicación Lista" : "Fijar Ubicación"}
               </Button>
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Dirección / Referencia"
-                multiline
-                rows={2}
-                value={formData.address}
-                onChange={(e) =>
-                  setFormData({ ...formData, address: e.target.value })
-                }
-              />
+              <TextField fullWidth label="Dirección principal" multiline rows={2} value={formData.address} onChange={(e) => setFormData({ ...formData, address: e.target.value })} helperText="Se autocompletará al fijar la ubicación" />
             </Grid>
             <Grid item xs={12}>
-              <Box
-                sx={{
-                  border: "1px dashed grey",
-                  borderRadius: 2,
-                  p: 2,
-                  textAlign: "center",
-                  position: "relative",
-                }}
-              >
+              <TextField fullWidth label="Referencia / Detalle" value={formData.address_detail} onChange={(e) => setFormData({ ...formData, address_detail: e.target.value })} placeholder="Ejem: Frente al parque, local azul..." />
+            </Grid>
+            <Grid item xs={12}>
+              <Box sx={{ border: "1px dashed grey", borderRadius: 2, p: 2, textAlign: "center", position: "relative" }}>
                 <Button component="label" startIcon={<CloudUploadIcon />}>
                   {imagePreview ? "Cambiar Imagen" : "Subir Foto del Local"}
                   <input type="file" hidden onChange={handleFileChange} />
                 </Button>
                 {imagePreview && (
-                  <Box
-                    sx={{ mt: 1, display: "flex", justifyContent: "center" }}
-                  >
-                    <Avatar
-                      src={imagePreview}
-                      variant="rounded"
-                      sx={{ width: 120, height: 120 }}
-                    />
+                  <Box sx={{ mt: 1, display: "flex", justifyContent: "center" }}>
+                    <Avatar src={imagePreview} variant="rounded" sx={{ width: 120, height: 120 }} />
                   </Box>
                 )}
               </Box>
@@ -592,162 +589,47 @@ export const Clients = () => {
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={() => setOpenCRUDDialog(false)}>Cancelar</Button>
           {editingClient && hasPermission("clientes.delete") && (
-            <Button
-              color="error"
-              onClick={() => handleDeleteClient(editingClient.id)}
-            >
-              Eliminar
-            </Button>
+            <Button color="error" onClick={() => handleDeleteClient(editingClient.id)}>Eliminar</Button>
           )}
-          <Button
-            variant="contained"
-            onClick={handleSaveClient}
-            disabled={isSubmitting || !formData.name || !tempLocation}
-            startIcon={isSubmitting && <CircularProgress size={20} />}
-          >
+          <Button variant="contained" onClick={handleSaveClient} disabled={isSubmitting || !formData.name || !tempLocation || isFetchingMapbox} startIcon={isSubmitting && <CircularProgress size={20} />}>
             Guardar Cliente
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Location Picker Modal (Superior) */}
-      <Dialog
-        open={openLocationDialog}
-        onClose={() => setOpenLocationDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Typography variant="h6" fontWeight="700">
-            Ajustar Ubicación
-          </Typography>
+      <Dialog open={openLocationDialog} onClose={() => setOpenLocationDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Typography variant="h6" fontWeight="700">Ajustar Ubicación</Typography>
           <Stack direction="row" spacing={1}>
             <MuiTooltip title="Usar GPS">
-              <IconButton
-                color={locationMode === "tracking" ? "primary" : "default"}
-                onClick={() => setLocationMode("tracking")}
-              >
-                <GpsFixed />
-              </IconButton>
+              <IconButton color={locationMode === "tracking" ? "primary" : "default"} onClick={() => setLocationMode("tracking")}><GpsFixed /></IconButton>
             </MuiTooltip>
             <MuiTooltip title="Ajuste Manual">
-              <IconButton
-                color={locationMode === "manual" ? "primary" : "default"}
-                onClick={() => setLocationMode("manual")}
-              >
-                <EditLocationAlt />
-              </IconButton>
+              <IconButton color={locationMode === "manual" ? "primary" : "default"} onClick={() => setLocationMode("manual")}><EditLocationAlt /></IconButton>
             </MuiTooltip>
           </Stack>
         </DialogTitle>
         <DialogContent sx={{ p: 0, height: 400, position: "relative" }}>
-          <MapContainer
-            center={
-              tempLocation
-                ? [tempLocation.lat, tempLocation.lng]
-                : [-12.0464, -77.0428]
-            }
-            zoom={18}
-            style={{ height: "100%", width: "100%" }}
-            ref={locationMapRef}
-          >
-            <TileLayer
-              url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
-              subdomains={["mt0", "mt1", "mt2", "mt3"]}
-            />
-            {locationMode === "tracking" && tempLocation && (
-              <Marker
-                position={[tempLocation.lat, tempLocation.lng]}
-                icon={userMarkerIcon}
-              />
-            )}
+          <MapContainer center={tempLocation ? [tempLocation.lat, tempLocation.lng] : [-12.0464, -77.0428]} zoom={18} style={{ height: "100%", width: "100%" }} ref={locationMapRef}>
+            <TileLayer url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}" subdomains={["mt0", "mt1", "mt2", "mt3"]} />
+            {locationMode === "tracking" && tempLocation && <Marker position={[tempLocation.lat, tempLocation.lng]} icon={userMarkerIcon} />}
           </MapContainer>
-
           {locationMode === "manual" && (
-            <Box
-              sx={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                zIndex: 1000,
-                pointerEvents: "none",
-              }}
-            >
-              <PersonPinCircle
-                sx={{
-                  fontSize: 50,
-                  color: theme.palette.primary.main,
-                  filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))",
-                }}
-              />
+            <Box sx={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 1000, pointerEvents: "none" }}>
+              <PersonPinCircle sx={{ fontSize: 50, color: theme.palette.primary.main, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }} />
             </Box>
           )}
-
-          <Box
-            sx={{
-              position: "absolute",
-              bottom: 15,
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 1000,
-            }}
-          >
-            <Paper
-              sx={{
-                px: 2,
-                py: 1,
-                borderRadius: 2,
-                bgcolor: "rgba(255,255,255,0.9)",
-              }}
-            >
-              <Typography variant="caption" color="text.secondary">
-                {locationMode === "tracking"
-                  ? "Siguiendo GPS en tiempo real..."
-                  : "Mueve el mapa para centrar el icono en el local"}
-              </Typography>
-            </Paper>
-          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenLocationDialog(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleConfirmLocation}>
-            Confirmar Ubicación
-          </Button>
+          <Button variant="contained" onClick={handleConfirmLocation}>Confirmar Ubicación</Button>
         </DialogActions>
       </Dialog>
 
-      {/* Image View Modal */}
-      <Dialog
-        open={openImageDialog}
-        onClose={() => setOpenImageDialog(false)}
-        maxWidth="md"
-      >
+      <Dialog open={openImageDialog} onClose={() => setOpenImageDialog(false)} maxWidth="md">
         <Box sx={{ position: "relative" }}>
-          <IconButton
-            onClick={() => setOpenImageDialog(false)}
-            sx={{
-              position: "absolute",
-              right: 8,
-              top: 8,
-              bgcolor: "rgba(0,0,0,0.5)",
-              color: "white",
-              "&:hover": { bgcolor: "rgba(0,0,0,0.7)" },
-            }}
-          >
-            <Close />
-          </IconButton>
-          <img
-            src={selectedClient?.image_path}
-            alt={selectedClient?.name}
-            style={{ width: "100%", maxHeight: "80vh", objectFit: "contain" }}
-          />
+          <IconButton onClick={() => setOpenImageDialog(false)} sx={{ position: "absolute", right: 8, top: 8, bgcolor: "rgba(0,0,0,0.5)", color: "white", "&:hover": { bgcolor: "rgba(0,0,0,0.7)" } }}><Close /></IconButton>
+          <img src={selectedClient?.image_path} alt={selectedClient?.name} style={{ width: "100%", maxHeight: "80vh", objectFit: "contain" }} />
         </Box>
       </Dialog>
     </Box>

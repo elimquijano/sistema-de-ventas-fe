@@ -64,7 +64,7 @@ import {
   formatFullName,
 } from "../utils/formatters";
 import { businessAPI, cashRegisterAPI, salesAPI } from "../utils/api";
-import { notificationSwal } from "../utils/swal-helpers";
+import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
@@ -268,6 +268,35 @@ export const BusinessDashboard = () => {
       </Box>
     );
   }
+
+  const handleCloseCashRegister = async (cashRegister) => {
+    const confirmed = await confirmSwal(
+      "Cerrar Caja",
+      `¿Desea cerrar la caja registradora de ${cashRegister.opened_by?.full_name}?`,
+      { confirmButtonText: "Cerrar Caja", icon: "warning" }
+    );
+    if (confirmed) {
+      try {
+        await cashRegisterAPI.close(cashRegister.id, {
+          final_amount: cashRegister.total_in_cash || cashRegister.expected_amount,
+        });
+        notificationSwal(
+          "Caja Cerrada",
+          "La caja registradora ha sido cerrada exitosamente.",
+          "success"
+        );
+        // Refresh dashboard data
+        window.location.reload(); // Simple refresh for now to update all stats
+      } catch (error) {
+        console.error("Error closing cash register:", error);
+        notificationSwal(
+          "Error",
+          error.response?.data?.message || "Error al cerrar la caja registradora.",
+          "error"
+        );
+      }
+    }
+  };
 
   const getTrend = (current, previous) => {
     if (!previous || previous === 0) return current > 0 ? 100 : 0;
@@ -618,15 +647,29 @@ export const BusinessDashboard = () => {
                               {formatCurrency(reg.difference, currency)}
                             </Typography>
                           </Box>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            fullWidth
-                            startIcon={<Assessment />}
-                            onClick={() => handleOpenReports(reg.id)}
-                          >
-                            Ver Reporte
-                          </Button>
+                          <Box sx={{ display: 'flex', gap: 1 }}>
+                            <Button
+                              variant="contained"
+                              size="small"
+                              fullWidth
+                              startIcon={<Assessment />}
+                              onClick={() => handleOpenReports(reg.id)}
+                            >
+                              Reporte
+                            </Button>
+                            {reg.status === "open" && (user.role === 'admin' || user.roles?.some(r => r.name.toLowerCase() === 'admin') || reg.opened_by?.id === user.id) && (
+                              <Button
+                                variant="contained"
+                                size="small"
+                                fullWidth
+                                color="error"
+                                startIcon={<CloseIcon />}
+                                onClick={() => handleCloseCashRegister(reg)}
+                              >
+                                Cerrar
+                              </Button>
+                            )}
+                          </Box>
                         </CardContent>
                       </Card>
                     ))}
@@ -638,14 +681,28 @@ export const BusinessDashboard = () => {
                         key={reg.id}
                         disableGutters
                         secondaryAction={
-                          <IconButton
-                            edge="end"
-                            aria-label="report"
-                            onClick={() => handleOpenReports(reg.id)}
-                            title="Ver Reporte"
-                          >
-                            <Assessment color="primary" />
-                          </IconButton>
+                          <Box>
+                            {reg.status === "open" && (user.role === "admin" || reg.opened_by?.id === user.id) && (
+                              <IconButton
+                                edge="end"
+                                aria-label="close"
+                                onClick={() => handleCloseCashRegister(reg)}
+                                title="Cerrar Caja"
+                                color="error"
+                                sx={{ mr: 1 }}
+                              >
+                                <CloseIcon />
+                              </IconButton>
+                            )}
+                            <IconButton
+                              edge="end"
+                              aria-label="report"
+                              onClick={() => handleOpenReports(reg.id)}
+                              title="Ver Reporte"
+                            >
+                              <Assessment color="primary" />
+                            </IconButton>
+                          </Box>
                         }
                       >
                         <ListItemIcon sx={{ minWidth: 32 }}>

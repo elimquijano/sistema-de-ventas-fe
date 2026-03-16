@@ -273,6 +273,10 @@ export const salesAPI = {
   getMonthlySales: (month, year) => api.get(`/sales/monthly/${year}/${month}`, { loaderMessage: "Cargando reporte mensual..." }),
   getSaleReceipt: (saleId) =>
     api.get(`/sales/${saleId}/receipt`, { responseType: "blob", loaderMessage: "Generando recibo..." }),
+  whatsappResend: (saleId, data = {}) => api.post(`/sales/${saleId}/whatsapp-resend`, data, { loaderMessage: "Reenviando WhatsApp..." }),
+  quickOrder: (orderData) => api.post("/sales/quick-order", orderData, { loaderMessage: "Registrando pedido..." }),
+  confirmDelivery: (id, paymentData) => api.post(`/sales/${id}/confirm-delivery`, paymentData, { loaderMessage: "Confirmando entrega..." }),
+  cancelOrder: (id) => api.post(`/sales/${id}/cancel`, {}, { loaderMessage: "Cancelando pedido..." }),
 };
 
 export const expensesAPI = {
@@ -342,7 +346,7 @@ export const clientsAPI = {
 
 export const cashRegisterAPI = {
   getAll: (params = {}) => api.get("/cash-registers", { params, loaderMessage: "Cargando cajas..." }),
-  getCurrent: () => api.get("/cash-registers/current", { loaderMessage: "Verificando caja abierta..." }),
+  getCurrent: (params = {}) => api.get("/cash-registers/current", { params, loaderMessage: "Verificando caja abierta..." }),
   create: (data) => api.post("/cash-registers", data, { loaderMessage: "Abriendo caja..." }),
   close: (id, data) => api.post(`/cash-registers/${id}/close`, data, { loaderMessage: "Cerrando caja..." }),
   getReport: (id) => api.get(`/cash-registers/${id}/report`, { loaderMessage: "Generando reporte de caja..." }),

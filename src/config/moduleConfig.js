@@ -21,6 +21,7 @@ import { Loans } from "../pages/Loans";
 import { Purchases } from "../pages/Purchases";
 import { CashRegisters } from "../pages/CashRegisters";
 import { Clients } from "../pages/Clients";
+import { Orders } from "../pages/Orders";
 import LocationTracker from "../pages/LocationTracker";
 
 // Importar iconos de Material-UI
@@ -45,6 +46,7 @@ import {
   CreditCard,
   Assessment,
   Store,
+  LocalShipping,
 } from "@mui/icons-material";
 
 // Mapeo de componentes - AQUÍ AGREGAS NUEVOS COMPONENTES
@@ -70,6 +72,7 @@ export const componentMap = {
   Purchases,
   CashRegisters,
   Clients,
+  Orders,
   LocationTracker,
 };
 
@@ -94,6 +97,7 @@ export const iconMap = {
   CreditCard: <CreditCard />,
   Assessment: <Assessment />,
   Store: <Store />,
+  LocalShipping: <LocalShipping />,
 };
 
 // Función para obtener icono por nombre

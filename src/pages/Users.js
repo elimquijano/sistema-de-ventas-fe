@@ -59,6 +59,7 @@ export const Users = () => {
     last_name: "",
     email: "",
     password: "",
+    phone: "",
     status: "active",
     role_ids: [],
     business_id: "",
@@ -138,6 +139,7 @@ export const Users = () => {
         last_name: user.last_name,
         email: user.email,
         password: "",
+        phone: user.phone || "",
         status: user.status,
         role_ids: user.roles?.map((role) => role.id) || [],
         business_id: user.business_id || "",
@@ -149,6 +151,7 @@ export const Users = () => {
         last_name: "",
         email: "",
         password: "",
+        phone: "",
         status: "active",
         role_ids: [],
         business_id: "",
@@ -377,6 +380,7 @@ export const Users = () => {
                   <TableCell>Usuario</TableCell>
                   <TableCell>Rol</TableCell>
                   <TableCell>Negocio</TableCell>
+                  <TableCell>Teléfono</TableCell>
                   <TableCell>Estado</TableCell>
                   <TableCell>Último Inicio de Sesión</TableCell>
                   <TableCell>Creado</TableCell>
@@ -426,6 +430,7 @@ export const Users = () => {
                             ?.name || "N/A"
                         : "N/A"}
                     </TableCell>
+                    <TableCell>{user.phone || "-"}</TableCell>
                     <TableCell>
                       <Chip
                         label={user.status}
@@ -524,6 +529,17 @@ export const Users = () => {
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, email: e.target.value }))
                 }
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Teléfono"
+                value={formData.phone}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, phone: e.target.value }))
+                }
+                placeholder="Ej: 987654321"
               />
             </Grid>
             <Grid item xs={12}>

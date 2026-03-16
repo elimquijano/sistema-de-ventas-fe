@@ -215,6 +215,24 @@ export const Sales = () => {
     }
   };
 
+  const handleWhatsappResend = async (saleId) => {
+    try {
+      const response = await salesAPI.whatsappResend(saleId);
+      notificationSwal(
+        "WhatsApp Enviado",
+        `Mensaje enviado correctamente al número: ${response.data.phone}`,
+        "success"
+      );
+    } catch (error) {
+      console.error("Error resending WhatsApp:", error);
+      notificationSwal(
+        "Error",
+        error.response?.data?.message || "No se pudo reenviar el mensaje de WhatsApp.",
+        "error"
+      );
+    }
+  };
+
   const getPaymentStatusColor = (status) => {
     const colors = {
       completed: "success",

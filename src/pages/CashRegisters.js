@@ -40,16 +40,19 @@ import {
   Visibility as ViewIcon,
   Print as PrintIcon,
   Close as CloseIcon,
+  Add as AddIcon,
 } from "@mui/icons-material";
 import { formatCurrency, formatDate } from "../utils/formatters";
-import { notificationSwal } from "../utils/swal-helpers";
+import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { cashRegisterAPI, usersAPI, salesAPI } from "../utils/api";
+import { useAuth } from "../contexts/AuthContext";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
 export const CashRegisters = () => {
+  const { user, hasPermission } = useAuth();
   const [cashRegisters, setCashRegisters] = useState([]);
   const [users, setUsers] = useState([]);
   const [searchFilters, setSearchFilters] = useState({});
@@ -62,6 +65,13 @@ export const CashRegisters = () => {
   const [reportData, setReportData] = useState(null);
   const [reportType, setReportType] = useState("sales");
   const [isPrinting, setIsPrinting] = useState(false);
+
+  // Init Cash Dialog States
+  const [openInitCashDialog, setOpenInitCashDialog] = useState(false);
+  const [initCashAmount, setInitCashAmount] = useState("");
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [currency, setCurrency] = useState("PEN");
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -81,7 +91,7 @@ export const CashRegisters = () => {
       notificationSwal(
         "Error",
         "Hubo un error al cargar las cajas registradoras.",
-        "error"
+        "error",
       );
     } finally {
       setIsLoading(false);
@@ -120,7 +130,7 @@ export const CashRegisters = () => {
       const cashSalesAmount = sales
         .filter((s) => s.payment_method === "cash")
         .reduce((sum, s) => sum + parseFloat(s.total_amount), 0);
-      
+
       const productSummary = sales
         .flatMap((s) => s.items)
         .filter((i) => i.item_type.includes("Product"))
@@ -142,7 +152,7 @@ export const CashRegisters = () => {
         total_in_cash: report.report_current_cash,
         reportDifference: report.report_difference,
         productSummary: Object.values(productSummary),
-        currency: report.currency || 'PEN' // Fallback if currency is missing in some endpoint
+        currency: report.currency || "PEN", // Fallback if currency is missing in some endpoint
       });
       setOpenReportsDialog(true);
     } catch (error) {
@@ -166,6 +176,67 @@ export const CashRegisters = () => {
     }
   };
 
+  const handleInitializeCash = async () => {
+    try {
+      const amount = parseFloat(initCashAmount) || 0;
+      const payload = {
+        initial_amount: amount,
+        currency,
+      };
+
+      if (selectedUserId) {
+        payload.user_id = selectedUserId;
+      }
+
+      await cashRegisterAPI.create(payload);
+      loadCashRegisters();
+      setOpenInitCashDialog(false);
+      setInitCashAmount("");
+      setSelectedUserId("");
+      notificationSwal(
+        "Caja Abierta",
+        `Caja inicializada con ${formatCurrency(amount, currency)}`,
+        "success",
+      );
+    } catch (error) {
+      notificationSwal(
+        "Error",
+        error.response?.data?.message || "Error al abrir la caja registradora.",
+        "error",
+      );
+    }
+  };
+
+  const handleCloseCashRegister = async (cashRegister) => {
+    const confirmed = await confirmSwal(
+      "Cerrar Caja",
+      `¿Desea cerrar la caja registradora de ${cashRegister.opened_by?.full_name}?`,
+      { confirmButtonText: "Cerrar Caja", icon: "warning" },
+    );
+    if (confirmed) {
+      try {
+        await cashRegisterAPI.close(cashRegister.id, {
+          final_amount:
+            cashRegister.total_in_cash || cashRegister.expected_amount,
+        });
+        loadCashRegisters();
+        notificationSwal(
+          "Caja Cerrada",
+          "La caja registradora ha sido cerrada exitosamente.",
+          "success",
+        );
+      } catch (error) {
+        console.error("Error closing cash register:", error);
+        notificationSwal(
+          "Error",
+          error.response?.data?.message ||
+            "Error al cerrar la caja registradora.",
+          "error",
+        );
+      }
+    }
+  };
+
   const getStatusLabel = (status) => {
     return status === "open" ? "Abierta" : "Cerrada";
   };
@@ -176,17 +247,33 @@ export const CashRegisters = () => {
 
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
           Cajas Registradoras
         </Typography>
+        {hasPermission("cajas.create") && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenInitCashDialog(true)}
+          >
+            Abrir Caja
+          </Button>
+        )}
       </Box>
 
       <Card>
         <CardContent>
           {/* Filters */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-             <Grid item xs={12} md={2}>
+            <Grid item xs={12} md={2}>
               <FormControl fullWidth>
                 <InputLabel>Estado</InputLabel>
                 <Select
@@ -277,11 +364,30 @@ export const CashRegisters = () => {
                         />
                       </TableCell>
                       <TableCell>{formatDate(cr.opened_at)}</TableCell>
-                      <TableCell>{cr.closed_at ? formatDate(cr.closed_at) : "-"}</TableCell>
-                      <TableCell>{formatCurrency(cr.initial_amount, cr.currency)}</TableCell>
-                      <TableCell>{cr.final_amount ? formatCurrency(cr.final_amount, cr.currency) : "-"}</TableCell>
+                      <TableCell>
+                        {cr.closed_at ? formatDate(cr.closed_at) : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {formatCurrency(cr.initial_amount, cr.currency)}
+                      </TableCell>
+                      <TableCell>
+                        {cr.final_amount
+                          ? formatCurrency(cr.final_amount, cr.currency)
+                          : "-"}
+                      </TableCell>
                       <TableCell>{cr.opened_by?.full_name || "-"}</TableCell>
                       <TableCell align="right">
+                        {cr.status === "open" &&
+                          hasPermission("cajas.create") && (
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => handleCloseCashRegister(cr)}
+                              title="Cerrar Caja"
+                            >
+                              <CloseIcon />
+                            </IconButton>
+                          )}
                         <IconButton
                           size="small"
                           onClick={() => handleOpenReports(cr.id)}
@@ -293,9 +399,11 @@ export const CashRegisters = () => {
                   ))
                 )}
                 {!isLoading && cashRegisters.length === 0 && (
-                    <TableRow>
-                        <TableCell colSpan={8} align="center">No hay registros encontrados.</TableCell>
-                    </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={8} align="center">
+                      No hay registros encontrados.
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -311,6 +419,61 @@ export const CashRegisters = () => {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Initialize Cash Dialog */}
+      <Dialog
+        open={openInitCashDialog}
+        onClose={() => setOpenInitCashDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Inicializar Caja</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <FormControl fullWidth>
+              <InputLabel>Usuario Responsable</InputLabel>
+              <Select
+                value={selectedUserId}
+                label="Usuario Responsable"
+                onChange={(e) => setSelectedUserId(e.target.value)}
+              >
+                <MenuItem value="">
+                  <em>Actual ({user.full_name})</em>
+                </MenuItem>
+                {users.map((u) => (
+                  <MenuItem key={u.id} value={u.id}>
+                    {u.full_name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Moneda</InputLabel>
+              <Select
+                value={currency}
+                label="Moneda"
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                <MenuItem value="PEN">Soles (PEN)</MenuItem>
+                <MenuItem value="USD">Dólares (USD)</MenuItem>
+              </Select>
+            </FormControl>
+            <TextField
+              fullWidth
+              label="Monto inicial"
+              type="number"
+              value={initCashAmount}
+              onChange={(e) => setInitCashAmount(e.target.value)}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenInitCashDialog(false)}>Cancelar</Button>
+          <Button onClick={handleInitializeCash} variant="contained">
+            Abrir Caja
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Reports Modal */}
       <Dialog
@@ -369,7 +532,10 @@ export const CashRegisters = () => {
                     }}
                   >
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.initial_amount, reportData.currency)}
+                      {formatCurrency(
+                        reportData.initial_amount,
+                        reportData.currency,
+                      )}
                     </Typography>
                     <Typography variant="body2">Dinero Inicial</Typography>
                   </Paper>
@@ -384,7 +550,10 @@ export const CashRegisters = () => {
                     }}
                   >
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.total_in_cash, reportData.currency)}
+                      {formatCurrency(
+                        reportData.total_in_cash,
+                        reportData.currency,
+                      )}
                     </Typography>
                     <Typography variant="body2">Efectivo en Caja</Typography>
                   </Paper>
@@ -399,7 +568,10 @@ export const CashRegisters = () => {
                     }}
                   >
                     <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.expected_amount, reportData.currency)}
+                      {formatCurrency(
+                        reportData.expected_amount,
+                        reportData.currency,
+                      )}
                     </Typography>
                     <Typography variant="body2">Total General</Typography>
                   </Paper>
@@ -445,7 +617,10 @@ export const CashRegisters = () => {
                             }`}
                           />
                           <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {formatCurrency(sale.total_amount, reportData.currency)}
+                            {formatCurrency(
+                              sale.total_amount,
+                              reportData.currency,
+                            )}
                           </Typography>
                           <IconButton
                             size="small"

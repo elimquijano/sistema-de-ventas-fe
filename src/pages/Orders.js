@@ -43,6 +43,8 @@ import {
   Tooltip as MuiTooltip,
   alpha,
   CardActionArea,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -76,8 +78,11 @@ import {
   ReceiptLong as ReceiptIcon,
   Refresh as RefreshIcon,
   Category as CategoryIcon,
+  GridView as GridViewIcon,
+  LocationOn as LocationOnIcon,
+  Info as InfoIcon,
 } from "@mui/icons-material";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { renderToString } from "react-dom/server";
@@ -109,11 +114,36 @@ const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
-const MapRecenter = ({ location }) => {
+const MapRecenter = ({ location, zoom = 17 }) => {
   const map = useMap();
   useEffect(() => {
-    if (location) map.flyTo([location.lat, location.lng], 17);
-  }, [location, map]);
+    if (location) map.flyTo([location.lat, location.lng], zoom);
+  }, [location, map, zoom]);
+  return null;
+};
+
+const MapFitBounds = ({ orders }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (orders && orders.length > 0) {
+      const validOrders = orders.filter(
+        (o) =>
+          (o.latitude || o.client?.latitude) &&
+          (o.longitude || o.client?.longitude),
+      );
+      if (validOrders.length > 0) {
+        const bounds = L.latLngBounds(
+          validOrders.map((o) => [
+            parseFloat(o.latitude || o.client.latitude),
+            parseFloat(o.longitude || o.client.longitude),
+          ]),
+        );
+        if (bounds.isValid()) {
+          map.fitBounds(bounds, { padding: [30, 30] });
+        }
+      }
+    }
+  }, [orders, map]);
   return null;
 };
 
@@ -124,9 +154,11 @@ function TabPanel(props) {
       role="tabpanel"
       hidden={value !== index}
       {...other}
-      style={{ height: "100%" }}
+      style={{ height: "100%", width: "100%" }}
     >
-      {value === index && <Box sx={{ py: 2, height: "100%" }}>{children}</Box>}
+      {value === index && (
+        <Box sx={{ py: { xs: 0.5, md: 1 }, height: "100%" }}>{children}</Box>
+      )}
     </div>
   );
 }
@@ -140,13 +172,20 @@ const PAYMENT_METHODS = [
   { value: "credit", label: "Crédito", icon: <ScheduleIcon /> },
 ];
 
+const getNowDateTimeLocal = () => {
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  return now.toISOString().slice(0, 16);
+};
+
 export const Orders = () => {
   const theme = useTheme();
   const { user } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
-  // --- ESTADOS ---
   const [tabValue, setTabValue] = useState(0);
+  const [monitorView, setMonitorView] = useState("cards");
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -158,12 +197,10 @@ export const Orders = () => {
   const [isSearchingClient, setIsSearchingClient] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // --- ESTADOS DE SELECCIÓN ---
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [editableTotal, setEditableTotal] = useState("");
 
-  // --- ESTADOS DE CLIENTE ---
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -171,23 +208,19 @@ export const Orders = () => {
   const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [selectedRider, setSelectedRider] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
-  const [scheduledAt, setScheduledAt] = useState("");
+  const [scheduledAt, setScheduledAt] = useState(getNowDateTimeLocal());
   const [userLocation, setUserLocation] = useState(null);
 
-  // --- ESTADOS DE MAPA ---
   const [addressSuggestions, setAddressSuggestions] = useState([]);
   const [openLocationDialog, setOpenLocationDialog] = useState(false);
   const [locationMode, setLocationMode] = useState("manual");
   const [tempLocation, setTempLocation] = useState(null);
   const locationMapRef = useRef();
 
-  // --- ESTADOS DE PAGO ---
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [selectedOrderToConfirm, setSelectedOrderToConfirm] = useState(null);
   const [payments, setPayments] = useState([]);
-  const [cashReceived, setCashReceived] = useState("");
 
-  // --- MEMOS ---
   const calculatedTotal = useMemo(() => {
     if (!selectedProduct) return 0;
     return selectedProduct.price * quantity;
@@ -220,16 +253,7 @@ export const Orders = () => {
         : 0,
     [selectedOrderToConfirm, totalPaid],
   );
-  const cashChange = useMemo(() => {
-    if (!cashReceived) return 0;
-    const cashTotal = payments
-      .filter((p) => p.payment_method === "cash")
-      .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
-    const change = parseFloat(cashReceived) - cashTotal;
-    return change >= 0 ? change : 0;
-  }, [payments, cashReceived]);
 
-  // --- EFECTOS ---
   useEffect(() => {
     loadData();
     loadRiders();
@@ -250,7 +274,6 @@ export const Orders = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // --- ACCIONES ---
   const loadData = async () => {
     try {
       const [prodRes, servRes, catRes] = await Promise.all([
@@ -426,14 +449,7 @@ export const Orders = () => {
 
   const handleOpenConfirmDialog = (order) => {
     setSelectedOrderToConfirm(order);
-    setPayments([
-      {
-        id: Date.now(),
-        payment_method: "cash",
-        amount: order.total_amount,
-        reference: "",
-      },
-    ]);
+    setPayments([]);
     setOpenPaymentDialog(true);
   };
 
@@ -473,13 +489,196 @@ export const Orders = () => {
       new L.divIcon({
         html: renderToString(
           <MyLocationIcon
-            style={{ fontSize: 32, color: theme.palette.secondary.main }}
+            style={{ fontSize: 28, color: theme.palette.secondary.main }}
           />,
         ),
-        iconSize: [32, 32],
-        iconAnchor: [16, 32],
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
       }),
     [theme.palette.secondary.main],
+  );
+
+  const orderMarkerIcon = (color = theme.palette.primary.main) =>
+    new L.divIcon({
+      html: renderToString(
+        <LocationOnIcon style={{ fontSize: 32, color: color }} />,
+      ),
+      iconSize: [32, 32],
+      iconAnchor: [16, 32],
+      popupAnchor: [0, -32],
+      className: "order-marker",
+    });
+
+  const OrderCard = ({ order }) => (
+    <Card
+      elevation={1}
+      sx={{
+        borderRadius: 1.5,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        border: "1px solid",
+        borderColor: order.scheduled_at ? "error.light" : "divider",
+        transition: "all 0.2s",
+        "&:hover": { boxShadow: theme.shadows[3] },
+      }}
+    >
+      <Box
+        sx={{
+          p: 1,
+          px: 1.5,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          bgcolor: order.scheduled_at ? alpha(theme.palette.error.main, 0.04) : alpha(theme.palette.primary.main, 0.04),
+        }}
+      >
+        <Chip
+          label={`#${order.sale_number}`}
+          size="small"
+          color={order.scheduled_at ? "error" : "primary"}
+          sx={{ fontWeight: 800, height: 20, fontSize: 10, borderRadius: 1 }}
+        />
+        <Typography
+          variant="caption"
+          fontWeight="600"
+          sx={{ fontSize: 10, color: "text.secondary" }}
+        >
+          {formatDate(order.created_at)}
+        </Typography>
+      </Box>
+      <CardContent sx={{ flex: 1, p: 1.5 }}>
+        <Typography
+          variant="subtitle1"
+          fontWeight="700"
+          noWrap
+          sx={{ mb: 0.5, color: "text.primary", lineHeight: 1.2 }}
+        >
+          {order.customer_name}
+        </Typography>
+        {order.items?.length > 0 && (
+          <Box sx={{ mb: 1.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+            {order.items.map((it, idx) => (
+              <Chip
+                key={idx}
+                label={`${it.quantity}x ${it.item_name}`}
+                size="small"
+                variant="outlined"
+                sx={{
+                  height: 18,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  borderColor: "primary.light",
+                  color: "primary.main",
+                  borderRadius: 1
+                }}
+              />
+            ))}
+          </Box>
+        )}
+
+        <Stack spacing={0.8}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <PhoneIcon sx={{ fontSize: 14, color: "success.main" }} />
+            <Typography variant="caption" sx={{ fontWeight: 600 }}>
+              {order.delivery_phone || order.phone || order.client?.phone || "S/T"}
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+            <MapIcon sx={{ fontSize: 14, color: "info.main", mt: 0.2 }} />
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 500,
+                lineHeight: 1.1,
+                color: "text.secondary",
+                display: "-webkit-box",
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {order.delivery_address || order.address}
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <LocalShippingIcon sx={{ fontSize: 14, color: "warning.main" }} />
+            <Typography variant="caption" fontWeight="700" color="warning.dark">
+              {(() => {
+                const rider = riders.find((r) => r.id === order.rider_id);
+                return rider
+                  ? rider.full_name || `${rider.first_name} ${rider.last_name || ""}`
+                  : "NO ASIGNADO";
+              })()}
+            </Typography>
+          </Box>
+          {order.scheduled_at && (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                color: "error.main",
+                bgcolor: alpha(theme.palette.error.main, 0.08),
+                p: 0.5,
+                borderRadius: 1,
+              }}
+            >
+              <ScheduleIcon sx={{ fontSize: 14 }} />
+              <Typography variant="caption" fontWeight="800" sx={{ fontSize: 9 }}>
+                ENTREGA: {formatDate(order.scheduled_at)}
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+        <Box sx={{ mt: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+           <Typography variant="caption" fontWeight="700" color="text.secondary">TOTAL:</Typography>
+           <Typography variant="subtitle1" fontWeight="800" color="primary">
+            {formatCurrency(order.total_amount, currency)}
+          </Typography>
+        </Box>
+      </CardContent>
+      <Divider />
+      <CardActions
+        sx={{
+          justifyContent: "space-between",
+          p: 1,
+        }}
+      >
+        <Stack direction="row" spacing={0.5}>
+          <IconButton
+            size="small"
+            sx={{ color: "success.main" }}
+            onClick={() => handleWhatsappResend(order.id)}
+            title="Reenviar WhatsApp"
+          >
+            <WhatsAppIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            size="small"
+            sx={{ color: "error.main" }}
+            onClick={() => handleCancelOrder(order.id)}
+          >
+            <CancelIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+        <Button
+          variant="contained"
+          size="small"
+          color="success"
+          startIcon={<PaymentIcon sx={{ fontSize: 16 }} />}
+          onClick={() => handleOpenConfirmDialog(order)}
+          sx={{
+            borderRadius: 1,
+            fontWeight: 700,
+            px: 1.5,
+            fontSize: 11,
+          }}
+        >
+          Cobrar
+        </Button>
+      </CardActions>
+    </Card>
   );
 
   return (
@@ -490,69 +689,91 @@ export const Orders = () => {
         flexDirection: "column",
       }}
     >
-      <Paper
-        elevation={0}
-        sx={{
-          borderBottom: 1,
-          borderColor: "divider",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          pr: 2,
-        }}
-      >
-        <Tabs
-          value={tabValue}
-          onChange={(e, v) => setTabValue(v)}
-          sx={{ px: 2 }}
-        >
-          <Tab label="Nueva Orden" icon={<AddIcon />} iconPosition="start" />
-          <Tab
-            label={
-              <Badge
-                badgeContent={pendingOrders.length}
-                color="error"
-                overlap="rectangular"
+      <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
+        <Toolbar variant="dense" sx={{ justifyContent: "space-between", px: { xs: 0.5, sm: 1.5 }, minHeight: 48 }}>
+          <Tabs
+            value={tabValue}
+            onChange={(e, v) => setTabValue(v)}
+            variant={isMobile ? "fullWidth" : "standard"}
+            sx={{ 
+              minHeight: 48,
+              "& .MuiTab-root": { minHeight: 48, fontWeight: 700, px: { xs: 1, sm: 3 } }
+            }}
+          >
+            <Tab 
+              label={isMobile ? "" : "Nueva Orden"} 
+              icon={<AddIcon fontSize="small" />} 
+              iconPosition="start" 
+              sx={{ minWidth: isMobile ? 50 : 140 }}
+            />
+            <Tab
+              label={isMobile ? "" : (
+                <Badge
+                  badgeContent={pendingOrders.length}
+                  color="error"
+                  overlap="rectangular"
+                  sx={{ "& .MuiBadge-badge": { fontWeight: 800, fontSize: 10 } }}
+                >
+                  Monitor
+                </Badge>
+              )}
+              icon={<LocalShippingIcon fontSize="small" />}
+              iconPosition="start"
+              sx={{ minWidth: isMobile ? 50 : 140 }}
+            />
+          </Tabs>
+          
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            {tabValue === 1 && (
+              <ToggleButtonGroup
+                size="small"
+                value={monitorView}
+                exclusive
+                onChange={(e, v) => v && setMonitorView(v)}
+                sx={{ height: 32 }}
               >
-                Monitor
-              </Badge>
-            }
-            icon={<LocalShippingIcon />}
-            iconPosition="start"
-          />
-        </Tabs>
-        <IconButton
-          size="small"
-          onClick={() => {
-            loadData();
-            loadPendingOrders();
-          }}
-          color="primary"
-        >
-          <RefreshIcon />
-        </IconButton>
-      </Paper>
+                <ToggleButton value="cards" sx={{ px: 1 }}>
+                  <GridViewIcon fontSize="small" />
+                </ToggleButton>
+                <ToggleButton value="map" sx={{ px: 1 }}>
+                  <MapIcon fontSize="small" />
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
+            <IconButton
+              size="small"
+              onClick={() => {
+                loadData();
+                loadPendingOrders();
+              }}
+              color="primary"
+              sx={{ ml: 1 }}
+            >
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Stack>
+        </Toolbar>
+      </AppBar>
 
-      <Box sx={{ flex: 1, overflow: "hidden", p: 2 }}>
+      <Box sx={{ flex: 1, overflow: "hidden", p: { xs: 0.5, sm: 1 } }}>
         <TabPanel value={tabValue} index={0}>
-          <Grid container spacing={2} sx={{ height: "100%" }}>
-            {/* IZQUIERDA: CLIENTE */}
-            <Grid item xs={12} md={3}>
-              <Card sx={{ height: "100%", borderRadius: 3 }}>
-                <CardContent sx={{ p: 2 }}>
+          <Grid container spacing={1} sx={{ height: "100%", overflowY: isTablet ? "auto" : "hidden" }}>
+            <Grid item xs={12} md={3} sx={{ height: isTablet ? "auto" : "100%" }}>
+              <Card variant="outlined" sx={{ height: "100%", borderRadius: 1.5 }}>
+                <CardContent sx={{ p: 1.5 }}>
                   <Typography
                     variant="subtitle2"
-                    fontWeight="800"
+                    fontWeight="700"
                     sx={{
-                      mb: 2,
+                      mb: 1.5,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
+                      color: "primary.main",
                     }}
                   >
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                      <PersonAddIcon color="primary" fontSize="small" /> DATOS
-                      DEL CLIENTE
+                      <PersonAddIcon fontSize="small" /> CLIENTE
                     </Box>
                     <IconButton
                       size="small"
@@ -579,13 +800,15 @@ export const Orders = () => {
                       value={customerPhone}
                       onChange={(e) => setCustomerPhone(e.target.value)}
                       InputProps={{
+                        startAdornment: <PhoneIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />,
                         endAdornment: (
                           <IconButton
                             size="small"
                             onClick={handleSearchCustomer}
                             disabled={isSearchingClient}
+                            color="primary"
                           >
-                            <SearchIcon />
+                            <SearchIcon fontSize="small" />
                           </IconButton>
                         ),
                       }}
@@ -602,9 +825,7 @@ export const Orders = () => {
                       freeSolo
                       size="small"
                       options={addressSuggestions}
-                      getOptionLabel={(o) =>
-                        typeof o === "string" ? o : o.place_name || ""
-                      }
+                      getOptionLabel={(o) => typeof o === "string" ? o : o.place_name || ""}
                       onInputChange={(e, v) => handleAddressSearch(v)}
                       onChange={(e, v) => handleSelectSuggestion(v)}
                       inputValue={customerAddress}
@@ -618,14 +839,13 @@ export const Orders = () => {
                             endAdornment: (
                               <IconButton
                                 size="small"
+                                color="secondary"
                                 onClick={() => {
-                                  setTempLocation(
-                                    customerLocation || userLocation,
-                                  );
+                                  setTempLocation(customerLocation || userLocation);
                                   setOpenLocationDialog(true);
                                 }}
                               >
-                                <MapIcon />
+                                <MapIcon fontSize="small" />
                               </IconButton>
                             ),
                           }}
@@ -643,6 +863,7 @@ export const Orders = () => {
                     />
                     <TextField
                       fullWidth
+                      size="small"
                       multiline
                       rows={2}
                       label="Notas/Referencia"
@@ -654,34 +875,36 @@ export const Orders = () => {
               </Card>
             </Grid>
 
-            {/* CENTRO: CATALOGO */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6} sx={{ height: isTablet ? "55vh" : "100%" }}>
               <Card
+                variant="outlined"
                 sx={{
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
-                  borderRadius: 3,
+                  borderRadius: 1.5,
                 }}
               >
                 <Box
                   sx={{
-                    p: 1.5,
+                    p: 1,
                     borderBottom: 1,
                     borderColor: "divider",
                     display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
                     gap: 1,
+                    bgcolor: "background.paper",
                   }}
                 >
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="Buscar..."
+                    placeholder="Buscar producto..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     InputProps={{
                       startAdornment: (
-                        <SearchIcon sx={{ mr: 1, color: "text.secondary" }} />
+                        <SearchIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />
                       ),
                     }}
                   />
@@ -689,32 +912,28 @@ export const Orders = () => {
                     size="small"
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    sx={{ width: 150 }}
+                    sx={{ width: { xs: "100%", sm: 160 }, fontWeight: 600, fontSize: 13 }}
                   >
                     <MenuItem value="all">Todas</MenuItem>
                     {categories.map((c) => (
-                      <MenuItem key={c.id} value={c.id}>
+                      <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
                         {c.name}
                       </MenuItem>
                     ))}
                   </Select>
                 </Box>
-                <Box sx={{ flex: 1, overflowY: "auto", p: 1.5 }}>
+                <Box sx={{ flex: 1, overflowY: "auto", p: 1 }}>
                   <Grid container spacing={1}>
                     {filteredItems.map((item) => (
                       <Grid item xs={6} sm={4} key={`${item.type}-${item.id}`}>
                         <Card
-                          variant="outlined"
+                          elevation={0}
                           sx={{
-                            borderRadius: 2,
-                            borderColor:
-                              selectedProduct?.id === item.id
-                                ? "primary.main"
-                                : "divider",
-                            bgcolor:
-                              selectedProduct?.id === item.id
-                                ? alpha(theme.palette.primary.main, 0.05)
-                                : "white",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: selectedProduct?.id === item.id ? "primary.main" : "divider",
+                            bgcolor: selectedProduct?.id === item.id ? alpha(theme.palette.primary.main, 0.04) : "white",
+                            transition: "all 0.1s",
                           }}
                         >
                           <CardActionArea
@@ -724,40 +943,48 @@ export const Orders = () => {
                             }}
                             sx={{ p: 1, textAlign: "center" }}
                           >
-                            <Avatar
-                              src={
-                                item.image_path
-                                  ? `${API_STORAGE_URL}/${item.image_path}`
-                                  : null
-                              }
-                              sx={{
-                                width: 32,
-                                height: 32,
-                                mx: "auto",
-                                mb: 0.5,
-                              }}
+                            <Badge
+                              badgeContent={item.type === "product" ? "P" : "S"}
+                              color={item.type === "product" ? "info" : "secondary"}
+                              sx={{ "& .MuiBadge-badge": { fontSize: 8, height: 14, minWidth: 14 } }}
                             >
-                              {item.type === "product" ? (
-                                <InventoryIcon sx={{ fontSize: 18 }} />
-                              ) : (
-                                <BuildIcon sx={{ fontSize: 18 }} />
-                              )}
-                            </Avatar>
+                              <Avatar
+                                src={item.image_path ? `${API_STORAGE_URL}/${item.image_path}` : null}
+                                sx={{
+                                  width: 44,
+                                  height: 44,
+                                  mx: "auto",
+                                  mb: 0.8,
+                                  bgcolor: "background.paper",
+                                  border: "1px solid",
+                                  borderColor: "grey.200"
+                                }}
+                              >
+                                {item.type === "product" ? (
+                                  <InventoryIcon sx={{ fontSize: 20 }} color="primary" />
+                                ) : (
+                                  <BuildIcon sx={{ fontSize: 20 }} color="secondary" />
+                                )}
+                              </Avatar>
+                            </Badge>
                             <Typography
                               variant="caption"
-                              fontWeight="700"
+                              fontWeight="600"
                               sx={{
-                                display: "block",
-                                height: 24,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 1,
+                                WebkitBoxOrient: "vertical",
                                 overflow: "hidden",
-                                lineHeight: 1,
+                                height: 16,
+                                lineHeight: 1.2,
+                                mb: 0.5,
                               }}
                             >
                               {item.name}
                             </Typography>
                             <Typography
-                              variant="caption"
-                              color="primary"
+                              variant="body2"
+                              color="primary.main"
                               fontWeight="800"
                             >
                               {formatCurrency(item.price, currency)}
@@ -771,120 +998,91 @@ export const Orders = () => {
               </Card>
             </Grid>
 
-            {/* DERECHA: TICKET */}
-            <Grid item xs={12} md={3}>
+            <Grid item xs={12} md={3} sx={{ height: isTablet ? "auto" : "100%" }}>
               <Card
+                elevation={0}
                 sx={{
                   height: "100%",
                   display: "flex",
                   flexDirection: "column",
-                  borderRadius: 3,
-                  border: "2px solid",
-                  borderColor: "brown",
+                  borderRadius: 1.5,
+                  border: "1px solid",
+                  borderColor: "orange",
+                  overflow: "hidden",
                 }}
               >
+                <Box sx={{ bgcolor: "orange", py: 0.8, textAlign: "center" }}>
+                  <Typography variant="caption" fontWeight="800" color="white" sx={{ letterSpacing: 1 }}>
+                    ORDEN DE VENTA
+                  </Typography>
+                </Box>
                 <CardContent
                   sx={{
                     flex: 1,
                     display: "flex",
                     flexDirection: "column",
-                    p: 2,
-                    backgroundImage:
-                      "radial-gradient(#0000001a 1px, transparent 0)",
-                    backgroundSize: "10px 10px",
+                    p: 1.5,
                   }}
                 >
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight="900"
-                    align="center"
-                    sx={{ mb: 1, color: "brown" }}
-                  >
-                    ORDEN DE DESPACHO
-                  </Typography>
-                  <Divider
-                    sx={{ mb: 2, borderStyle: "dashed", borderColor: "brown" }}
-                  />
-
                   {selectedProduct ? (
                     <Box sx={{ flex: 1 }}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          mb: 1,
-                        }}
-                      >
-                        <Typography
-                          variant="body2"
-                          fontWeight="800"
-                          sx={{ lineHeight: 1.2 }}
-                        >
+                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
+                        <Typography variant="body2" fontWeight="700" sx={{ color: "orange", lineHeight: 1.2 }}>
                           {selectedProduct.name}
                         </Typography>
                         <IconButton
                           size="small"
-                          color="error"
                           onClick={() => setSelectedProduct(null)}
-                          sx={{ mt: -0.5 }}
+                          sx={{ p: 0.5 }}
                         >
                           <ClearIcon fontSize="small" />
                         </IconButton>
                       </Box>
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        sx={{ mb: 3 }}
-                      >
-                        <Stack
-                          direction="row"
-                          alignItems="center"
+                      
+                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+                        <Box
                           sx={{
-                            border: 1,
-                            borderColor: "divider",
-                            borderRadius: 2,
-                            px: 0.5,
+                            display: "flex",
+                            alignItems: "center",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: "orange",
                           }}
                         >
                           <IconButton
                             size="small"
-                            onClick={() =>
-                              setQuantity(Math.max(1, quantity - 1))
-                            }
+                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                            sx={{ color: "orange", p: 0.5 }}
                           >
                             <RemoveIcon fontSize="small" />
                           </IconButton>
-                          <Typography sx={{ mx: 1.5, fontWeight: 800 }}>
+                          <Typography sx={{ mx: 1.5, fontWeight: 700, fontSize: 14 }}>
                             {quantity}
                           </Typography>
                           <IconButton
                             size="small"
                             onClick={() => setQuantity(quantity + 1)}
+                            sx={{ color: "orange", p: 0.5 }}
                           >
                             <AddIcon fontSize="small" />
                           </IconButton>
-                        </Stack>
-                        <Typography variant="subtitle1" fontWeight="900">
-                          {formatCurrency(
-                            selectedProduct.price * quantity,
-                            currency,
-                          )}
+                        </Box>
+                        <Typography variant="subtitle2" fontWeight="700">
+                          {formatCurrency(selectedProduct.price * quantity, currency)}
                         </Typography>
                       </Stack>
 
                       <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                        <InputLabel>Asignar Motorizado</InputLabel>
+                        <InputLabel sx={{ fontSize: 13 }}>Motorizado</InputLabel>
                         <Select
                           value={selectedRider}
-                          label="Asignar Motorizado"
+                          label="Motorizado"
                           onChange={(e) => setSelectedRider(e.target.value)}
+                          sx={{ borderRadius: 1, fontSize: 13 }}
                         >
                           {riders.map((r) => (
-                            <MenuItem key={r.id} value={r.id}>
-                              {r.full_name ||
-                                `${r.first_name} ${r.last_name || ""}`}
+                            <MenuItem key={r.id} value={r.id} sx={{ fontSize: 13 }}>
+                              {r.full_name || `${r.first_name} ${r.last_name || ""}`}
                             </MenuItem>
                           ))}
                         </Select>
@@ -894,7 +1092,7 @@ export const Orders = () => {
                         sx={{
                           bgcolor: alpha(theme.palette.info.main, 0.05),
                           p: 1.5,
-                          borderRadius: 2,
+                          borderRadius: 1,
                           mb: 2,
                           border: "1px solid",
                           borderColor: "info.light",
@@ -903,15 +1101,10 @@ export const Orders = () => {
                         <Typography
                           variant="caption"
                           color="info.main"
-                          fontWeight="800"
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.5,
-                            mb: 0.5,
-                          }}
+                          fontWeight="700"
+                          sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}
                         >
-                          <ReceiptIcon sx={{ fontSize: 14 }} /> MONTO A COBRAR:
+                          <ReceiptIcon sx={{ fontSize: 14 }} /> TOTAL A PAGAR
                         </Typography>
                         <TextField
                           fullWidth
@@ -923,19 +1116,15 @@ export const Orders = () => {
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
-                                <Typography
-                                  fontWeight="900"
-                                  color="info.main"
-                                  sx={{ mr: 0.5 }}
-                                >
+                                <Typography fontWeight="800" color="info.main" variant="subtitle1">
                                   {currency === "PEN" ? "S/" : "$"}
                                 </Typography>
                               </InputAdornment>
                             ),
                             disableUnderline: true,
                             sx: {
-                              fontWeight: 900,
-                              fontSize: "1.4rem",
+                              fontWeight: 800,
+                              fontSize: "1.2rem",
                               color: "info.main",
                             },
                           }}
@@ -950,33 +1139,30 @@ export const Orders = () => {
                         flexDirection: "column",
                         justifyContent: "center",
                         alignItems: "center",
-                        opacity: 0.3,
+                        opacity: 0.2,
+                        py: 4,
                       }}
                     >
-                      <ShoppingCartIcon sx={{ fontSize: 40, mb: 1 }} />
-                      <Typography variant="caption">Ticket vacío</Typography>
+                      <ShoppingCartIcon sx={{ fontSize: 60, mb: 1, color: "orange" }} />
+                      <Typography variant="caption" fontWeight="700">LISTA VACÍA</Typography>
                     </Box>
                   )}
 
                   <Button
                     fullWidth
                     variant="contained"
-                    size="large"
+                    size="medium"
                     onClick={handleCreateQuickOrder}
-                    disabled={
-                      isLoading ||
-                      !selectedProduct ||
-                      !customerPhone ||
-                      !selectedRider
-                    }
-                    startIcon={
-                      isLoading ? (
-                        <CircularProgress size={20} color="inherit" />
-                      ) : (
-                        <SendIcon />
-                      )
-                    }
-                    sx={{ py: 1.5, borderRadius: 3, fontWeight: 800 }}
+                    disabled={isLoading || !selectedProduct || !customerPhone || !selectedRider}
+                    startIcon={isLoading ? <CircularProgress size={18} color="inherit" /> : <SendIcon fontSize="small" />}
+                    sx={{
+                      py: 1,
+                      borderRadius: 1,
+                      fontWeight: 700,
+                      bgcolor: "orange",
+                      "&:hover": { bgcolor: "#e68a00" },
+                      fontSize: 13,
+                    }}
                   >
                     REGISTRAR PEDIDO
                   </Button>
@@ -987,278 +1173,143 @@ export const Orders = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <Box sx={{ height: "100%", overflowY: "auto", px: 1 }}>
+          <Box sx={{ height: "100%", overflow: "hidden" }}>
             {pendingOrders.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 8, opacity: 0.4 }}>
-                <HistoryIcon sx={{ fontSize: 64, mb: 1 }} />
-                <Typography variant="h6">Sin pedidos pendientes</Typography>
+              <Box sx={{ textAlign: "center", py: 10, opacity: 0.2 }}>
+                <HistoryIcon sx={{ fontSize: 80, mb: 1, color: "primary.main" }} />
+                <Typography variant="h6" fontWeight="700">No hay pedidos pendientes</Typography>
+              </Box>
+            ) : monitorView === "cards" ? (
+              <Box sx={{ height: "100%", overflowY: "auto", px: 0.5, pb: 2 }}>
+                <Grid container spacing={1.5}>
+                  {pendingOrders.map((order) => (
+                    <Grid item xs={12} sm={6} md={4} lg={3} key={order.id}>
+                      <OrderCard order={order} />
+                    </Grid>
+                  ))}
+                </Grid>
               </Box>
             ) : (
-              <Grid container spacing={2}>
-                {pendingOrders.map((order) => (
-                  <Grid item xs={12} sm={6} md={4} lg={3} key={order.id}>
-                    <Card
-                      sx={{
-                        borderRadius: 3,
-                        height: "100%",
-                        display: "flex",
-                        flexDirection: "column",
-                        border: "1px solid",
-                        borderColor: "divider",
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          p: 1,
-                          px: 2,
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
+              <Card variant="outlined" sx={{ height: "100%", borderRadius: 1, overflow: "hidden" }}>
+                <MapContainer
+                  center={userLocation ? [userLocation.lat, userLocation.lng] : [-9.93, -76.24]}
+                  zoom={14}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <LayersControl position="topright">
+                    <LayersControl.BaseLayer checked name="Google Calles">
+                      <TileLayer
+                        url="http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                        subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                      />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="Google Satélite">
+                      <TileLayer
+                        url="http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                        subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                      />
+                    </LayersControl.BaseLayer>
+                    <LayersControl.BaseLayer name="Google Híbrido">
+                      <TileLayer
+                        url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
+                        subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                      />
+                    </LayersControl.BaseLayer>
+                  </LayersControl>
+                  {pendingOrders
+                    .filter((o) => (o.latitude || o.client?.latitude) && (o.longitude || o.client?.longitude))
+                    .map((order) => (
+                      <Marker
+                        key={order.id}
+                        position={[
+                          parseFloat(order.latitude || order.client.latitude),
+                          parseFloat(order.longitude || order.client.longitude),
+                        ]}
+                        icon={orderMarkerIcon(order.scheduled_at ? theme.palette.error.main : theme.palette.primary.main)}
                       >
-                        <Chip
-                          label={`#${order.sale_number}`}
-                          size="small"
-                          sx={{
-                            fontWeight: 800,
-                            height: 20,
-                            fontSize: 10,
-                          }}
-                        />
-                        <Typography
-                          variant="caption"
-                          fontWeight="700"
-                          sx={{ fontSize: 10 }}
-                        >
-                          {formatDate(order.created_at)}
-                        </Typography>
-                      </Box>
-                      <CardContent sx={{ flex: 1, p: 2 }}>
-                        <Typography
-                          variant="subtitle2"
-                          fontWeight="900"
-                          noWrap
-                          sx={{ mb: 0.5 }}
-                        >
-                          {order.customer_name}
-                        </Typography>
-                        {order.items?.length > 0 && (
-                          <Chip
-                            label={order.items[0].item_name}
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                            sx={{
-                              height: 18,
-                              fontSize: 9,
-                              mb: 1.5,
-                              fontWeight: 700,
-                            }}
-                          />
-                        )}
-
-                        <Stack spacing={0.8}>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <PhoneIcon
-                              sx={{ fontSize: 14, color: "text.secondary" }}
-                            />
-                            <Typography
-                              variant="caption"
-                              sx={{ fontWeight: 600 }}
-                            >
-                              {order.delivery_phone ||
-                                order.phone ||
-                                order.client?.phone ||
-                                "S/T"}
-                            </Typography>
+                        <Popup minWidth={280} className="order-popup">
+                          <Box sx={{ p: 0.2 }}>
+                            <OrderCard order={order} />
                           </Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "flex-start",
-                              gap: 1,
-                            }}
-                          >
-                            <MapIcon
-                              sx={{
-                                fontSize: 14,
-                                color: "text.secondary",
-                                mt: 0.3,
-                              }}
-                            />
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                lineHeight: 1.1,
-                                display: "-webkit-box",
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                              }}
-                            >
-                              {order.delivery_address || order.address}
-                            </Typography>
-                          </Box>
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <LocalShippingIcon
-                              sx={{ fontSize: 14, color: "secondary.main" }}
-                            />
-                            <Typography
-                              variant="caption"
-                              fontWeight="800"
-                              color="secondary.dark"
-                            >
-                              {(() => {
-                                const rider = riders.find(
-                                  (r) => r.id === order.rider_id,
-                                );
-                                return rider
-                                  ? rider.full_name ||
-                                      `${rider.first_name} ${rider.last_name || ""}`
-                                  : "NO ASIGNADO";
-                              })()}
-                            </Typography>
-                          </Box>
-                          {order.scheduled_at && (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: 1,
-                                color: "error.main",
-                                bgcolor: alpha(theme.palette.error.main, 0.05),
-                                p: 0.5,
-                                borderRadius: 1,
-                              }}
-                            >
-                              <ScheduleIcon sx={{ fontSize: 14 }} />
-                              <Typography variant="caption" fontWeight="800">
-                                ENTREGA: {formatDate(order.scheduled_at)}
-                              </Typography>
-                            </Box>
-                          )}
-                        </Stack>
-                        <Typography
-                          variant="h6"
-                          fontWeight="900"
-                          color="primary"
-                          sx={{ mt: 1.5 }}
-                        >
-                          {formatCurrency(order.total_amount, currency)}
-                        </Typography>
-                      </CardContent>
-                      <Divider />
-                      <CardActions
-                        sx={{
-                          justifyContent: "space-between",
-                          p: 1,
-                        }}
-                      >
-                        <Stack direction="row" spacing={0.5}>
-                          <IconButton
-                            size="small"
-                            color="success"
-                            onClick={() => handleWhatsappResend(order.id)}
-                            title="Reenviar WhatsApp"
-                          >
-                            <WhatsAppIcon fontSize="small" />
-                          </IconButton>
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleCancelOrder(order.id)}
-                          >
-                            <CancelIcon fontSize="small" />
-                          </IconButton>
-                        </Stack>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="success"
-                          startIcon={<PaymentIcon />}
-                          onClick={() => handleOpenConfirmDialog(order)}
-                          sx={{
-                            borderRadius: 2,
-                            fontWeight: 800,
-                            fontSize: 11,
-                            px: 2,
-                          }}
-                        >
-                          Cobrar
-                        </Button>
-                      </CardActions>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  {userLocation && (
+                    <Marker position={[userLocation.lat, userLocation.lng]} icon={userMarkerIcon}>
+                      <Popup>Tu ubicación</Popup>
+                    </Marker>
+                  )}
+                  <MapFitBounds orders={pendingOrders} />
+                </MapContainer>
+              </Card>
             )}
           </Box>
         </TabPanel>
       </Box>
 
-      {/* DIALOGOS */}
       <Dialog
         open={openLocationDialog}
         onClose={() => setOpenLocationDialog(false)}
         maxWidth="md"
         fullWidth
+        sx={{ "& .MuiDialog-paper": { borderRadius: 1.5 } }}
       >
         <DialogTitle
           sx={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
+            bgcolor: "primary.main",
+            color: "white",
+            py: 1,
+            px: 2
           }}
         >
-          Fijar Ubicación del Cliente{" "}
-          <Stack direction="row">
+          <Typography variant="subtitle1" fontWeight="700">FIJAR UBICACIÓN</Typography>
+          <Stack direction="row" spacing={1}>
             <IconButton
+              size="small"
               onClick={() => setLocationMode("tracking")}
-              color={locationMode === "tracking" ? "primary" : "default"}
+              sx={{ color: locationMode === "tracking" ? "white" : alpha("#fff", 0.5) }}
             >
-              <GpsFixedIcon />
+              <GpsFixedIcon fontSize="small" />
             </IconButton>
             <IconButton
+              size="small"
               onClick={() => setLocationMode("manual")}
-              color={locationMode === "manual" ? "primary" : "default"}
+              sx={{ color: locationMode === "manual" ? "white" : alpha("#fff", 0.5) }}
             >
-              <EditLocationIcon />
+              <EditLocationIcon fontSize="small" />
             </IconButton>
           </Stack>
         </DialogTitle>
         <DialogContent sx={{ p: 0, height: 400, position: "relative" }}>
           <MapContainer
-            center={
-              tempLocation
-                ? [tempLocation.lat, tempLocation.lng]
-                : [-9.93, -76.24]
-            }
+            center={tempLocation ? [tempLocation.lat, tempLocation.lng] : [-9.93, -76.24]}
             zoom={15}
             style={{ height: "100%", width: "100%" }}
             ref={locationMapRef}
           >
-            <TileLayer
-              url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
-              subdomains={["mt0", "mt1", "mt2", "mt3"]}
-            />
-            {locationMode === "tracking" && tempLocation && (
-              <Marker
-                position={[tempLocation.lat, tempLocation.lng]}
-                icon={userMarkerIcon}
-              />
-            )}
+            <LayersControl position="topright">
+              <LayersControl.BaseLayer checked name="Google Calles">
+                <TileLayer
+                  url="http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                  subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Google Satélite">
+                <TileLayer
+                  url="http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
+                  subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Google Híbrido">
+                <TileLayer
+                  url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
+                  subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                />
+              </LayersControl.BaseLayer>
+            </LayersControl>
             <MapRecenter location={tempLocation} />
           </MapContainer>
           {locationMode === "manual" && (
@@ -1267,31 +1318,25 @@ export const Orders = () => {
                 position: "absolute",
                 top: "50%",
                 left: "50%",
-                transform: "translate(-50%, -50%)",
+                transform: "translate(-50%, -100%)",
                 zIndex: 1000,
                 pointerEvents: "none",
               }}
             >
-              <EditLocationIcon
-                sx={{
-                  fontSize: 48,
-                  color: theme.palette.primary.main,
-                  filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))",
-                }}
-              />
+              <LocationOnIcon sx={{ fontSize: 40, color: "primary.main", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }} />
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenLocationDialog(false)} color="inherit">
+        <DialogActions sx={{ p: 1.5 }}>
+          <Button onClick={() => setOpenLocationDialog(false)} color="inherit" sx={{ fontWeight: 600 }}>
             Cancelar
           </Button>
           <Button
             variant="contained"
             onClick={handleConfirmLocation}
-            sx={{ borderRadius: 2, px: 3 }}
+            sx={{ borderRadius: 1, px: 3, fontWeight: 700 }}
           >
-            Confirmar Punto
+            CONFIRMAR
           </Button>
         </DialogActions>
       </Dialog>
@@ -1302,94 +1347,77 @@ export const Orders = () => {
         maxWidth="xs"
         fullWidth
         TransitionComponent={Transition}
+        sx={{ "& .MuiDialog-paper": { borderRadius: 2 } }}
       >
-        <DialogTitle sx={{ textAlign: "center", pb: 0 }}>
-          CONFIRMAR COBRO{" "}
-          <Typography variant="caption" display="block" fontWeight="700">
-            ORDEN #{selectedOrderToConfirm?.sale_number}
+        <DialogTitle sx={{ textAlign: "center", bgcolor: "success.main", color: "white", py: 1.5 }}>
+          <Typography variant="subtitle1" fontWeight="700">COBRAR PEDIDO</Typography>
+          <Typography variant="caption" sx={{ opacity: 0.9 }}>
+            #{selectedOrderToConfirm?.sale_number}
           </Typography>
         </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
+        <DialogContent sx={{ mt: 2, px: 2 }}>
           <Paper
-            variant="outlined"
+            elevation={0}
             sx={{
               p: 2,
               textAlign: "center",
               mb: 2,
-              bgcolor: alpha(theme.palette.primary.main, 0.05),
-              borderRadius: 3,
-              border: "2px solid",
-              borderColor: "primary.light",
+              bgcolor: alpha(theme.palette.success.main, 0.04),
+              borderRadius: 1,
+              border: "1px solid",
+              borderColor: "success.light",
             }}
           >
-            <Typography variant="h4" fontWeight="900" color="primary">
-              {formatCurrency(
-                selectedOrderToConfirm?.total_amount || 0,
-                currency,
-              )}
+            <Typography variant="h4" fontWeight="800" color="success.main">
+              {formatCurrency(selectedOrderToConfirm?.total_amount || 0, currency)}
             </Typography>
-            <Typography
-              variant="caption"
-              fontWeight="700"
-              color="text.secondary"
-            >
-              TOTAL A RECIBIR
-            </Typography>
+            <Typography variant="caption" fontWeight="600" color="text.secondary">TOTAL A RECIBIR</Typography>
           </Paper>
-          <Stack spacing={1}>
+          
+          <Stack spacing={1.5}>
             {payments.map((p) => (
-              <Paper
+              <Box
                 key={p.id}
-                variant="outlined"
-                sx={{ p: 1.5, position: "relative", borderRadius: 2 }}
+                sx={{ p: 1.5, position: "relative", borderRadius: 1, border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}
               >
-                <Typography
-                  variant="caption"
-                  fontWeight="800"
-                  color="text.secondary"
-                >
-                  {PAYMENT_METHODS.find(
-                    (m) => m.value === p.payment_method,
-                  )?.label.toUpperCase()}
+                <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ position: "absolute", top: -8, left: 10, bgcolor: "background.paper", px: 0.5 }}>
+                  {PAYMENT_METHODS.find((m) => m.value === p.payment_method)?.label}
                 </Typography>
                 <TextField
                   fullWidth
-                  size="small"
                   variant="standard"
                   type="number"
                   value={p.amount}
                   onChange={(e) =>
-                    setPayments(
-                      payments.map((x) =>
-                        x.id === p.id ? { ...x, amount: e.target.value } : x,
-                      ),
-                    )
+                    setPayments(payments.map((x) => x.id === p.id ? { ...x, amount: e.target.value } : x))
                   }
                   InputProps={{
                     disableUnderline: true,
-                    sx: { fontWeight: 800, fontSize: "1.1rem" },
+                    sx: { fontWeight: 700, fontSize: "1.1rem" },
                   }}
                   autoFocus
+                />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Referencia (Opcional)"
+                  value={p.reference || ""}
+                  onChange={(e) =>
+                    setPayments(payments.map((x) => x.id === p.id ? { ...x, reference: e.target.value } : x))
+                  }
+                  sx={{ mt: 1 }}
                 />
                 <IconButton
                   size="small"
                   color="error"
-                  sx={{ position: "absolute", top: 4, right: 4 }}
-                  onClick={() =>
-                    setPayments(payments.filter((x) => x.id !== p.id))
-                  }
+                  sx={{ position: "absolute", top: 10, right: 10 }}
+                  onClick={() => setPayments(payments.filter((x) => x.id !== p.id))}
                 >
-                  <DeleteForeverIcon fontSize="small" />
+                  <DeleteIcon fontSize="small" />
                 </IconButton>
-              </Paper>
+              </Box>
             ))}
-            <Typography
-              variant="caption"
-              fontWeight="800"
-              sx={{ mt: 1, display: "block" }}
-            >
-              AÑADIR MÉTODO:
-            </Typography>
+            
             <Grid container spacing={1}>
               {PAYMENT_METHODS.map((m) => (
                 <Grid item xs={4} key={m.value}>
@@ -1403,70 +1431,30 @@ export const Orders = () => {
                         {
                           id: Date.now(),
                           payment_method: m.value,
-                          amount:
-                            remainingAmount > 0
-                              ? remainingAmount.toFixed(2)
-                              : "0",
+                          amount: remainingAmount > 0 ? remainingAmount.toFixed(2) : "0",
+                          reference: ""
                         },
                       ])
                     }
-                    sx={{
-                      fontSize: 10,
-                      borderRadius: 1.5,
-                      fontWeight: 700,
-                      height: 35,
-                    }}
+                    sx={{ fontSize: 10, borderRadius: 1, fontWeight: 600, height: 32, borderColor: "divider" }}
                   >
                     {m.label}
                   </Button>
                 </Grid>
               ))}
             </Grid>
-            {payments.some((p) => p.payment_method === "cash") && (
-              <Box sx={{ mt: 2, p: 1.5, bgcolor: "grey.100", borderRadius: 2 }}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Efectivo recibido"
-                  type="number"
-                  value={cashReceived}
-                  onChange={(e) => setCashReceived(e.target.value)}
-                  variant="standard"
-                  InputProps={{ sx: { fontWeight: 800 } }}
-                />
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    mt: 1,
-                  }}
-                >
-                  <Typography variant="subtitle2" fontWeight="800">
-                    Vuelto:
-                  </Typography>
-                  <Typography
-                    variant="subtitle2"
-                    fontWeight="900"
-                    color="info.main"
-                  >
-                    {formatCurrency(cashChange, currency)}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
           </Stack>
         </DialogContent>
-        <Divider />
         <DialogActions sx={{ p: 2 }}>
           <Button
             fullWidth
             variant="contained"
-            size="large"
+            color="success"
             onClick={handleConfirmDelivery}
             disabled={isLoading || Math.abs(remainingAmount) > 0.01}
-            sx={{ borderRadius: 3, height: 50, fontWeight: 900 }}
+            sx={{ borderRadius: 1, py: 1.2, fontWeight: 700 }}
           >
-            FINALIZAR ENTREGA
+            CONFIRMAR ENTREGA
           </Button>
         </DialogActions>
       </Dialog>

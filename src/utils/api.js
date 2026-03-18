@@ -350,6 +350,7 @@ export const cashRegisterAPI = {
   create: (data) => api.post("/cash-registers", data, { loaderMessage: "Abriendo caja..." }),
   close: (id, data) => api.post(`/cash-registers/${id}/close`, data, { loaderMessage: "Cerrando caja..." }),
   getReport: (id) => api.get(`/cash-registers/${id}/report`, { loaderMessage: "Generando reporte de caja..." }),
+  addInflow: (id, data) => api.post(`/cash-registers/${id}/add-inflow`, data, { loaderMessage: "Agregando dinero a caja..." }),
 };
 
 export default api;

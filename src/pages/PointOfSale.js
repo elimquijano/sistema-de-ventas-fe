@@ -241,6 +241,7 @@ export const PointOfSale = () => {
         expectedCash: report.expected_amount,
         total_in_cash: report.report_current_cash,
         reportDifference: report.report_difference,
+        manual_inflow: report.manual_inflow || 0,
         productSummary: Object.values(productSummary),
       });
       setOpenReportsDialog(true);
@@ -1283,7 +1284,7 @@ export const PointOfSale = () => {
                     sx={{
                       p: 2,
                       textAlign: "center",
-                      bgcolor: "success.light",
+                      bgcolor: "info.light",
                       color: "white",
                     }}
                   >
@@ -1298,7 +1299,7 @@ export const PointOfSale = () => {
                     sx={{
                       p: 2,
                       textAlign: "center",
-                      bgcolor: "info.light",
+                      bgcolor: "success.light",
                       color: "white",
                     }}
                   >
@@ -1314,6 +1315,21 @@ export const PointOfSale = () => {
                       p: 2,
                       textAlign: "center",
                       bgcolor: "warning.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(reportData.manual_inflow, currency)}
+                    </Typography>
+                    <Typography variant="body2">Ingresos Manuales</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "error.light",
                       color: "white",
                     }}
                   >

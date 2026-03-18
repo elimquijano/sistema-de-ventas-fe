@@ -72,6 +72,12 @@ export const CashRegisters = () => {
   const [selectedUserId, setSelectedUserId] = useState("");
   const [currency, setCurrency] = useState("PEN");
 
+  // Manual Inflow States
+  const [openInflowDialog, setOpenInflowDialog] = useState(false);
+  const [inflowAmount, setInflowAmount] = useState("");
+  const [inflowNotes, setInflowNotes] = useState("");
+  const [selectedCashRegisterId, setSelectedCashRegisterId] = useState(null);
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -151,6 +157,7 @@ export const CashRegisters = () => {
         expectedCash: report.expected_amount,
         total_in_cash: report.report_current_cash,
         reportDifference: report.report_difference,
+        manual_inflow: report.manual_inflow || 0,
         productSummary: Object.values(productSummary),
         currency: report.currency || "PEN", // Fallback if currency is missing in some endpoint
       });
@@ -159,6 +166,33 @@ export const CashRegisters = () => {
       console.error("Error loading report:", error);
       notificationSwal("Error", "No se pudo cargar el reporte.", "error");
     }
+  };
+
+  const handleAddInflow = async () => {
+    if (!inflowAmount || parseFloat(inflowAmount) <= 0) {
+      notificationSwal("Error", "Ingrese un monto válido.", "error");
+      return;
+    }
+
+    try {
+      await cashRegisterAPI.addInflow(selectedCashRegisterId, {
+        amount: parseFloat(inflowAmount),
+        notes: inflowNotes,
+      });
+      notificationSwal("Éxito", "Dinero agregado a caja.", "success");
+      setOpenInflowDialog(false);
+      setInflowAmount("");
+      setInflowNotes("");
+      loadCashRegisters();
+    } catch (error) {
+      console.error("Error adding inflow:", error);
+      notificationSwal("Error", "No se pudo agregar el dinero.", "error");
+    }
+  };
+
+  const handleOpenInflowDialog = (id) => {
+    setSelectedCashRegisterId(id);
+    setOpenInflowDialog(true);
   };
 
   const handlePrintReceipt = async (saleId) => {
@@ -379,14 +413,24 @@ export const CashRegisters = () => {
                       <TableCell align="right">
                         {cr.status === "open" &&
                           hasPermission("cajas.create") && (
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleCloseCashRegister(cr)}
-                              title="Cerrar Caja"
-                            >
-                              <CloseIcon />
-                            </IconButton>
+                            <>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleOpenInflowDialog(cr.id)}
+                                title="Inyectar Dinero"
+                              >
+                                <AddIcon />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleCloseCashRegister(cr)}
+                                title="Cerrar Caja"
+                              >
+                                <CloseIcon />
+                              </IconButton>
+                            </>
                           )}
                         <IconButton
                           size="small"
@@ -527,7 +571,7 @@ export const CashRegisters = () => {
                     sx={{
                       p: 2,
                       textAlign: "center",
-                      bgcolor: "success.light",
+                      bgcolor: "info.light",
                       color: "white",
                     }}
                   >
@@ -545,7 +589,7 @@ export const CashRegisters = () => {
                     sx={{
                       p: 2,
                       textAlign: "center",
-                      bgcolor: "info.light",
+                      bgcolor: "success.light",
                       color: "white",
                     }}
                   >
@@ -564,6 +608,24 @@ export const CashRegisters = () => {
                       p: 2,
                       textAlign: "center",
                       bgcolor: "warning.light",
+                      color: "white",
+                    }}
+                  >
+                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                      {formatCurrency(
+                        reportData.manual_inflow,
+                        reportData.currency,
+                      )}
+                    </Typography>
+                    <Typography variant="body2">Ingresos Manuales</Typography>
+                  </Paper>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Paper
+                    sx={{
+                      p: 2,
+                      textAlign: "center",
+                      bgcolor: "error.light",
                       color: "white",
                     }}
                   >
@@ -676,6 +738,46 @@ export const CashRegisters = () => {
             </>
           )}
         </DialogContent>
+      </Dialog>
+
+      {/* Manual Inflow Dialog */}
+      <Dialog
+        open={openInflowDialog}
+        onClose={() => setOpenInflowDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Inyectar Dinero a Caja</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary">
+              Use esta opción para agregar dinero extra a la caja abierta (ej: sencillo).
+            </Typography>
+            <TextField
+              fullWidth
+              label="Monto a inyectar"
+              type="number"
+              value={inflowAmount}
+              onChange={(e) => setInflowAmount(e.target.value)}
+              autoFocus
+            />
+            <TextField
+              fullWidth
+              label="Notas/Motivo"
+              multiline
+              rows={2}
+              value={inflowNotes}
+              onChange={(e) => setInflowNotes(e.target.value)}
+              placeholder="Ej: Sencillo para cambio"
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenInflowDialog(false)}>Cancelar</Button>
+          <Button onClick={handleAddInflow} variant="contained" color="primary">
+            Agregar Dinero
+          </Button>
+        </DialogActions>
       </Dialog>
     </Box>
   );

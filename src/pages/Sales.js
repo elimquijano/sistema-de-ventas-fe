@@ -237,6 +237,7 @@ export const Sales = () => {
     const colors = {
       completed: "success",
       pending: "warning",
+      debt: "warning",
       cancelled: "error",
     };
     return colors[status] || "default";
@@ -245,8 +246,9 @@ export const Sales = () => {
   const getPaymentStatusLabel = (status) => {
     const statuses = {
       completed: "Pagado",
-      pending: "Pendiente",
-      cancelled: "Cancelado",
+      pending: "Por Entregar",
+      debt: "Deuda",
+      cancelled: "Anulado",
     };
     return statuses[status] || status;
   };
@@ -339,8 +341,9 @@ export const Sales = () => {
                 >
                   <MenuItem value="">Todos</MenuItem>
                   <MenuItem value="completed">Pagado</MenuItem>
-                  <MenuItem value="pending">Pendiente</MenuItem>
-                  <MenuItem value="cancelled">Vencido</MenuItem>
+                  <MenuItem value="pending">Por Entregar</MenuItem>
+                  <MenuItem value="debt">Deuda</MenuItem>
+                  <MenuItem value="cancelled">Anulado</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -644,8 +647,9 @@ export const Sales = () => {
                       onChange={handleEditFormChange}
                     >
                       <MenuItem value="completed">Pagado</MenuItem>
-                      <MenuItem value="pending">Pendiente</MenuItem>
-                      <MenuItem value="cancelled">Vencido</MenuItem>
+                      <MenuItem value="pending">Por Entregar</MenuItem>
+                      <MenuItem value="debt">Deuda</MenuItem>
+                      <MenuItem value="cancelled">Anulado</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>

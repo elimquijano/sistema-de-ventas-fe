@@ -185,11 +185,10 @@ export const Orders = () => {
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
 
   const [tabValue, setTabValue] = useState(0);
+  const [itemTabValue, setItemTabValue] = useState(0);
   const [monitorView, setMonitorView] = useState("cards");
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState("all");
   const [currency, setCurrency] = useState(user?.business?.currency || "PEN");
   const [riders, setRiders] = useState([]);
   const [pendingOrders, setPendingOrders] = useState([]);
@@ -232,15 +231,14 @@ export const Orders = () => {
   }, [calculatedTotal, selectedProduct]);
 
   const filteredItems = useMemo(() => {
-    let all = [...products, ...services];
-    if (selectedCategory !== "all") {
-      all = all.filter((item) => item.category_id === selectedCategory);
-    }
+    const type = itemTabValue === 0 ? "product" : "service";
+    let all = type === "product" ? products : services;
+
     if (!searchQuery) return all;
     return all.filter((item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
-  }, [products, services, searchQuery, selectedCategory]);
+  }, [products, services, searchQuery, itemTabValue]);
 
   const totalPaid = useMemo(
     () => payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0),
@@ -276,10 +274,9 @@ export const Orders = () => {
 
   const loadData = async () => {
     try {
-      const [prodRes, servRes, catRes] = await Promise.all([
+      const [prodRes, servRes] = await Promise.all([
         productsAPI.getAll({ per_page: -1 }),
         servicesAPI.getAll({ per_page: -1 }),
-        categoriesAPI.getAll({ per_page: -1 }),
       ]);
       setProducts(
         (prodRes.data.data || []).map((p) => ({ ...p, type: "product" })),
@@ -287,10 +284,22 @@ export const Orders = () => {
       setServices(
         (servRes.data.data || []).map((s) => ({ ...s, type: "service" })),
       );
-      setCategories(catRes.data.data || []);
     } catch (e) {
       console.error("Error loading data", e);
     }
+  };
+
+  const handleItemClick = (itemToAdd) => {
+    if (itemToAdd.type === "product" && itemToAdd.stock <= 0) {
+      notificationSwal(
+        "Sin Stock",
+        "Este producto no tiene stock disponible.",
+        "error",
+      );
+      return;
+    }
+    setSelectedProduct(itemToAdd);
+    setQuantity(1);
   };
 
   const loadRiders = async () => {
@@ -885,21 +894,28 @@ export const Orders = () => {
                   borderRadius: 1.5,
                 }}
               >
+                <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+                  <Tabs
+                    value={itemTabValue}
+                    onChange={(e, v) => setItemTabValue(v)}
+                    variant="fullWidth"
+                  >
+                    <Tab label={`Productos (${products.length})`} sx={{ fontWeight: 700 }} />
+                    <Tab label={`Servicios (${services.length})`} sx={{ fontWeight: 700 }} />
+                  </Tabs>
+                </Box>
                 <Box
                   sx={{
                     p: 1,
                     borderBottom: 1,
                     borderColor: "divider",
-                    display: "flex",
-                    flexDirection: { xs: "column", sm: "row" },
-                    gap: 1,
                     bgcolor: "background.paper",
                   }}
                 >
                   <TextField
                     fullWidth
                     size="small"
-                    placeholder="Buscar producto..."
+                    placeholder="Buscar..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     InputProps={{
@@ -908,88 +924,113 @@ export const Orders = () => {
                       ),
                     }}
                   />
-                  <Select
-                    size="small"
-                    value={selectedCategory}
-                    onChange={(e) => setSelectedCategory(e.target.value)}
-                    sx={{ width: { xs: "100%", sm: 160 }, fontWeight: 600, fontSize: 13 }}
-                  >
-                    <MenuItem value="all">Todas</MenuItem>
-                    {categories.map((c) => (
-                      <MenuItem key={c.id} value={c.id} sx={{ fontSize: 13 }}>
-                        {c.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
                 </Box>
-                <Box sx={{ flex: 1, overflowY: "auto", p: 1 }}>
+                <Box sx={{ flex: 1, overflowY: "auto", p: 0.5 }}>
                   <Grid container spacing={1}>
                     {filteredItems.map((item) => (
-                      <Grid item xs={6} sm={4} key={`${item.type}-${item.id}`}>
+                      <Grid item xs={6} sm={4} md={4} lg={3} key={`${item.type}-${item.id}`}>
                         <Card
                           elevation={0}
                           sx={{
                             borderRadius: 1,
                             border: "1px solid",
-                            borderColor: selectedProduct?.id === item.id ? "primary.main" : "divider",
-                            bgcolor: selectedProduct?.id === item.id ? alpha(theme.palette.primary.main, 0.04) : "white",
+                            borderColor: selectedProduct?.id === item.id ? "divider" : theme.palette.warning.main,
+                            bgcolor: selectedProduct?.id === item.id 
+                              ? theme.palette.background.paper
+                              : alpha(theme.palette.warning.main, 0.08),
                             transition: "all 0.1s",
+                            cursor: "pointer",
+                            position: "relative",
+                            opacity: item.type === "product" && item.stock <= 0 ? 0.6 : 1,
+                            "&:hover": { 
+                              boxShadow: theme.shadows[2],
+                              borderColor: "divider",
+                              bgcolor: theme.palette.mode === "light" ? alpha(theme.palette.common.black, 0.03) : theme.palette.background.default
+                            }
                           }}
+                          onClick={() => handleItemClick(item)}
                         >
-                          <CardActionArea
-                            onClick={() => {
-                              setSelectedProduct(item);
-                              setQuantity(1);
-                            }}
-                            sx={{ p: 1, textAlign: "center" }}
-                          >
-                            <Badge
-                              badgeContent={item.type === "product" ? "P" : "S"}
-                              color={item.type === "product" ? "info" : "secondary"}
-                              sx={{ "& .MuiBadge-badge": { fontSize: 8, height: 14, minWidth: 14 } }}
-                            >
-                              <Avatar
-                                src={item.image_path ? `${API_STORAGE_URL}/${item.image_path}` : null}
-                                sx={{
-                                  width: 44,
-                                  height: 44,
-                                  mx: "auto",
-                                  mb: 0.8,
-                                  bgcolor: "background.paper",
-                                  border: "1px solid",
-                                  borderColor: "grey.200"
+                          <CardContent sx={{ p: 0.8, textAlign: "center", "&:last-child": { pb: 0.8 } }}>
+                            {item.type === "product" && (
+                              <Chip
+                                label={`Stock: ${item.stock}`}
+                                size="small"
+                                color={item.stock <= 5 ? "error" : "success"}
+                                sx={{ 
+                                  position: "absolute", 
+                                  top: 3, 
+                                  right: 3, 
+                                  height: 14, 
+                                  fontSize: 8, 
+                                  fontWeight: 900,
+                                  zIndex: 2,
+                                  px: 0.5,
+                                  minWidth: 18
                                 }}
-                              >
-                                {item.type === "product" ? (
-                                  <InventoryIcon sx={{ fontSize: 20 }} color="primary" />
-                                ) : (
-                                  <BuildIcon sx={{ fontSize: 20 }} color="secondary" />
-                                )}
-                              </Avatar>
-                            </Badge>
+                              />
+                            )}
+                            <Avatar
+                              src={item.image_path ? `${API_STORAGE_URL}/${item.image_path}` : null}
+                              variant="rounded"
+                              sx={{
+                                width: 44,
+                                height: 44,
+                                mx: "auto",
+                                mb: 0.5,
+                                bgcolor: "background.paper",
+                                border: "1px solid",
+                                borderColor: "grey.200"
+                              }}
+                            >
+                              {item.type === "product" ? (
+                                <InventoryIcon sx={{ fontSize: 22 }} color="primary" />
+                              ) : (
+                                <BuildIcon sx={{ fontSize: 22 }} color="secondary" />
+                              )}
+                            </Avatar>
                             <Typography
                               variant="caption"
-                              fontWeight="600"
+                              fontWeight="700"
                               sx={{
                                 display: "-webkit-box",
-                                WebkitLineClamp: 1,
+                                WebkitLineClamp: 2,
                                 WebkitBoxOrient: "vertical",
                                 overflow: "hidden",
-                                height: 16,
-                                lineHeight: 1.2,
-                                mb: 0.5,
+                                height: 24,
+                                lineHeight: 1.1,
+                                fontSize: 10.5,
+                                mb: 0.3,
                               }}
                             >
                               {item.name}
                             </Typography>
                             <Typography
-                              variant="body2"
+                              variant="subtitle2"
                               color="primary.main"
-                              fontWeight="800"
+                              fontWeight="900"
+                              sx={{ fontSize: 12, display: "block" }}
                             >
                               {formatCurrency(item.price, currency)}
                             </Typography>
-                          </CardActionArea>
+
+                            {item.type === "product" && item.stock <= 0 && (
+                              <Box
+                                sx={{
+                                  position: "absolute",
+                                  inset: 0,
+                                  bgcolor: "rgba(0,0,0,0.6)",
+                                  color: "white",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  borderRadius: 1,
+                                  zIndex: 3
+                                }}
+                              >
+                                <Typography variant="caption" fontWeight="900" sx={{ fontSize: 9 }}>AGOTADO</Typography>
+                              </Box>
+                            )}
+                          </CardContent>
                         </Card>
                       </Grid>
                     ))}
@@ -1007,11 +1048,11 @@ export const Orders = () => {
                   flexDirection: "column",
                   borderRadius: 1.5,
                   border: "1px solid",
-                  borderColor: "orange",
+                  borderColor: theme.palette.warning.main,
                   overflow: "hidden",
                 }}
               >
-                <Box sx={{ bgcolor: "orange", py: 0.8, textAlign: "center" }}>
+                <Box sx={{ bgcolor: theme.palette.warning.main, py: 0.8, textAlign: "center" }}>
                   <Typography variant="caption" fontWeight="800" color="white" sx={{ letterSpacing: 1 }}>
                     ORDEN DE VENTA
                   </Typography>
@@ -1027,7 +1068,7 @@ export const Orders = () => {
                   {selectedProduct ? (
                     <Box sx={{ flex: 1 }}>
                       <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                        <Typography variant="body2" fontWeight="700" sx={{ color: "orange", lineHeight: 1.2 }}>
+                        <Typography variant="body2" fontWeight="700" sx={{ color: theme.palette.warning.main, lineHeight: 1.2 }}>
                           {selectedProduct.name}
                         </Typography>
                         <IconButton
@@ -1046,13 +1087,13 @@ export const Orders = () => {
                             alignItems: "center",
                             borderRadius: 1,
                             border: "1px solid",
-                            borderColor: "orange",
+                            borderColor: theme.palette.warning.main,
                           }}
                         >
                           <IconButton
                             size="small"
                             onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                            sx={{ color: "orange", p: 0.5 }}
+                            sx={{ color: theme.palette.warning.main, p: 0.5 }}
                           >
                             <RemoveIcon fontSize="small" />
                           </IconButton>
@@ -1062,7 +1103,7 @@ export const Orders = () => {
                           <IconButton
                             size="small"
                             onClick={() => setQuantity(quantity + 1)}
-                            sx={{ color: "orange", p: 0.5 }}
+                            sx={{ color: theme.palette.warning.main, p: 0.5 }}
                           >
                             <AddIcon fontSize="small" />
                           </IconButton>
@@ -1143,7 +1184,7 @@ export const Orders = () => {
                         py: 4,
                       }}
                     >
-                      <ShoppingCartIcon sx={{ fontSize: 60, mb: 1, color: "orange" }} />
+                      <ShoppingCartIcon sx={{ fontSize: 60, mb: 1, color: theme.palette.warning.main }} />
                       <Typography variant="caption" fontWeight="700">LISTA VACÍA</Typography>
                     </Box>
                   )}
@@ -1159,8 +1200,8 @@ export const Orders = () => {
                       py: 1,
                       borderRadius: 1,
                       fontWeight: 700,
-                      bgcolor: "orange",
-                      "&:hover": { bgcolor: "#e68a00" },
+                      bgcolor: theme.palette.warning.main,
+                      "&:hover": { bgcolor: theme.palette.warning.dark },
                       fontSize: 13,
                     }}
                   >

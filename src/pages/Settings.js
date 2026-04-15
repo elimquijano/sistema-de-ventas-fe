@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Grid,
@@ -8,7 +8,6 @@ import {
   TextField,
   Button,
   Switch,
-  FormControlLabel,
   Divider,
   List,
   ListItem,
@@ -18,13 +17,17 @@ import {
   Chip,
   Tab,
   Tabs,
-} from '@mui/material';
+} from "@mui/material";
 import {
   Person as PersonIcon,
   Security as SecurityIcon,
   Notifications as NotificationsIcon,
   Palette as PaletteIcon,
-} from '@mui/icons-material';
+} from "@mui/icons-material";
+import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
+import { authAPI, usersAPI } from "../utils/api";
+import { notificationSwal } from "../utils/swal-helpers";
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -43,65 +46,148 @@ function TabPanel(props) {
 }
 
 export const Settings = () => {
+  const { user, updateUser } = useAuth();
+  const { isDarkMode, toggleDarkMode } = useTheme();
   const [tabValue, setTabValue] = useState(0);
-  const [profileData, setProfileData] = useState({
-    firstName: 'John',
-    lastName: 'Doe',
-    email: 'john@example.com',
-    phone: '+1 234 567 8900',
-    company: 'Berry Inc.',
-    position: 'Administrator',
+
+  // Form states
+  const [profileForm, setProfileForm] = useState({
+    first_name: "",
+    last_name: "",
+    email: "",
+    phone: "",
   });
 
-  const [notifications, setNotifications] = useState({
-    emailNotifications: true,
-    pushNotifications: false,
-    smsNotifications: true,
-    marketingEmails: false,
+  const [passwordForm, setPasswordForm] = useState({
+    old_password: "",
+    password: "",
+    password_confirmation: "",
   });
 
-  const [preferences, setPreferences] = useState({
-    darkMode: false,
-    language: 'en',
-    timezone: 'UTC-5',
-    dateFormat: 'MM/DD/YYYY',
-  });
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+      });
+    }
+  }, [user]);
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
   };
 
-  const handleProfileChange = (field, value) => {
-    setProfileData(prev => ({ ...prev, [field]: value }));
+  const handleProfileChange = (e) => {
+    const { name, value } = e.target;
+    setProfileForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleNotificationChange = (field, value) => {
-    setNotifications(prev => ({ ...prev, [field]: value }));
+  const handlePasswordChange = (e) => {
+    const { name, value } = e.target;
+    setPasswordForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const saveProfile = async () => {
+    try {
+      const response = await authAPI.profile(profileForm);
+      updateUser(response.data.user || response.data);
+      notificationSwal("Éxito", "Perfil actualizado correctamente", "success");
+    } catch (error) {
+      console.error(error);
+      notificationSwal(
+        "Error",
+        error.response?.data?.message || "Error al actualizar el perfil",
+        "error",
+      );
+    }
+  };
+
+  const updatePassword = async () => {
+    if (passwordForm.password !== passwordForm.password_confirmation) {
+      return notificationSwal("Error", "Las contraseñas no coinciden", "error");
+    }
+
+    try {
+      await authAPI.changePassword(passwordForm);
+      setPasswordForm({
+        old_password: "",
+        password: "",
+        password_confirmation: "",
+      });
+      notificationSwal(
+        "Éxito",
+        "Contraseña actualizada correctamente",
+        "success",
+      );
+    } catch (error) {
+      console.error(error);
+      notificationSwal(
+        "Error",
+        error.response?.data?.message || "Error al actualizar la contraseña",
+        "error",
+      );
+    }
+  };
+
+  const handleNotificationToggle = async (checked) => {
+    try {
+      /* const response = await usersAPI.update(user.id, {
+        ...user,
+        receive_notifications: checked
+      });
+      updateUser(response.data.user || response.data); */
+      notificationSwal(
+        "Éxito",
+        "Preferencia de notificaciones actualizada",
+        "success",
+      );
+    } catch (error) {
+      console.error(error);
+      notificationSwal(
+        "Error",
+        "No se pudo actualizar la preferencia",
+        "error",
+      );
+    }
   };
 
   const tabs = [
-    { label: 'Profile', icon: <PersonIcon /> },
-    { label: 'Security', icon: <SecurityIcon /> },
-    { label: 'Notifications', icon: <NotificationsIcon /> },
-    { label: 'Preferences', icon: <PaletteIcon /> },
+    { label: "Perfil", icon: <PersonIcon /> },
+    { label: "Seguridad", icon: <SecurityIcon /> },
+    { label: "Notificaciones", icon: <NotificationsIcon /> },
+    { label: "Preferencias", icon: <PaletteIcon /> },
   ];
+
+  if (!user) return null;
 
   return (
     <Box>
       <Typography variant="h4" sx={{ mb: 3, fontWeight: 600 }}>
-        Settings
+        Configuración
       </Typography>
 
       <Grid container spacing={3}>
         <Grid item xs={12} md={3}>
           <Card>
-            <CardContent>
+            <CardContent sx={{ p: 0 }}>
               <Tabs
                 orientation="vertical"
                 variant="scrollable"
                 value={tabValue}
                 onChange={handleTabChange}
-                sx={{ borderRight: 1, borderColor: 'divider' }}
+                sx={{
+                  borderRight: 1,
+                  borderColor: "divider",
+                  "& .MuiTab-root": {
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    textAlign: "left",
+                    py: 2,
+                    px: 3,
+                  },
+                }}
               >
                 {tabs.map((tab, index) => (
                   <Tab
@@ -109,11 +195,6 @@ export const Settings = () => {
                     label={tab.label}
                     icon={tab.icon}
                     iconPosition="start"
-                    sx={{
-                      justifyContent: 'flex-start',
-                      textAlign: 'left',
-                      minHeight: 48,
-                    }}
                   />
                 ))}
               </Tabs>
@@ -123,33 +204,46 @@ export const Settings = () => {
 
         <Grid item xs={12} md={9}>
           <Card>
-            <CardContent>
-              {/* Profile Tab */}
+            <CardContent sx={{ p: 4 }}>
+              {/* Perfil Tab */}
               <TabPanel value={tabValue} index={0}>
                 <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                  Profile Information
+                  Información del Perfil
                 </Typography>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+
+                <Box sx={{ display: "flex", alignItems: "center", mb: 4 }}>
                   <Avatar
                     sx={{
                       width: 80,
                       height: 80,
                       mr: 3,
-                      bgcolor: 'primary.main',
-                      fontSize: '2rem',
+                      bgcolor: "primary.main",
+                      fontSize: "2rem",
                     }}
                   >
-                    {profileData.firstName.charAt(0)}{profileData.lastName.charAt(0)}
+                    {user.first_name?.charAt(0)}
+                    {user.last_name?.charAt(0)}
                   </Avatar>
                   <Box>
                     <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      {profileData.firstName} {profileData.lastName}
+                      {user.first_name} {user.last_name}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      {profileData.position} at {profileData.company}
+                      {user.email}
                     </Typography>
-                    <Chip label="Administrator" color="primary" size="small" sx={{ mt: 1 }} />
+                    <Box sx={{ mt: 1, display: "flex", gap: 1 }}>
+                      {user.roles?.map((role) => (
+                        <Chip
+                          key={role.id}
+                          label={role.name}
+                          color="primary"
+                          size="small"
+                        />
+                      ))}
+                      {!user.roles && (
+                        <Chip label="Usuario" color="primary" size="small" />
+                      )}
+                    </Box>
                   </Box>
                 </Box>
 
@@ -157,267 +251,197 @@ export const Settings = () => {
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="First Name"
-                      value={profileData.firstName}
-                      onChange={(e) => handleProfileChange('firstName', e.target.value)}
+                      label="Nombre"
+                      name="first_name"
+                      value={profileForm.first_name}
+                      onChange={handleProfileChange}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Last Name"
-                      value={profileData.lastName}
-                      onChange={(e) => handleProfileChange('lastName', e.target.value)}
+                      label="Apellido"
+                      name="last_name"
+                      value={profileForm.last_name}
+                      onChange={handleProfileChange}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Email"
+                      label="Correo Electrónico"
                       type="email"
-                      value={profileData.email}
-                      onChange={(e) => handleProfileChange('email', e.target.value)}
+                      name="email"
+                      value={profileForm.email}
+                      onChange={handleProfileChange}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Phone"
-                      value={profileData.phone}
-                      onChange={(e) => handleProfileChange('phone', e.target.value)}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Company"
-                      value={profileData.company}
-                      onChange={(e) => handleProfileChange('company', e.target.value)}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Position"
-                      value={profileData.position}
-                      onChange={(e) => handleProfileChange('position', e.target.value)}
+                      label="Teléfono"
+                      name="phone"
+                      value={profileForm.phone}
+                      onChange={handleProfileChange}
                     />
                   </Grid>
                 </Grid>
 
-                <Box sx={{ mt: 3 }}>
-                  <Button variant="contained">Save Changes</Button>
-                  <Button variant="outlined" sx={{ ml: 2 }}>Cancel</Button>
+                <Box sx={{ mt: 4 }}>
+                  <Button variant="contained" onClick={saveProfile}>
+                    Guardar Cambios
+                  </Button>
                 </Box>
               </TabPanel>
 
-              {/* Security Tab */}
+              {/* Seguridad Tab */}
               <TabPanel value={tabValue} index={1}>
                 <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                  Security Settings
+                  Seguridad
                 </Typography>
 
                 <Box sx={{ mb: 4 }}>
-                  <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                    Change Password
+                  <Typography
+                    variant="subtitle1"
+                    sx={{ mb: 2, fontWeight: 600 }}
+                  >
+                    Cambiar Contraseña
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid item xs={12}>
                       <TextField
                         fullWidth
-                        label="Current Password"
+                        label="Contraseña Actual"
                         type="password"
+                        name="old_password"
+                        value={passwordForm.old_password}
+                        onChange={handlePasswordChange}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
-                        label="New Password"
+                        label="Nueva Contraseña"
                         type="password"
+                        name="password"
+                        value={passwordForm.password}
+                        onChange={handlePasswordChange}
                       />
                     </Grid>
                     <Grid item xs={12} sm={6}>
                       <TextField
                         fullWidth
-                        label="Confirm New Password"
+                        label="Confirmar Nueva Contraseña"
                         type="password"
+                        name="password_confirmation"
+                        value={passwordForm.password_confirmation}
+                        onChange={handlePasswordChange}
                       />
                     </Grid>
                   </Grid>
-                  <Button variant="contained" sx={{ mt: 2 }}>
-                    Update Password
+                  <Button
+                    variant="contained"
+                    sx={{ mt: 3 }}
+                    onClick={updatePassword}
+                  >
+                    Actualizar Contraseña
                   </Button>
                 </Box>
 
                 <Divider sx={{ my: 3 }} />
 
                 <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                  Two-Factor Authentication
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Switch />
-                  <Typography sx={{ ml: 2 }}>
-                    Enable two-factor authentication for enhanced security
-                  </Typography>
-                </Box>
-
-                <Divider sx={{ my: 3 }} />
-
-                <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-                  Active Sessions
+                  Sesiones Activas
                 </Typography>
                 <List>
                   <ListItem>
                     <ListItemText
-                      primary="Current Session"
-                      secondary="Chrome on Windows • New York, NY"
+                      primary="Sesión Actual"
+                      secondary="Navegador Web • Activo ahora"
                     />
                     <ListItemSecondaryAction>
-                      <Chip label="Active" color="success" size="small" />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  <ListItem>
-                    <ListItemText
-                      primary="Mobile App"
-                      secondary="iPhone • Last active 2 hours ago"
-                    />
-                    <ListItemSecondaryAction>
-                      <Button size="small" color="error">Revoke</Button>
+                      <Chip label="Activo" color="success" size="small" />
                     </ListItemSecondaryAction>
                   </ListItem>
                 </List>
               </TabPanel>
 
-              {/* Notifications Tab */}
+              {/* Notificaciones Tab */}
               <TabPanel value={tabValue} index={2}>
                 <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                  Notification Preferences
+                  Preferencias de Notificación
                 </Typography>
 
                 <List>
                   <ListItem>
                     <ListItemText
-                      primary="Email Notifications"
-                      secondary="Receive notifications via email"
+                      primary="Recibir Notificaciones"
+                      secondary="Alertas automáticas sobre actividad crítica en el negocio (Préstamos, Créditos, etc.)"
                     />
                     <ListItemSecondaryAction>
                       <Switch
-                        checked={notifications.emailNotifications}
-                        onChange={(e) => handleNotificationChange('emailNotifications', e.target.checked)}
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  
-                  <ListItem>
-                    <ListItemText
-                      primary="Push Notifications"
-                      secondary="Receive push notifications in your browser"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={notifications.pushNotifications}
-                        onChange={(e) => handleNotificationChange('pushNotifications', e.target.checked)}
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  
-                  <ListItem>
-                    <ListItemText
-                      primary="SMS Notifications"
-                      secondary="Receive important updates via SMS"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={notifications.smsNotifications}
-                        onChange={(e) => handleNotificationChange('smsNotifications', e.target.checked)}
-                      />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                  
-                  <ListItem>
-                    <ListItemText
-                      primary="Marketing Emails"
-                      secondary="Receive marketing and promotional emails"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={notifications.marketingEmails}
-                        onChange={(e) => handleNotificationChange('marketingEmails', e.target.checked)}
+                        checked={user.receive_notifications || false}
+                        onChange={(e) =>
+                          handleNotificationToggle(e.target.checked)
+                        }
                       />
                     </ListItemSecondaryAction>
                   </ListItem>
                 </List>
               </TabPanel>
 
-              {/* Preferences Tab */}
+              {/* Preferencias Tab */}
               <TabPanel value={tabValue} index={3}>
                 <Typography variant="h6" sx={{ mb: 3, fontWeight: 600 }}>
-                  Application Preferences
+                  Preferencias de la Aplicación
                 </Typography>
 
                 <Grid container spacing={3}>
                   <Grid item xs={12}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                      }}
+                    >
                       <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                          Dark Mode
+                        <Typography
+                          variant="subtitle1"
+                          sx={{ fontWeight: 600 }}
+                        >
+                          Modo Oscuro
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          Switch between light and dark themes
+                          Cambiar entre temas claro y oscuro
                         </Typography>
                       </Box>
-                      <Switch
-                        checked={preferences.darkMode}
-                        onChange={(e) => setPreferences(prev => ({ ...prev, darkMode: e.target.checked }))}
-                      />
+                      <Switch checked={isDarkMode} onChange={toggleDarkMode} />
                     </Box>
                   </Grid>
-                  
+
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Language"
-                      value={preferences.language}
-                      onChange={(e) => setPreferences(prev => ({ ...prev, language: e.target.value }))}
+                      label="Idioma"
+                      value="es"
+                      disabled
                       select
                       SelectProps={{ native: true }}
                     >
-                      <option value="en">English</option>
-                      <option value="es">Spanish</option>
-                      <option value="fr">French</option>
-                      <option value="de">German</option>
+                      <option value="es">Español</option>
                     </TextField>
                   </Grid>
-                  
+
                   <Grid item xs={12} sm={6}>
                     <TextField
                       fullWidth
-                      label="Timezone"
-                      value={preferences.timezone}
-                      onChange={(e) => setPreferences(prev => ({ ...prev, timezone: e.target.value }))}
+                      label="Zona Horaria"
+                      value="America/Lima"
+                      disabled
                     />
                   </Grid>
-                  
-                  <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label="Date Format"
-                      value={preferences.dateFormat}
-                      onChange={(e) => setPreferences(prev => ({ ...prev, dateFormat: e.target.value }))}
-                      select
-                      SelectProps={{ native: true }}
-                    >
-                      <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                      <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                      <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                    </TextField>
-                  </Grid>
                 </Grid>
-
-                <Box sx={{ mt: 3 }}>
-                  <Button variant="contained">Save Preferences</Button>
-                  <Button variant="outlined" sx={{ ml: 2 }}>Reset to Default</Button>
-                </Box>
               </TabPanel>
             </CardContent>
           </Card>

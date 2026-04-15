@@ -126,7 +126,9 @@ export const authAPI = {
   forgotPassword: (email) => api.post("/auth/forgot-password", { email }, { loaderMessage: "Enviando correo de recuperación..." }),
   resetPassword: (data) => api.post("/auth/reset-password", data, { loaderMessage: "Restableciendo contraseña..." }),
   refreshToken: () => api.post("/auth/refresh", {}, { silent: true }),
-  me: () => api.get("/auth/me", { loaderMessage: "Verificando identidad..." }), 
+  me: () => api.get("/auth/me", { loaderMessage: "Verificando identidad..." }),
+  profile: (userData) => api.patch("/auth/profile", userData, { loaderMessage: "Actualizando perfil..." }),
+  changePassword: (data) => api.post("/auth/change-password", data, { loaderMessage: "Cambiando contraseña..." }),
 };
 
 // Funciones de API para usuarios

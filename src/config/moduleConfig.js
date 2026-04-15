@@ -22,6 +22,8 @@ import { Purchases } from "../pages/Purchases";
 import { CashRegisters } from "../pages/CashRegisters";
 import { Clients } from "../pages/Clients";
 import { Orders } from "../pages/Orders";
+import { RiderOrders } from "../pages/RiderOrders";
+import NotificationsPage from "../pages/Notifications";
 import LocationTracker from "../pages/LocationTracker";
 
 // Importar iconos de Material-UI
@@ -47,6 +49,7 @@ import {
   Assessment,
   Store,
   LocalShipping,
+  History,
 } from "@mui/icons-material";
 
 // Mapeo de componentes - AQUÍ AGREGAS NUEVOS COMPONENTES
@@ -57,6 +60,7 @@ export const componentMap = {
   UserPermissions,
   Modules,
   SettingsPage,
+  Notifications: NotificationsPage,
 
   // Nuevos componentes del sistema de ventas
   BusinessDashboard,
@@ -74,6 +78,7 @@ export const componentMap = {
   Clients,
   Orders,
   LocationTracker,
+  RiderOrders,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES
@@ -98,6 +103,7 @@ export const iconMap = {
   Assessment: <Assessment />,
   Store: <Store />,
   LocalShipping: <LocalShipping />,
+  History: <History />,
 };
 
 // Función para obtener icono por nombre

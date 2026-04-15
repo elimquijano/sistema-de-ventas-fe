@@ -183,11 +183,11 @@ export const dashboardAPI = {
 
 // Funciones de API para notificaciones
 export const notificationsAPI = {
-  getAll: (params = {}) => api.get("/notifications", { params }),
-  markAsRead: (id) => api.patch(`/notifications/${id}/read`),
-  markAllAsRead: () => api.patch("/notifications/mark-all-read"),
-  delete: (id) => api.delete(`/notifications/${id}`),
-  getUnreadCount: () => api.get("/notifications/unread-count"),
+  getAll: (params = {}) => api.get("/notifications", { params, silent: true }),
+  markAsRead: (id) => api.patch(`/notifications/${id}/read`, {}, { silent: true }),
+  markAllAsRead: () => api.patch("/notifications/mark-all-read", {}, { silent: true }),
+  delete: (id) => api.delete(`/notifications/${id}`, { silent: true }),
+  getUnreadCount: () => api.get("/notifications/unread-count", { silent: true }),
 };
 
 // NUEVAS APIs para el sistema de ventas
@@ -266,7 +266,13 @@ export const servicesAPI = {
 export const salesAPI = {
   getAll: (params = {}) => api.get("/sales", { params, loaderMessage: "Cargando ventas..." }),
   getById: (id) => api.get(`/sales/${id}`, { loaderMessage: "Obteniendo detalles de la venta..." }),
-  create: (saleData) => api.post("/sales", saleData, { loaderMessage: "Procesando venta..." }),
+  create: (saleData) =>
+    api.post("/sales", saleData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      loaderMessage: "Procesando venta..."
+    }),
   update: (id, saleData) => api.put(`/sales/${id}`, saleData, { loaderMessage: "Actualizando venta..." }),
   delete: (id) => api.delete(`/sales/${id}`, { loaderMessage: "Anulando venta..." }),
   getDaily: (date) => api.get(`/sales/daily?date=${date}`, { loaderMessage: "Cargando reporte diario..." }),
@@ -275,8 +281,17 @@ export const salesAPI = {
     api.get(`/sales/${saleId}/receipt`, { responseType: "blob", loaderMessage: "Generando recibo..." }),
   whatsappResend: (saleId, data = {}) => api.post(`/sales/${saleId}/whatsapp-resend`, data, { loaderMessage: "Reenviando WhatsApp..." }),
   quickOrder: (orderData) => api.post("/sales/quick-order", orderData, { loaderMessage: "Registrando pedido..." }),
-  confirmDelivery: (id, paymentData) => api.post(`/sales/${id}/confirm-delivery`, paymentData, { loaderMessage: "Confirmando entrega..." }),
+  updateQuickOrder: (id, orderData) => api.put(`/sales/quick-order/${id}`, orderData, { loaderMessage: "Actualizando pedido..." }),
+  confirmDelivery: (id, paymentData) =>
+    api.post(`/sales/${id}/confirm-delivery`, paymentData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      loaderMessage: "Confirmando entrega..."
+    }),
   cancelOrder: (id) => api.post(`/sales/${id}/cancel`, {}, { loaderMessage: "Cancelando pedido..." }),
+  reopen: (id) => api.post(`/sales/${id}/reopen`, {}, { loaderMessage: "Reabriendo venta..." }),
+  timeline: (id) => api.get(`/sales/${id}/timeline`, { loaderMessage: "Cargando línea de tiempo..." }),
 };
 
 export const expensesAPI = {
@@ -295,6 +310,7 @@ export const creditsAPI = {
   processPayment: (id, paymentData) =>
     api.post(`/credits/${id}/payment`, paymentData, { loaderMessage: "Procesando pago de crédito..." }),
   getPending: () => api.get("/credits/pending", { loaderMessage: "Cargando créditos pendientes..." }),
+  timeline: (id) => api.get(`/credits/${id}/timeline`, { loaderMessage: "Cargando línea de tiempo..." }),
 };
 
 export const loansAPI = {
@@ -306,6 +322,7 @@ export const loansAPI = {
   addPayment: (id, paymentData) =>
     api.post(`/loans/${id}/payment`, paymentData, { loaderMessage: "Registrando pago de préstamo..." }),
   getPending: () => api.get("/loans/pending", { loaderMessage: "Cargando préstamos pendientes..." }),
+  timeline: (id) => api.get(`/loans/${id}/timeline`, { loaderMessage: "Cargando línea de tiempo..." }),
 };
 
 export const categoriesAPI = {

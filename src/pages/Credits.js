@@ -39,11 +39,13 @@ import {
   AccountBalance as AccountBalanceIcon,
   ShoppingCart as ShoppingCartIcon,
   Build as BuildIcon,
+  History as HistoryIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { creditsAPI } from "../utils/api";
+import { AuditTimeline } from "../components/AuditTimeline";
 
 export const Credits = () => {
   const { hasPermission } = useAuth();
@@ -61,7 +63,16 @@ export const Credits = () => {
   // Edit Dialog State
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingCredit, setEditingCredit] = useState(null);
-  const [editFormData, setEditFormData] = useState({ due_date: "", status: "", paid_amount: "" });
+  const [editFormData, setEditFormData] = useState({
+    due_date: "",
+    status: "",
+    paid_amount: "",
+  });
+
+  // Timeline State
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [timelineLogs, setTimelineLogs] = useState([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
 
   useEffect(() => {
     loadCredits();
@@ -78,7 +89,7 @@ export const Credits = () => {
       notificationSwal(
         "Error",
         "Hubo un error al cargar los créditos.",
-        "error"
+        "error",
       );
     } finally {
       setLoading(false);
@@ -117,7 +128,7 @@ export const Credits = () => {
       notificationSwal(
         "Pago Registrado",
         `Se ha registrado un pago de ${formatCurrency(amount)}.`,
-        "success"
+        "success",
       );
 
       setOpenPaymentDialog(false);
@@ -154,10 +165,14 @@ export const Credits = () => {
     try {
       const dataToUpdate = {
         ...editFormData,
-        paid_amount: parseFloat(editFormData.paid_amount)
+        paid_amount: parseFloat(editFormData.paid_amount),
       };
       await creditsAPI.update(editingCredit.id, dataToUpdate);
-      notificationSwal("Crédito Actualizado", "El crédito ha sido actualizado.", "success");
+      notificationSwal(
+        "Crédito Actualizado",
+        "El crédito ha sido actualizado.",
+        "success",
+      );
       handleCloseEditDialog();
       loadCredits();
     } catch (error) {
@@ -165,6 +180,20 @@ export const Credits = () => {
       notificationSwal("Error", "No se pudo actualizar el crédito.", "error");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleOpenTimeline = async (creditId) => {
+    setTimelineOpen(true);
+    setLoadingTimeline(true);
+    try {
+      const response = await creditsAPI.timeline(creditId);
+      setTimelineLogs(response.data || []);
+    } catch (error) {
+      console.error("Error loading timeline:", error);
+      notificationSwal("Error", "No se pudo cargar el historial.", "error");
+    } finally {
+      setLoadingTimeline(false);
     }
   };
 
@@ -305,7 +334,7 @@ export const Credits = () => {
                       />
                     </TableCell>
                     <TableCell align="right">
-                      {hasPermission("creditos.view") &&
+                      {hasPermission("creditos.pay") &&
                         credit.status === "pending" && (
                           <IconButton
                             size="small"
@@ -316,8 +345,20 @@ export const Credits = () => {
                           </IconButton>
                         )}
                       {hasPermission("creditos.edit") && (
-                        <IconButton size="small" onClick={() => handleOpenEditDialog(credit)}>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenEditDialog(credit)}
+                        >
                           <EditIcon />
+                        </IconButton>
+                      )}
+                      {hasPermission("creditos.audit") && (
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenTimeline(credit.id)}
+                          title="Ver Historial"
+                        >
+                          <HistoryIcon />
                         </IconButton>
                       )}
                     </TableCell>
@@ -375,15 +416,26 @@ export const Credits = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenPaymentDialog(false)} disabled={isSubmitting}>Cancelar</Button>
+          <Button
+            onClick={() => setOpenPaymentDialog(false)}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
           <Button
             onClick={handleProcessPayment}
             variant="contained"
-            disabled={!paymentAmount || parseFloat(paymentAmount) <= 0 || isSubmitting}
+            disabled={
+              !paymentAmount || parseFloat(paymentAmount) <= 0 || isSubmitting
+            }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
             }}
-            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+            startIcon={
+              isSubmitting ? (
+                <CircularProgress size={20} color="inherit" />
+              ) : null
+            }
           >
             Registrar Pago
           </Button>
@@ -391,7 +443,12 @@ export const Credits = () => {
       </Dialog>
 
       {/* Edit Dialog */}
-      <Dialog open={editDialogOpen} onClose={handleCloseEditDialog} maxWidth="xs" fullWidth>
+      <Dialog
+        open={editDialogOpen}
+        onClose={handleCloseEditDialog}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle>Editar Crédito</DialogTitle>
         <DialogContent>
           {editingCredit && (
@@ -402,7 +459,12 @@ export const Credits = () => {
                   label="Fecha de Vencimiento"
                   type="date"
                   value={editFormData.due_date}
-                  onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      due_date: e.target.value,
+                    })
+                  }
                   InputLabelProps={{ shrink: true }}
                   disabled={isSubmitting}
                 />
@@ -413,17 +475,39 @@ export const Credits = () => {
                   label="Monto Pagado"
                   type="number"
                   value={editFormData.paid_amount}
-                  onChange={(e) => setEditFormData({ ...editFormData, paid_amount: e.target.value })}
+                  onChange={(e) =>
+                    setEditFormData({
+                      ...editFormData,
+                      paid_amount: e.target.value,
+                    })
+                  }
                   InputLabelProps={{ shrink: true }}
-                  error={parseFloat(editFormData.paid_amount) > editingCredit?.total_amount}
-                  helperText={parseFloat(editFormData.paid_amount) > editingCredit?.total_amount ? "No puede ser mayor al total." : ""}
+                  error={
+                    parseFloat(editFormData.paid_amount) >
+                    editingCredit?.total_amount
+                  }
+                  helperText={
+                    parseFloat(editFormData.paid_amount) >
+                    editingCredit?.total_amount
+                      ? "No puede ser mayor al total."
+                      : ""
+                  }
                   disabled={isSubmitting}
                 />
               </Grid>
               <Grid item xs={12}>
                 <FormControl fullWidth disabled={isSubmitting}>
                   <InputLabel>Estado</InputLabel>
-                  <Select value={editFormData.status} label="Estado" onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value })}>
+                  <Select
+                    value={editFormData.status}
+                    label="Estado"
+                    onChange={(e) =>
+                      setEditFormData({
+                        ...editFormData,
+                        status: e.target.value,
+                      })
+                    }
+                  >
                     <MenuItem value="pending">Pendiente</MenuItem>
                     <MenuItem value="paid">Pagado</MenuItem>
                     <MenuItem value="overdue">Vencido</MenuItem>
@@ -434,10 +518,38 @@ export const Credits = () => {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>Cancelar</Button>
-          <Button onClick={handleUpdateCredit} variant="contained" disabled={isSubmitting}>
-            {isSubmitting ? <CircularProgress size={20} color="inherit" /> : "Guardar Cambios"}
+          <Button onClick={handleCloseEditDialog} disabled={isSubmitting}>
+            Cancelar
           </Button>
+          <Button
+            onClick={handleUpdateCredit}
+            variant="contained"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <CircularProgress size={20} color="inherit" />
+            ) : (
+              "Guardar Cambios"
+            )}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Timeline Dialog */}
+      <Dialog
+        open={timelineOpen}
+        onClose={() => setTimelineOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <HistoryIcon color="primary" /> Historial del Crédito
+        </DialogTitle>
+        <DialogContent>
+          <AuditTimeline logs={timelineLogs} loading={loadingTimeline} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTimelineOpen(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>

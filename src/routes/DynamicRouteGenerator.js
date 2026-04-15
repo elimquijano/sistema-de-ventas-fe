@@ -66,6 +66,7 @@ const PageNotFoundWithinDashboard = () => (
  * Paso 3: Componente principal que genera las <Routes> dinámicamente.
  */
 export const DynamicRoutes = ({ navConfig }) => {
+  const Notifications = getComponent("Notifications");
   // Usamos useMemo para evitar recalcular en cada render, por eficiencia.
   const flatRoutes = React.useMemo(() => flattenRoutes(navConfig), [navConfig]);
   const groupedRoutes = React.useMemo(
@@ -136,6 +137,16 @@ export const DynamicRoutes = ({ navConfig }) => {
           </Route>
         );
       })}
+
+      {/* Manual routes that are always available */}
+      <Route
+        path="notifications"
+        element={
+          <ProtectedRoute>
+            <Notifications />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Fallback general para cualquier ruta no coincidente dentro del dashboard */}
       <Route path="*" element={<PageNotFoundWithinDashboard />} />

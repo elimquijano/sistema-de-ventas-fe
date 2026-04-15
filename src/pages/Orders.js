@@ -81,6 +81,7 @@ import {
   GridView as GridViewIcon,
   LocationOn as LocationOnIcon,
   Info as InfoIcon,
+  AddCard as AddCardIcon,
 } from "@mui/icons-material";
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
@@ -99,6 +100,8 @@ import {
   categoriesAPI,
 } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
+
+import { OrderMonitor } from "../components/OrderMonitor";
 
 // --- CONFIGURACIÓN DE ÍCONOS LEAFLET ---
 delete L.Icon.Default.prototype._getIconUrl;
@@ -119,31 +122,6 @@ const MapRecenter = ({ location, zoom = 17 }) => {
   useEffect(() => {
     if (location) map.flyTo([location.lat, location.lng], zoom);
   }, [location, map, zoom]);
-  return null;
-};
-
-const MapFitBounds = ({ orders }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (orders && orders.length > 0) {
-      const validOrders = orders.filter(
-        (o) =>
-          (o.latitude || o.client?.latitude) &&
-          (o.longitude || o.client?.longitude),
-      );
-      if (validOrders.length > 0) {
-        const bounds = L.latLngBounds(
-          validOrders.map((o) => [
-            parseFloat(o.latitude || o.client.latitude),
-            parseFloat(o.longitude || o.client.longitude),
-          ]),
-        );
-        if (bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [30, 30] });
-        }
-      }
-    }
-  }, [orders, map]);
   return null;
 };
 
@@ -170,6 +148,7 @@ const PAYMENT_METHODS = [
   { value: "card", label: "Tarjeta", icon: <CreditCardIcon /> },
   { value: "transfer", label: "Transferencia", icon: <CreditCardIcon /> },
   { value: "credit", label: "Crédito", icon: <ScheduleIcon /> },
+  { value: "vale", label: "Vale", icon: <AddCardIcon /> },
 ];
 
 const getNowDateTimeLocal = () => {
@@ -189,6 +168,7 @@ export const Orders = () => {
   const [monitorView, setMonitorView] = useState("cards");
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
+  const [allClients, setAllClients] = useState([]);
   const [currency, setCurrency] = useState(user?.business?.currency || "PEN");
   const [riders, setRiders] = useState([]);
   const [pendingOrders, setPendingOrders] = useState([]);
@@ -274,9 +254,10 @@ export const Orders = () => {
 
   const loadData = async () => {
     try {
-      const [prodRes, servRes] = await Promise.all([
+      const [prodRes, servRes, clientRes] = await Promise.all([
         productsAPI.getAll({ per_page: -1 }),
         servicesAPI.getAll({ per_page: -1 }),
+        clientsAPI.getAll({ per_page: -1 }),
       ]);
       setProducts(
         (prodRes.data.data || []).map((p) => ({ ...p, type: "product" })),
@@ -284,6 +265,7 @@ export const Orders = () => {
       setServices(
         (servRes.data.data || []).map((s) => ({ ...s, type: "service" })),
       );
+      setAllClients(clientRes.data.data || []);
     } catch (e) {
       console.error("Error loading data", e);
     }
@@ -425,7 +407,7 @@ export const Orders = () => {
       setCustomerLocation(null);
       setOrderNotes("");
       setSelectedRider("");
-      setScheduledAt("");
+      // No limpiar scheduledAt
       loadPendingOrders();
     } catch (e) {
       notificationSwal(
@@ -435,42 +417,6 @@ export const Orders = () => {
       );
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleConfirmDelivery = async () => {
-    if (Math.abs(remainingAmount) > 0.01)
-      return notificationSwal("Monto", "Pago incompleto.", "error");
-    setIsLoading(true);
-    try {
-      await salesAPI.confirmDelivery(selectedOrderToConfirm.id, {
-        payments: payments.map((p) => ({ ...p, amount: parseFloat(p.amount) })),
-      });
-      notificationSwal("Éxito", "Entrega confirmada.", "success");
-      setOpenPaymentDialog(false);
-      loadPendingOrders();
-    } catch (e) {
-      notificationSwal("Error", "Error al confirmar.", "error");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOpenConfirmDialog = (order) => {
-    setSelectedOrderToConfirm(order);
-    setPayments([]);
-    setOpenPaymentDialog(true);
-  };
-
-  const handleCancelOrder = async (id) => {
-    if (await confirmSwal("¿Cancelar?", "Se liberará el stock.")) {
-      try {
-        await salesAPI.cancelOrder(id);
-        notificationSwal("Cancelado", "Pedido anulado.", "success");
-        loadPendingOrders();
-      } catch (e) {
-        notificationSwal("Error", "No se pudo cancelar.", "error");
-      }
     }
   };
 
@@ -518,178 +464,6 @@ export const Orders = () => {
       className: "order-marker",
     });
 
-  const OrderCard = ({ order }) => (
-    <Card
-      elevation={1}
-      sx={{
-        borderRadius: 1.5,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        border: "1px solid",
-        borderColor: order.scheduled_at ? "error.light" : "divider",
-        transition: "all 0.2s",
-        "&:hover": { boxShadow: theme.shadows[3] },
-      }}
-    >
-      <Box
-        sx={{
-          p: 1,
-          px: 1.5,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          bgcolor: order.scheduled_at ? alpha(theme.palette.error.main, 0.04) : alpha(theme.palette.primary.main, 0.04),
-        }}
-      >
-        <Chip
-          label={`#${order.sale_number}`}
-          size="small"
-          color={order.scheduled_at ? "error" : "primary"}
-          sx={{ fontWeight: 800, height: 20, fontSize: 10, borderRadius: 1 }}
-        />
-        <Typography
-          variant="caption"
-          fontWeight="600"
-          sx={{ fontSize: 10, color: "text.secondary" }}
-        >
-          {formatDate(order.created_at)}
-        </Typography>
-      </Box>
-      <CardContent sx={{ flex: 1, p: 1.5 }}>
-        <Typography
-          variant="subtitle1"
-          fontWeight="700"
-          noWrap
-          sx={{ mb: 0.5, color: "text.primary", lineHeight: 1.2 }}
-        >
-          {order.customer_name}
-        </Typography>
-        {order.items?.length > 0 && (
-          <Box sx={{ mb: 1.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-            {order.items.map((it, idx) => (
-              <Chip
-                key={idx}
-                label={`${it.quantity}x ${it.item_name}`}
-                size="small"
-                variant="outlined"
-                sx={{
-                  height: 18,
-                  fontSize: 9,
-                  fontWeight: 600,
-                  borderColor: "primary.light",
-                  color: "primary.main",
-                  borderRadius: 1
-                }}
-              />
-            ))}
-          </Box>
-        )}
-
-        <Stack spacing={0.8}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <PhoneIcon sx={{ fontSize: 14, color: "success.main" }} />
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>
-              {order.delivery_phone || order.phone || order.client?.phone || "S/T"}
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-            <MapIcon sx={{ fontSize: 14, color: "info.main", mt: 0.2 }} />
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: 500,
-                lineHeight: 1.1,
-                color: "text.secondary",
-                display: "-webkit-box",
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-              }}
-            >
-              {order.delivery_address || order.address}
-            </Typography>
-          </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <LocalShippingIcon sx={{ fontSize: 14, color: "warning.main" }} />
-            <Typography variant="caption" fontWeight="700" color="warning.dark">
-              {(() => {
-                const rider = riders.find((r) => r.id === order.rider_id);
-                return rider
-                  ? rider.full_name || `${rider.first_name} ${rider.last_name || ""}`
-                  : "NO ASIGNADO";
-              })()}
-            </Typography>
-          </Box>
-          {order.scheduled_at && (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                color: "error.main",
-                bgcolor: alpha(theme.palette.error.main, 0.08),
-                p: 0.5,
-                borderRadius: 1,
-              }}
-            >
-              <ScheduleIcon sx={{ fontSize: 14 }} />
-              <Typography variant="caption" fontWeight="800" sx={{ fontSize: 9 }}>
-                ENTREGA: {formatDate(order.scheduled_at)}
-              </Typography>
-            </Box>
-          )}
-        </Stack>
-        <Box sx={{ mt: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-           <Typography variant="caption" fontWeight="700" color="text.secondary">TOTAL:</Typography>
-           <Typography variant="subtitle1" fontWeight="800" color="primary">
-            {formatCurrency(order.total_amount, currency)}
-          </Typography>
-        </Box>
-      </CardContent>
-      <Divider />
-      <CardActions
-        sx={{
-          justifyContent: "space-between",
-          p: 1,
-        }}
-      >
-        <Stack direction="row" spacing={0.5}>
-          <IconButton
-            size="small"
-            sx={{ color: "success.main" }}
-            onClick={() => handleWhatsappResend(order.id)}
-            title="Reenviar WhatsApp"
-          >
-            <WhatsAppIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            sx={{ color: "error.main" }}
-            onClick={() => handleCancelOrder(order.id)}
-          >
-            <CancelIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-        <Button
-          variant="contained"
-          size="small"
-          color="success"
-          startIcon={<PaymentIcon sx={{ fontSize: 16 }} />}
-          onClick={() => handleOpenConfirmDialog(order)}
-          sx={{
-            borderRadius: 1,
-            fontWeight: 700,
-            px: 1.5,
-            fontSize: 11,
-          }}
-        >
-          Cobrar
-        </Button>
-      </CardActions>
-    </Card>
-  );
-
   return (
     <Box
       sx={{
@@ -733,22 +507,6 @@ export const Orders = () => {
           </Tabs>
           
           <Stack direction="row" spacing={0.5} alignItems="center">
-            {tabValue === 1 && (
-              <ToggleButtonGroup
-                size="small"
-                value={monitorView}
-                exclusive
-                onChange={(e, v) => v && setMonitorView(v)}
-                sx={{ height: 32 }}
-              >
-                <ToggleButton value="cards" sx={{ px: 1 }}>
-                  <GridViewIcon fontSize="small" />
-                </ToggleButton>
-                <ToggleButton value="map" sx={{ px: 1 }}>
-                  <MapIcon fontSize="small" />
-                </ToggleButton>
-              </ToggleButtonGroup>
-            )}
             <IconButton
               size="small"
               onClick={() => {
@@ -792,7 +550,7 @@ export const Orders = () => {
                         setCustomerAddress("");
                         setCustomerLocation(null);
                         setOrderNotes("");
-                        setScheduledAt("");
+                        // No limpiar scheduledAt
                         setSelectedProduct(null);
                       }}
                       color="error"
@@ -801,34 +559,75 @@ export const Orders = () => {
                     </IconButton>
                   </Typography>
                   <Stack spacing={1.5}>
-                    <TextField
-                      fullWidth
+                    <Autocomplete
+                      freeSolo
                       size="small"
-                      label="Teléfono"
-                      type="number"
-                      value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
-                      InputProps={{
-                        startAdornment: <PhoneIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />,
-                        endAdornment: (
-                          <IconButton
-                            size="small"
-                            onClick={handleSearchCustomer}
-                            disabled={isSearchingClient}
-                            color="primary"
-                          >
-                            <SearchIcon fontSize="small" />
-                          </IconButton>
-                        ),
+                      options={allClients}
+                      getOptionLabel={(option) => {
+                        if (typeof option === 'string') return option;
+                        return option.phone || "";
                       }}
+                      value={customerPhone}
+                      onInputChange={(event, newInputValue) => {
+                        setCustomerPhone(newInputValue);
+                      }}
+                      onChange={(event, newValue) => {
+                        if (newValue && typeof newValue !== 'string') {
+                          setCustomerName(newValue.name || "");
+                          setCustomerPhone(newValue.phone || "");
+                          setCustomerAddress(newValue.address || "");
+                          if (newValue.latitude && newValue.longitude) {
+                            setCustomerLocation({
+                              lat: parseFloat(newValue.latitude),
+                              lng: parseFloat(newValue.longitude),
+                            });
+                          }
+                          setIsNewCustomer(false);
+                        }
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Teléfono"
+                          InputProps={{
+                            ...params.InputProps,
+                            startAdornment: <PhoneIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />,
+                          }}
+                        />
+                      )}
                     />
-                    <TextField
-                      fullWidth
+                    <Autocomplete
+                      freeSolo
                       size="small"
-                      label="Nombre"
+                      options={allClients}
+                      getOptionLabel={(option) => {
+                        if (typeof option === 'string') return option;
+                        return option.name || "";
+                      }}
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
-                      disabled={!isNewCustomer && customerName !== ""}
+                      onInputChange={(event, newInputValue) => {
+                        setCustomerName(newInputValue);
+                      }}
+                      onChange={(event, newValue) => {
+                        if (newValue && typeof newValue !== 'string') {
+                          setCustomerName(newValue.name || "");
+                          setCustomerPhone(newValue.phone || "");
+                          setCustomerAddress(newValue.address || "");
+                          if (newValue.latitude && newValue.longitude) {
+                            setCustomerLocation({
+                              lat: parseFloat(newValue.latitude),
+                              lng: parseFloat(newValue.longitude),
+                            });
+                          }
+                          setIsNewCustomer(false);
+                        }
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Nombre"
+                        />
+                      )}
                     />
                     <Autocomplete
                       freeSolo
@@ -1214,77 +1013,13 @@ export const Orders = () => {
         </TabPanel>
 
         <TabPanel value={tabValue} index={1}>
-          <Box sx={{ height: "100%", overflow: "hidden" }}>
-            {pendingOrders.length === 0 ? (
-              <Box sx={{ textAlign: "center", py: 10, opacity: 0.2 }}>
-                <HistoryIcon sx={{ fontSize: 80, mb: 1, color: "primary.main" }} />
-                <Typography variant="h6" fontWeight="700">No hay pedidos pendientes</Typography>
-              </Box>
-            ) : monitorView === "cards" ? (
-              <Box sx={{ height: "100%", overflowY: "auto", px: 0.5, pb: 2 }}>
-                <Grid container spacing={1.5}>
-                  {pendingOrders.map((order) => (
-                    <Grid item xs={12} sm={6} md={4} lg={3} key={order.id}>
-                      <OrderCard order={order} />
-                    </Grid>
-                  ))}
-                </Grid>
-              </Box>
-            ) : (
-              <Card variant="outlined" sx={{ height: "100%", borderRadius: 1, overflow: "hidden" }}>
-                <MapContainer
-                  center={userLocation ? [userLocation.lat, userLocation.lng] : [-9.93, -76.24]}
-                  zoom={14}
-                  style={{ height: "100%", width: "100%" }}
-                >
-                  <LayersControl position="topright">
-                    <LayersControl.BaseLayer checked name="Google Calles">
-                      <TileLayer
-                        url="http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-                        subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                      />
-                    </LayersControl.BaseLayer>
-                    <LayersControl.BaseLayer name="Google Satélite">
-                      <TileLayer
-                        url="http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                        subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                      />
-                    </LayersControl.BaseLayer>
-                    <LayersControl.BaseLayer name="Google Híbrido">
-                      <TileLayer
-                        url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
-                        subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                      />
-                    </LayersControl.BaseLayer>
-                  </LayersControl>
-                  {pendingOrders
-                    .filter((o) => (o.latitude || o.client?.latitude) && (o.longitude || o.client?.longitude))
-                    .map((order) => (
-                      <Marker
-                        key={order.id}
-                        position={[
-                          parseFloat(order.latitude || order.client.latitude),
-                          parseFloat(order.longitude || order.client.longitude),
-                        ]}
-                        icon={orderMarkerIcon(order.scheduled_at ? theme.palette.error.main : theme.palette.primary.main)}
-                      >
-                        <Popup minWidth={280} className="order-popup">
-                          <Box sx={{ p: 0.2 }}>
-                            <OrderCard order={order} />
-                          </Box>
-                        </Popup>
-                      </Marker>
-                    ))}
-                  {userLocation && (
-                    <Marker position={[userLocation.lat, userLocation.lng]} icon={userMarkerIcon}>
-                      <Popup>Tu ubicación</Popup>
-                    </Marker>
-                  )}
-                  <MapFitBounds orders={pendingOrders} />
-                </MapContainer>
-              </Card>
-            )}
-          </Box>
+          <OrderMonitor
+            orders={pendingOrders}
+            riders={riders}
+            userLocation={userLocation}
+            onRefresh={loadPendingOrders}
+            currency={currency}
+          />
         </TabPanel>
       </Box>
 
@@ -1378,124 +1113,6 @@ export const Orders = () => {
             sx={{ borderRadius: 1, px: 3, fontWeight: 700 }}
           >
             CONFIRMAR
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      <Dialog
-        open={openPaymentDialog}
-        onClose={() => setOpenPaymentDialog(false)}
-        maxWidth="xs"
-        fullWidth
-        TransitionComponent={Transition}
-        sx={{ "& .MuiDialog-paper": { borderRadius: 2 } }}
-      >
-        <DialogTitle sx={{ textAlign: "center", bgcolor: "success.main", color: "white", py: 1.5 }}>
-          <Typography variant="subtitle1" fontWeight="700">COBRAR PEDIDO</Typography>
-          <Typography variant="caption" sx={{ opacity: 0.9 }}>
-            #{selectedOrderToConfirm?.sale_number}
-          </Typography>
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2, px: 2 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              p: 2,
-              textAlign: "center",
-              mb: 2,
-              bgcolor: alpha(theme.palette.success.main, 0.04),
-              borderRadius: 1,
-              border: "1px solid",
-              borderColor: "success.light",
-            }}
-          >
-            <Typography variant="h4" fontWeight="800" color="success.main">
-              {formatCurrency(selectedOrderToConfirm?.total_amount || 0, currency)}
-            </Typography>
-            <Typography variant="caption" fontWeight="600" color="text.secondary">TOTAL A RECIBIR</Typography>
-          </Paper>
-          
-          <Stack spacing={1.5}>
-            {payments.map((p) => (
-              <Box
-                key={p.id}
-                sx={{ p: 1.5, position: "relative", borderRadius: 1, border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}
-              >
-                <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ position: "absolute", top: -8, left: 10, bgcolor: "background.paper", px: 0.5 }}>
-                  {PAYMENT_METHODS.find((m) => m.value === p.payment_method)?.label}
-                </Typography>
-                <TextField
-                  fullWidth
-                  variant="standard"
-                  type="number"
-                  value={p.amount}
-                  onChange={(e) =>
-                    setPayments(payments.map((x) => x.id === p.id ? { ...x, amount: e.target.value } : x))
-                  }
-                  InputProps={{
-                    disableUnderline: true,
-                    sx: { fontWeight: 700, fontSize: "1.1rem" },
-                  }}
-                  autoFocus
-                />
-                <TextField
-                  fullWidth
-                  size="small"
-                  label="Referencia (Opcional)"
-                  value={p.reference || ""}
-                  onChange={(e) =>
-                    setPayments(payments.map((x) => x.id === p.id ? { ...x, reference: e.target.value } : x))
-                  }
-                  sx={{ mt: 1 }}
-                />
-                <IconButton
-                  size="small"
-                  color="error"
-                  sx={{ position: "absolute", top: 10, right: 10 }}
-                  onClick={() => setPayments(payments.filter((x) => x.id !== p.id))}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            ))}
-            
-            <Grid container spacing={1}>
-              {PAYMENT_METHODS.map((m) => (
-                <Grid item xs={4} key={m.value}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    onClick={() =>
-                      setPayments([
-                        ...payments,
-                        {
-                          id: Date.now(),
-                          payment_method: m.value,
-                          amount: remainingAmount > 0 ? remainingAmount.toFixed(2) : "0",
-                          reference: ""
-                        },
-                      ])
-                    }
-                    sx={{ fontSize: 10, borderRadius: 1, fontWeight: 600, height: 32, borderColor: "divider" }}
-                  >
-                    {m.label}
-                  </Button>
-                </Grid>
-              ))}
-            </Grid>
-          </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button
-            fullWidth
-            variant="contained"
-            color="success"
-            onClick={handleConfirmDelivery}
-            disabled={isLoading || Math.abs(remainingAmount) > 0.01}
-            sx={{ borderRadius: 1, py: 1.2, fontWeight: 700 }}
-          >
-            CONFIRMAR ENTREGA
           </Button>
         </DialogActions>
       </Dialog>

@@ -94,6 +94,7 @@ const PAYMENT_METHODS = [
   { value: "transfer", label: "Transferencia", icon: <CreditCardIcon /> },
   { value: "credit", label: "Crédito", icon: <ScheduleIcon /> },
   { value: "discount", label: "Descuento", icon: <PriceCheckIcon /> },
+  { value: "vale", label: "Vale", icon: <AddCardIcon /> },
 ];
 
 export const PointOfSale = () => {
@@ -424,22 +425,27 @@ export const PointOfSale = () => {
       return;
     }
 
-    const saleData = {
-      customer_name: customerName.trim() || "Cliente General",
-      items: cart.map((item) => ({
-        id: item.id,
-        type: item.type,
-        quantity: item.quantity,
-      })),
-      payments: payments.map(({ id, ...p }) => ({
-        ...p,
-        amount: parseFloat(p.amount),
-      })),
-    };
+    const formData = new FormData();
+    formData.append("customer_name", customerName.trim() || "Cliente General");
+    
+    cart.forEach((item, index) => {
+      formData.append(`items[${index}][id]`, item.id);
+      formData.append(`items[${index}][type]`, item.type);
+      formData.append(`items[${index}][quantity]`, item.quantity);
+    });
+
+    payments.forEach((p, index) => {
+      formData.append(`payments[${index}][payment_method]`, p.payment_method);
+      formData.append(`payments[${index}][amount]`, p.amount);
+      formData.append(`payments[${index}][reference]`, p.reference || "");
+      if (p.payment_image) {
+        formData.append(`payments[${index}][payment_image]`, p.payment_image);
+      }
+    });
 
     setIsLoading(true);
     try {
-      await salesAPI.create(saleData);
+      await salesAPI.create(formData);
       notificationSwal(
         "Venta Completada",
         "Venta procesada exitosamente.",
@@ -452,7 +458,7 @@ export const PointOfSale = () => {
       loadProducts();
     } catch (error) {
       const msg =
-        error.response?.data?.message || "Error al completar la venta.";
+        error.response?.data?.message || error.response?.data?.error || "Error al completar la venta.";
       notificationSwal("Error", msg, "error");
     } finally {
       setIsLoading(false);
@@ -1079,14 +1085,40 @@ export const PointOfSale = () => {
                       handlePaymentChange(p.id, "amount", e.target.value)
                     }
                   />
-                  <TextField
-                    fullWidth
-                    label="Referencia (Opcional)"
-                    value={p.reference}
-                    onChange={(e) =>
-                      handlePaymentChange(p.id, "reference", e.target.value)
-                    }
-                  />
+                  {["yape", "plin", "transfer", "vale", "card"].includes(p.payment_method) && (
+                    <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        component="label"
+                        startIcon={<AddIcon />}
+                        color={p.payment_image ? "success" : "primary"}
+                        sx={{ flex: 1, textTransform: "none" }}
+                      >
+                        {p.payment_image ? "Imagen Cargada" : "Subir Comprobante"}
+                        <input
+                          type="file"
+                          hidden
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                              handlePaymentChange(p.id, "payment_image", file);
+                            }
+                          }}
+                        />
+                      </Button>
+                      {p.payment_image && (
+                        <IconButton 
+                          size="small" 
+                          color="error" 
+                          onClick={() => handlePaymentChange(p.id, "payment_image", null)}
+                        >
+                          <ClearIcon />
+                        </IconButton>
+                      )}
+                    </Box>
+                  )}
                 </Stack>
               </Paper>
             ))}

@@ -30,7 +30,6 @@ import {
 import {
   Menu as MenuIcon,
   Search as SearchIcon,
-  Notifications as NotificationsIcon,
   ExpandLess,
   ExpandMore,
   Logout as LogoutIcon,
@@ -42,14 +41,15 @@ import {
   ChevronLeft as ChevronLeftIcon,
   ChevronRight as ChevronRightIcon,
 } from "@mui/icons-material";
-import { useNavigate, useLocation, Outlet, Navigate } from "react-router-dom";
+import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme as useCustomTheme } from "../contexts/ThemeContext";
-import { notificationsAPI, modulesAPI } from "../utils/api";
+import { modulesAPI } from "../utils/api";
 import { getIcon } from "../config/moduleConfig";
 import { DynamicRoutes } from "../routes/DynamicRouteGenerator";
 import { findFirstValidRoute } from "../utils/navigationUtils";
 import Logo from "../components/Logo";
+import NotificationMenu from "../components/NotificationMenu";
 import Swal from "sweetalert2";
 
 const drawerWidth = 260;
@@ -75,14 +75,11 @@ export const DashboardLayout = () => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, hasPermission } = useAuth();
+  const { user, logout } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
-  const [notificationAnchor, setNotificationAnchor] = useState(null);
   const [expandedItems, setExpandedItems] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [menuModules, setMenuModules] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -91,7 +88,6 @@ export const DashboardLayout = () => {
     : drawerWidth;
 
   useEffect(() => {
-    loadNotifications();
     loadMenuModules();
   }, []);
 
@@ -106,28 +102,6 @@ export const DashboardLayout = () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
     };
   }, []);
-
-  const loadNotifications = async () => {
-    try {
-      const response = await notificationsAPI.getAll({ unread: true });
-      setNotifications(response.data.data || []);
-      setUnreadCount(response.data.unread_count || 0);
-    } catch (error) {
-      console.error("Error loading notifications:", error);
-      const mockNotifications = [
-        {
-          id: 1,
-          type: "info",
-          title: "Welcome",
-          message: "Welcome to Stock Master",
-          read_at: null,
-          created_at: new Date().toISOString(),
-        },
-      ];
-      setNotifications(mockNotifications);
-      setUnreadCount(1);
-    }
-  };
 
   const loadMenuModules = async () => {
     try {
@@ -144,7 +118,6 @@ export const DashboardLayout = () => {
       }
     } catch (error) {
       console.error("Error loading menu modules:", error);
-      // Fallback a menú estático si falla la API
       setMenuModules([]);
     } finally {
       setLoading(false);
@@ -175,14 +148,6 @@ export const DashboardLayout = () => {
     setAnchorEl(null);
   };
 
-  const handleNotificationClick = (event) => {
-    setNotificationAnchor(event.currentTarget);
-  };
-
-  const handleNotificationClose = () => {
-    setNotificationAnchor(null);
-  };
-
   const handleLogout = () => {
     handleClose();
     Swal.fire({
@@ -208,22 +173,6 @@ export const DashboardLayout = () => {
         ? prev.filter((item) => item !== text)
         : [...prev, text]
     );
-  };
-
-  const markAllAsRead = async () => {
-    try {
-      await notificationsAPI.markAllAsRead();
-      setNotifications((prev) =>
-        prev.map((notif) => ({ ...notif, read_at: new Date().toISOString() }))
-      );
-      setUnreadCount(0);
-    } catch (error) {
-      console.error("Error marking notifications as read:", error);
-      setNotifications((prev) =>
-        prev.map((notif) => ({ ...notif, read_at: new Date().toISOString() }))
-      );
-      setUnreadCount(0);
-    }
   };
 
   const renderMenuItem = (item, depth = 0) => {
@@ -319,10 +268,8 @@ export const DashboardLayout = () => {
         (item) => item.status === "active" && item.show_in_menu
       ) || [];
 
-    // Si es un módulo sin hijos visibles, no mostrarlo
     if (module.type === "module" && visibleItems.length === 0) return null;
 
-    // Si es una página individual, mostrarla directamente
     if (module.type === "page") {
       return renderMenuItem(module);
     }
@@ -353,7 +300,6 @@ export const DashboardLayout = () => {
 
   const drawer = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      {/* Logo */}
       <Box
         sx={{
           display: "flex",
@@ -392,7 +338,6 @@ export const DashboardLayout = () => {
         )}
       </Box>
 
-      {/* Menu Items */}
       <Box sx={{ flex: 1, overflow: "auto", py: 1 }}>
         {loading ? (
           <Box sx={{ p: 2, textAlign: "center" }}>
@@ -405,7 +350,6 @@ export const DashboardLayout = () => {
         )}
       </Box>
 
-      {/* Collapse Button */}
       <Box sx={{ p: 1, borderTop: `1px solid ${theme.palette.divider}` }}>
         <IconButton
           onClick={handleSidebarToggle}
@@ -423,7 +367,6 @@ export const DashboardLayout = () => {
 
   return (
     <Box sx={{ display: "flex" }}>
-      {/* Header */}
       <AppBar
         position="fixed"
         sx={{
@@ -450,7 +393,6 @@ export const DashboardLayout = () => {
             <MenuIcon />
           </IconButton>
 
-          {/* Search */}
           <Box
             sx={{
               position: "relative",
@@ -493,7 +435,6 @@ export const DashboardLayout = () => {
 
           <Box sx={{ flexGrow: 1 }} />
 
-          {/* Header Actions */}
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <Tooltip title="Toggle Dark Mode">
               <IconButton color="inherit" onClick={toggleDarkMode}>
@@ -507,13 +448,8 @@ export const DashboardLayout = () => {
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Notifications">
-              <IconButton color="inherit" onClick={handleNotificationClick}>
-                <Badge badgeContent={unreadCount} color="error">
-                  <NotificationsIcon />
-                </Badge>
-              </IconButton>
-            </Tooltip>
+            {/* Notification Menu Component */}
+            <NotificationMenu />
 
             <Tooltip title="Profile">
               <IconButton
@@ -539,138 +475,6 @@ export const DashboardLayout = () => {
               </IconButton>
             </Tooltip>
 
-            {/* Notifications Menu */}
-            <Menu
-              anchorEl={notificationAnchor}
-              open={Boolean(notificationAnchor)}
-              onClose={handleNotificationClose}
-              PaperProps={{
-                sx: {
-                  width: 330,
-                  maxHeight: 500,
-                  mt: 1,
-                  border: `1px solid ${theme.palette.divider}`,
-                },
-              }}
-              transformOrigin={{ horizontal: "right", vertical: "top" }}
-              anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-            >
-              {/* Header de notificaciones */}
-              <Box
-                sx={{
-                  p: 2,
-                  borderBottom: `1px solid ${theme.palette.divider}`,
-                }}
-              >
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    mb: 1,
-                  }}
-                >
-                  <Typography
-                    variant="subtitle1"
-                    sx={{
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                    }}
-                  >
-                    All Notification
-                    <Chip
-                      label={unreadCount.toString().padStart(2, "0")}
-                      color="warning"
-                      size="small"
-                      sx={{ fontSize: "0.75rem", height: 20 }}
-                    />
-                  </Typography>
-                </Box>
-                <Button
-                  size="small"
-                  onClick={markAllAsRead}
-                  sx={{
-                    color: theme.palette.primary.main,
-                    textTransform: "none",
-                    p: 0,
-                  }}
-                >
-                  Mark as all read
-                </Button>
-              </Box>
-
-              {/* Lista de notificaciones */}
-              <Box sx={{ maxHeight: 300, overflow: "auto" }}>
-                {notifications.length > 0 ? (
-                  notifications.map((notification) => (
-                    <Box
-                      key={notification.id}
-                      sx={{
-                        p: 2,
-                        borderBottom: `1px solid ${theme.palette.divider}`,
-                      }}
-                    >
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 600, fontSize: "0.875rem" }}
-                      >
-                        {notification.title}
-                      </Typography>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ fontSize: "0.75rem", mt: 0.5 }}
-                      >
-                        {notification.message}
-                      </Typography>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          mt: 1,
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary">
-                          {new Date(notification.created_at).toLocaleString()}
-                        </Typography>
-                        {!notification.read_at && (
-                          <Chip
-                            label="Unread"
-                            color="error"
-                            size="small"
-                            sx={{ fontSize: "0.6rem", height: 18 }}
-                          />
-                        )}
-                      </Box>
-                    </Box>
-                  ))
-                ) : (
-                  <Box sx={{ p: 2, textAlign: "center" }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No notifications
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-
-              {/* Footer */}
-              <Box
-                sx={{
-                  p: 2,
-                  textAlign: "center",
-                  borderTop: `1px solid ${theme.palette.divider}`,
-                }}
-              >
-                <Button color="primary" sx={{ textTransform: "none" }}>
-                  View All
-                </Button>
-              </Box>
-            </Menu>
-
-            {/* User Menu */}
             <Menu
               id="menu-appbar"
               anchorEl={anchorEl}
@@ -744,7 +548,6 @@ export const DashboardLayout = () => {
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar */}
       <Box
         component="nav"
         sx={{
@@ -794,7 +597,6 @@ export const DashboardLayout = () => {
         </Drawer>
       </Box>
 
-      {/* Main Content */}
       <Box
         component="main"
         sx={{
@@ -822,8 +624,7 @@ export const DashboardLayout = () => {
           >
             {/* <CircularProgress /> */}
           </Box>
-        ) : // Si menuModules está vacío después de cargar, significa que el usuario no tiene acceso a NADA.
-        menuModules.length > 0 ? (
+        ) : menuModules.length > 0 ? (
           <DynamicRoutes navConfig={menuModules} />
         ) : (
           <Navigate to="/unauthorized" replace />

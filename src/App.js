@@ -8,6 +8,7 @@ import {
 import { CssBaseline } from "@mui/material";
 import { CustomThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import { LoaderProvider } from "./contexts/LoaderContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -26,59 +27,61 @@ function App() {
         <CssBaseline />
         <Loader />
         <AuthProvider>
-          <Router>
-            <Routes>
-              {/* Rutas Públicas */}
-              <Route
-                path="/"
-                element={
-                  <PublicRoute>
-                    <Landing />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/login"
-                element={
-                  <PublicRoute>
-                    <Login />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/signup"
-                element={
-                  <PublicRoute>
-                    <Signup />
-                  </PublicRoute>
-                }
-              />
-              <Route
-                path="/forgot-password"
-                element={
-                  <PublicRoute>
-                    <ForgotPassword />
-                  </PublicRoute>
-                }
-              />
+          <NotificationProvider>
+            <Router>
+              <Routes>
+                {/* Rutas Públicas */}
+                <Route
+                  path="/"
+                  element={
+                    <PublicRoute>
+                      <Landing />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/login"
+                  element={
+                    <PublicRoute>
+                      <Login />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/signup"
+                  element={
+                    <PublicRoute>
+                      <Signup />
+                    </PublicRoute>
+                  }
+                />
+                <Route
+                  path="/forgot-password"
+                  element={
+                    <PublicRoute>
+                      <ForgotPassword />
+                    </PublicRoute>
+                  }
+                />
 
-              {/* Página de acceso denegado */}
-              <Route path="/unauthorized" element={<Unauthorized />} />
+                {/* Página de acceso denegado */}
+                <Route path="/unauthorized" element={<Unauthorized />} />
 
-              {/* Rutas Protegidas del Dashboard */}
-              <Route
-                path="/dashboard/*"
-                element={
-                  <ProtectedRoute>
-                    <DashboardLayout />
-                  </ProtectedRoute>
-                }
-              />
+                {/* Rutas Protegidas del Dashboard */}
+                <Route
+                  path="/dashboard/*"
+                  element={
+                    <ProtectedRoute>
+                      <DashboardLayout />
+                    </ProtectedRoute>
+                  }
+                />
 
-              {/* Fallback - Redirigir a landing si no está autenticado, o dashboard si lo está */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Router>
+                {/* Fallback - Redirigir a landing si no está autenticado, o dashboard si lo está */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Router>
+          </NotificationProvider>
         </AuthProvider>
       </LoaderProvider>
     </CustomThemeProvider>

@@ -18,6 +18,8 @@ export const formatDate = (date, format = 'DD/MM/YYYY') => {
   const year = d.getFullYear();
   const hours = String(d.getHours()).padStart(2, '0');
   const minutes = String(d.getMinutes()).padStart(2, '0');
+  const yearShort = String(d.getFullYear()).slice(-2);
+  const seconds = String(d.getSeconds()).padStart(2, '0');
   
   switch (format) {
     case 'DD/MM/YYYY':
@@ -28,6 +30,8 @@ export const formatDate = (date, format = 'DD/MM/YYYY') => {
       return `${year}-${month}-${day}`;
     case 'DD/MM/YYYY HH:mm':
       return `${day}/${month}/${year} ${hours}:${minutes}`;
+    case 'DD-MM-YY HH:mm:ss':
+      return `${day}-${month}-${yearShort} ${hours}:${minutes}:${seconds}`;
     case 'HH:mm':
       return `${hours}:${minutes}`;
     case 'relative':

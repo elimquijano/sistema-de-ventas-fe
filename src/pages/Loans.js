@@ -34,11 +34,13 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Payment as PaymentIcon,
+  History as HistoryIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { loansAPI } from "../utils/api";
+import { AuditTimeline } from "../components/AuditTimeline";
 
 export const Loans = () => {
   const { hasPermission } = useAuth();
@@ -65,6 +67,11 @@ export const Loans = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [payingLoan, setPayingLoan] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState("");
+
+  // Timeline State
+  const [timelineOpen, setTimelineOpen] = useState(false);
+  const [timelineLogs, setTimelineLogs] = useState([]);
+  const [loadingTimeline, setLoadingTimeline] = useState(false);
 
   useEffect(() => {
     loadLoans();
@@ -207,6 +214,20 @@ export const Loans = () => {
     setPayingLoan(null);
   };
 
+  const handleOpenTimeline = async (loanId) => {
+    setTimelineOpen(true);
+    setLoadingTimeline(true);
+    try {
+      const response = await loansAPI.timeline(loanId);
+      setTimelineLogs(response.data || []);
+    } catch (error) {
+      console.error("Error loading timeline:", error);
+      notificationSwal("Error", "No se pudo cargar el historial.", "error");
+    } finally {
+      setLoadingTimeline(false);
+    }
+  };
+
   const handleProcessPayment = async () => {
     if (!payingLoan || !paymentAmount || parseFloat(paymentAmount) <= 0) {
       notificationSwal("Error", "Por favor, ingrese un monto válido.", "error");
@@ -310,11 +331,14 @@ export const Loans = () => {
                       <TableCell>{loan.creator?.full_name || "N/A"}</TableCell>
                       <TableCell>{getStatusChip(loan.status)}</TableCell>
                       <TableCell align="right">
-                        {loan.status === "pending" && hasPermission("prestamos.edit") && (
+                        {loan.status === "pending" && hasPermission("prestamos.pay") && (
                           <Button size="small" variant="contained" onClick={() => handleOpenPaymentDialog(loan)} sx={{ mr: 1 }} startIcon={<PaymentIcon />}>
                             Registrar Pago
                           </Button>
                         )}
+                        {hasPermission("prestamos.audit") &&(<IconButton size="small" onClick={() => handleOpenTimeline(loan.id)} title="Ver Historial">
+                          <HistoryIcon />
+                        </IconButton>)}
                         {hasPermission("prestamos.edit") && (
                           <IconButton size="small" onClick={() => handleOpenDialog(loan)}><EditIcon /></IconButton>
                         )}
@@ -405,6 +429,19 @@ export const Loans = () => {
           <Button onClick={handleProcessPayment} variant="contained" disabled={isSubmitting}>
             {isSubmitting ? <CircularProgress size={20} color="inherit" /> : "Registrar Pago"}
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Timeline Dialog */}
+      <Dialog open={timelineOpen} onClose={() => setTimelineOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <HistoryIcon color="primary" /> Historial del Préstamo
+        </DialogTitle>
+        <DialogContent>
+          <AuditTimeline logs={timelineLogs} loading={loadingTimeline} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTimelineOpen(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -29,6 +29,8 @@ import {
   Pagination,
   CircularProgress,
   Autocomplete,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -36,6 +38,8 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Visibility as ViewIcon,
+  NotificationsActive as NotificationsActiveIcon,
+  NotificationsOff as NotificationsOffIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { usersAPI, rolesAPI, businessAPI } from "../utils/api";
@@ -63,6 +67,7 @@ export const Users = () => {
     status: "active",
     role_ids: [],
     business_id: "",
+    receive_notifications: true,
   });
 
   useEffect(() => {
@@ -143,6 +148,7 @@ export const Users = () => {
         status: user.status,
         role_ids: user.roles?.map((role) => role.id) || [],
         business_id: user.business_id || "",
+        receive_notifications: user.receive_notifications ?? true,
       });
     } else {
       setEditingUser(null);
@@ -155,6 +161,7 @@ export const Users = () => {
         status: "active",
         role_ids: [],
         business_id: "",
+        receive_notifications: true,
       });
     }
     setOpenDialog(true);
@@ -378,6 +385,7 @@ export const Users = () => {
               <TableHead>
                 <TableRow>
                   <TableCell>Usuario</TableCell>
+                  <TableCell align="center">Notif.</TableCell>
                   <TableCell>Rol</TableCell>
                   <TableCell>Negocio</TableCell>
                   <TableCell>Teléfono</TableCell>
@@ -410,6 +418,13 @@ export const Users = () => {
                           </Typography>
                         </Box>
                       </Box>
+                    </TableCell>
+                    <TableCell align="center">
+                      {user.receive_notifications ? (
+                        <NotificationsActiveIcon color="primary" fontSize="small" />
+                      ) : (
+                        <NotificationsOffIcon color="action" fontSize="small" />
+                      )}
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
@@ -631,6 +646,23 @@ export const Users = () => {
                 </FormControl>
               </Grid>
             )}
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formData.receive_notifications}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        receive_notifications: e.target.checked,
+                      }))
+                    }
+                    color="primary"
+                  />
+                }
+                label="Recibir notificaciones del sistema"
+              />
+            </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>

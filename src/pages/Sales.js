@@ -29,7 +29,6 @@ import {
   List,
   ListItem,
   ListItemText,
-  CircularProgress,
   Stack,
   Divider,
 } from "@mui/material";
@@ -40,11 +39,16 @@ import {
   Visibility as ViewIcon,
   GetApp as ExportIcon,
   Print as PrintIcon,
+  Refresh as RefreshIcon,
+  History as HistoryIcon,
+  Close as CloseIcon,
+  Image as ImageIcon,
 } from "@mui/icons-material";
+import { SaleTimeline } from "../components/SaleTimeline";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { salesAPI, usersAPI } from "../utils/api";
+import { salesAPI, usersAPI, API_STORAGE_URL } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
 
 const PAYMENT_METHOD_LABELS = {
@@ -55,6 +59,7 @@ const PAYMENT_METHOD_LABELS = {
   transfer: "Transferencia",
   credit: "Crédito",
   discount: "Descuento",
+  vale: "Vale",
 };
 
 const getPaymentMethodLabel = (method) =>
@@ -68,6 +73,7 @@ const PAYMENT_METHOD_COLORS = {
   transfer: "info",
   credit: "error",
   discount: "default",
+  vale: "info",
 };
 
 const getPaymentMethodColor = (method) =>
@@ -87,11 +93,30 @@ export const Sales = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [openHistoryDialog, setOpenHistoryDialog] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [openImageDialog, setOpenImageDialog] = useState(false);
+  const [selectedImage, setSelectedImage] = useState("");
 
   useEffect(() => {
     loadSales();
     loadUsers();
   }, [page, searchFilters]);
+
+  const handleViewHistory = async (saleId) => {
+    setOpenHistoryDialog(true);
+    setIsLoadingHistory(true);
+    try {
+      const res = await salesAPI.timeline(saleId);
+      setHistoryLogs(res.data || []);
+    } catch (e) {
+      console.error("Error loading history:", e);
+      notificationSwal("Error", "No se pudo cargar el historial.", "error");
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
 
   const loadSales = async () => {
     setIsLoading(true);
@@ -212,6 +237,32 @@ export const Sales = () => {
       notificationSwal("Error", "No se pudo generar el recibo.", "error");
     } finally {
       setIsPrinting(false);
+    }
+  };
+
+  const handleReopenSale = async (saleId) => {
+    const confirmed = await confirmSwal(
+      "¿Reabrir Venta?",
+      "Esto revertirá stock y pagos, permitiendo editar la venta nuevamente.",
+      { confirmButtonText: "Sí, reabrir", icon: "warning" }
+    );
+
+    if (confirmed) {
+      setIsSubmitting(true);
+      try {
+        await salesAPI.reopen(saleId);
+        notificationSwal(
+          "Venta Reabierta",
+          "La venta está ahora en estado pendiente.",
+          "success"
+        );
+        loadSales();
+      } catch (error) {
+        console.error("Error reopening sale:", error);
+        notificationSwal("Error", "No se pudo reabrir la venta.", "error");
+      } finally {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -436,14 +487,35 @@ export const Sales = () => {
                         <IconButton
                           size="small"
                           onClick={() => handleViewSale(sale)}
+                          title="Ver Detalles"
                         >
                           <ViewIcon />
                         </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleViewHistory(sale.id)}
+                          title="Ver Historial"
+                          color="info"
+                        >
+                          <HistoryIcon />
+                        </IconButton>
+                        {hasPermission("ventas.edit") &&
+                          sale.status !== "pending" && (
+                            <IconButton
+                              size="small"
+                              onClick={() => handleReopenSale(sale.id)}
+                              color="primary"
+                              title="Reabrir Venta"
+                            >
+                              <RefreshIcon />
+                            </IconButton>
+                          )}
                         {hasPermission("ventas.edit") && (
                           <IconButton
                             size="small"
                             onClick={() => handleOpenEditDialog(sale)}
                             color="secondary"
+                            title="Editar"
                           >
                             <EditIcon />
                           </IconButton>
@@ -454,6 +526,7 @@ export const Sales = () => {
                             onClick={() => handleDeleteSale(sale.id)}
                             color="error"
                             disabled={isSubmitting}
+                            title="Anular"
                           >
                             <DeleteIcon />
                           </IconButton>
@@ -497,8 +570,25 @@ export const Sales = () => {
             <IconButton
               onClick={() => handlePrintReceipt(selectedSale.id)}
               disabled={isPrinting}
+              title="Imprimir"
             >
               <PrintIcon />
+            </IconButton>
+            {hasPermission("ventas.reopen") && selectedSale.status !== "pending" && (
+              <IconButton
+                onClick={() => {
+                  handleReopenSale(selectedSale.id);
+                  setOpenViewDialog(false);
+                }}
+                disabled={isSubmitting}
+                color="primary"
+                title="Reabrir Venta"
+              >
+                <RefreshIcon />
+              </IconButton>
+            )}
+            <IconButton onClick={() => setOpenViewDialog(false)}>
+              <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
@@ -557,10 +647,19 @@ export const Sales = () => {
                   {selectedSale.payments?.map((payment) => (
                     <Chip
                       key={payment.id}
-                      label={`${getPaymentMethodLabel(
-                        payment.payment_method
-                      )}: ${formatCurrency(payment.amount)}`}
+                      label={`${getPaymentMethodLabel(payment.payment_method)}: ${formatCurrency(payment.amount)}`}
                       color={getPaymentMethodColor(payment.payment_method)}
+                      icon={payment.payment_image ? <ImageIcon /> : null}
+                      onClick={
+                        payment.payment_image
+                          ? () => {
+                              setSelectedImage(`${API_STORAGE_URL}/${payment.payment_image}`);
+                              setOpenImageDialog(true);
+                            }
+                          : undefined
+                      }
+                      variant={payment.payment_image ? "contained" : "filled"}
+                      sx={{ pl: payment.payment_image ? 0.5 : 0 }}
                     />
                   ))}
                 </Stack>
@@ -667,6 +766,44 @@ export const Sales = () => {
             {isSubmitting ? "Guardando..." : "Guardar Cambios"}
           </Button>
         </DialogActions>
+      </Dialog>
+      {/* History Dialog */}
+      <Dialog
+        open={openHistoryDialog}
+        onClose={() => setOpenHistoryDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <HistoryIcon color="primary" /> Historial de la Venta
+        </DialogTitle>
+        <DialogContent dividers>
+          <SaleTimeline logs={historyLogs} loading={isLoadingHistory} />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenHistoryDialog(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Image Preview Dialog */}
+      <Dialog
+        open={openImageDialog}
+        onClose={() => setOpenImageDialog(false)}
+        maxWidth="md"
+      >
+        <DialogTitle sx={{ m: 0, p: 2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          Comprobante de Pago
+          <IconButton onClick={() => setOpenImageDialog(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 1, textAlign: "center" }}>
+          <img
+            src={selectedImage}
+            alt="Comprobante"
+            style={{ maxWidth: "100%", maxHeight: "80vh", objectFit: "contain" }}
+          />
+        </DialogContent>
       </Dialog>
     </Box>
   );

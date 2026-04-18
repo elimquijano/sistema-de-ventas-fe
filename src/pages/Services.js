@@ -41,6 +41,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { API_STORAGE_URL, categoriesAPI, servicesAPI } from "../utils/api";
+import { compressImage } from "../utils/imageCompression";
 
 export const Services = () => {
   const { hasPermission } = useAuth();
@@ -134,11 +135,18 @@ export const Services = () => {
     setImagePreview(null);
   };
 
-  const handleFileChange = (event) => {
+  const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, image: file }));
-      setImagePreview(URL.createObjectURL(file));
+      try {
+        const compressedFile = await compressImage(file);
+        setFormData((prev) => ({ ...prev, image: compressedFile }));
+        setImagePreview(URL.createObjectURL(compressedFile));
+      } catch (error) {
+        console.error("Error al procesar la imagen:", error);
+        setFormData((prev) => ({ ...prev, image: file }));
+        setImagePreview(URL.createObjectURL(file));
+      }
     }
   };
 

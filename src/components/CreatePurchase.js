@@ -31,10 +31,11 @@ import {
   Receipt,
   Save,
 } from '@mui/icons-material';
-import { productsAPI, businessAPI, purchasesAPI } from '../utils/api'; // Asumo que businessAPI tiene el endpoint de compras
+import { productsAPI, businessAPI, purchasesAPI } from '../utils/api'; 
 import { useAuth } from '../contexts/AuthContext';
 import { notificationSwal } from '../utils/swal-helpers';
 import { formatCurrency } from '../utils/formatters';
+import { compressImage } from '../utils/imageCompression';
 
 // Componente para el modal de creación rápida de productos
 const CreateProductModal = ({ open, onClose, onProductCreated, businessId }) => {
@@ -340,7 +341,22 @@ export const CreatePurchase = ({ onSuccess, onCancel }) => {
                     <Grid item xs={12} sm={6} sx={{display: 'flex', alignItems: 'center'}}>
                         <Button variant="outlined" component="label" startIcon={<UploadFile />} disabled={isSaving}>
                             Subir Factura
-                            <input type="file" hidden onChange={e => setReceiptFile(e.target.files[0])} />
+                            <input 
+                              type="file" 
+                              hidden 
+                              onChange={async (e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                  try {
+                                    const compressedFile = await compressImage(file);
+                                    setReceiptFile(compressedFile);
+                                  } catch (error) {
+                                    console.error("Error al procesar la imagen de compra:", error);
+                                    setReceiptFile(file);
+                                  }
+                                }
+                              }} 
+                            />
                         </Button>
                         {receiptFile && <Chip label={receiptFile.name} onDelete={() => setReceiptFile(null)} sx={{ml: 1}}/>}
                     </Grid>

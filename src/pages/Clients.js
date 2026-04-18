@@ -61,6 +61,7 @@ import {
 } from "@mui/icons-material";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { clientsAPI } from "../utils/api";
+import { compressImage } from "../utils/imageCompression";
 import { useAuth } from "../contexts/AuthContext";
 
 // --- CONFIGURACIÓN DE ÍCONOS LEAFLET ---
@@ -273,11 +274,18 @@ export const Clients = () => {
     setOpenCRUDDialog(true);
   };
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, image: file }));
-      setImagePreview(URL.createObjectURL(file));
+      try {
+        const compressedFile = await compressImage(file);
+        setFormData((prev) => ({ ...prev, image: compressedFile }));
+        setImagePreview(URL.createObjectURL(compressedFile));
+      } catch (error) {
+        console.error("Error al procesar la imagen:", error);
+        setFormData((prev) => ({ ...prev, image: file }));
+        setImagePreview(URL.createObjectURL(file));
+      }
     }
   };
 

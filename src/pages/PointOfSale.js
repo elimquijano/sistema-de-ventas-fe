@@ -58,6 +58,7 @@ import {
 } from "@mui/icons-material";
 import { formatCurrency } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
+import { compressImage } from "../utils/imageCompression";
 import {
   API_STORAGE_URL,
   cashRegisterAPI,
@@ -1100,10 +1101,16 @@ export const PointOfSale = () => {
                           type="file"
                           hidden
                           accept="image/*"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files[0];
                             if (file) {
-                              handlePaymentChange(p.id, "payment_image", file);
+                              try {
+                                const compressedFile = await compressImage(file);
+                                handlePaymentChange(p.id, "payment_image", compressedFile);
+                              } catch (error) {
+                                console.error("Error al procesar la imagen de pago:", error);
+                                handlePaymentChange(p.id, "payment_image", file);
+                              }
                             }
                           }}
                         />

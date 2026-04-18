@@ -51,6 +51,7 @@ import {
 } from "@mui/icons-material";
 import { notificationSwal } from "../utils/swal-helpers";
 import { clientsAPI } from "../utils/api";
+import { compressImage } from "../utils/imageCompression";
 
 // --- CONFIGURACIÓN DE ÍCONOS ---
 
@@ -295,11 +296,18 @@ export default function LocationTracker() {
     }
   };
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (file) {
-      setClientImage(file);
-      setImagePreview(URL.createObjectURL(file));
+      try {
+        const compressedFile = await compressImage(file);
+        setClientImage(compressedFile);
+        setImagePreview(URL.createObjectURL(compressedFile));
+      } catch (error) {
+        console.error("Error al procesar la imagen:", error);
+        setClientImage(file);
+        setImagePreview(URL.createObjectURL(file));
+      }
     }
   };
 

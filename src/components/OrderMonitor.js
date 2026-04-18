@@ -54,6 +54,7 @@ import { renderToString } from "react-dom/server";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
+import { compressImage } from "../utils/imageCompression";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -755,10 +756,16 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                         type="file"
                         hidden
                         accept="image/*"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           const file = e.target.files[0];
                           if (file) {
-                            setPayments(payments.map((x) => x.id === p.id ? { ...x, payment_image: file } : x));
+                            try {
+                              const compressedFile = await compressImage(file);
+                              setPayments(payments.map((x) => x.id === p.id ? { ...x, payment_image: compressedFile } : x));
+                            } catch (error) {
+                              console.error("Error al procesar la imagen de pago:", error);
+                              setPayments(payments.map((x) => x.id === p.id ? { ...x, payment_image: file } : x));
+                            }
                           }
                         }}
                       />

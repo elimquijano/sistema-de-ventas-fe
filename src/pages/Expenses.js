@@ -44,6 +44,7 @@ import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import api, { API_STORAGE_URL, categoriesAPI, expensesAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
+import { compressImage } from "../utils/imageCompression";
 
 export const Expenses = () => {
   const { hasPermission } = useAuth();
@@ -141,8 +142,17 @@ export const Expenses = () => {
     setReceiptFile(null);
   };
 
-  const handleFileChange = (event) => {
-    setReceiptFile(event.target.files[0]);
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      try {
+        const compressedFile = await compressImage(file);
+        setReceiptFile(compressedFile);
+      } catch (error) {
+        console.error("Error al procesar la imagen de gasto:", error);
+        setReceiptFile(file);
+      }
+    }
   };
 
   const handleSaveExpense = async () => {

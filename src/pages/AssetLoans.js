@@ -46,7 +46,7 @@ export const AssetLoans = () => {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("loaned");
   const [openDialog, setOpenDialog] = useState(false);
   const [openReturnDialog, setOpenReturnDialog] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);

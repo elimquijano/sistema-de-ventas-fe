@@ -14,6 +14,15 @@ import { formatDate, formatCurrency } from "../utils/formatters";
 
 const getEventStory = (log, currency) => {
   const user = log.user?.full_name || "Sistema";
+
+  // PRIORIDAD 1: Si el backend ya envía una descripción amigable (historia)
+  if (log.description) {
+      // Si la descripción ya empieza con el nombre del usuario, la devolvemos tal cual
+      if (log.description.includes(user)) return log.description;
+      // Si no, le anteponemos el usuario para que se lea como una historia
+      return `${user}: ${log.description}`;
+  }
+
   const { event, auditable_type, new_values, old_values, metadata } = log;
 
   // Traducción de modelos (asegurando coincidencia exacta con lo que envía el backend)
@@ -25,40 +34,98 @@ const getEventStory = (log, currency) => {
     "App\\Models\\LoanPayment": "un pago de préstamo",
     "App\\Models\\Credit": "el crédito",
     "App\\Models\\CreditPayment": "un pago de crédito",
+    "App\\Models\\Asset": "el activo",
+    "App\\Models\\AssetLoan": "el préstamo de activo",
   };
 
   // Limpiar el nombre del modelo (quitar namespace si es necesario para el fallback)
   const cleanType = auditable_type?.split('\\').pop() || "registro";
   const modelName = typeMap[auditable_type] || `el ${cleanType.toLowerCase()}`;
 
-  // --- LÓGICA GENERAL ---
-  if (event === "created") {
-    let details = "";
-    if (cleanType === "Loan" || cleanType === "Credit") {
-        const amount = new_values?.amount || metadata?.amount || 0;
-        details = ` por un monto de ${formatCurrency(amount, currency)}`;
+  // --- HISTORIA PARA ACTIVOS ---
+  if (cleanType === "Asset" && event === "created") {
+    const qty = new_values?.total_quantity || metadata?.total_quantity || 0;
+    return `${user} registró el ingreso de un nuevo activo al inventario: "${new_values?.name || metadata?.name}" con una cantidad inicial de ${qty} unidades.`;
+  }
+
+  // --- HISTORIA PARA PRÉSTAMOS DE ACTIVOS ---
+  if (cleanType === "AssetLoan" && event === "created") {
+    const qty = new_values?.quantity || metadata?.quantity || 0;
+    const asset = metadata?.asset_name || "un activo";
+    const borrower = new_values?.borrower_name || metadata?.borrower_name || "alguien";
+    return `${user} registró la salida de ${qty} unidad(es) de "${asset}" prestado(s) a ${borrower}.`;
+  }
+
+  // --- HISTORIA PARA PRÉSTAMOS ---
+  if (cleanType === "Loan" && event === "created") {
+    const amountVal = new_values?.amount || new_values?.total_amount || metadata?.amount || 0;
+    const amount = formatCurrency(amountVal, currency);
+    const desc = new_values?.description || metadata?.description;
+    return `${user} registró un nuevo préstamo${desc ? ` por "${desc}"` : ""} con un monto inicial de ${amount}.`;
+  }
+
+  // --- HISTORIA PARA CRÉDITOS ---
+  if (cleanType === "Credit" && event === "created") {
+    const amountVal = new_values?.total_amount || new_values?.amount || metadata?.amount || 0;
+    const amount = formatCurrency(amountVal, currency);
+    const client = metadata?.client_name || new_values?.customer_name || "un cliente";
+    return `${user} registró un crédito para ${client} por un total de ${amount}.`;
+  }
+
+  // --- HISTORIA PARA PAGOS (PRÉSTAMOS/CRÉDITOS) ---
+  if (cleanType.includes("Payment") && event === "created") {
+    const amountVal = new_values?.amount || new_values?.total_amount || metadata?.amount || 0;
+    const amount = formatCurrency(amountVal, currency);
+    const parent = cleanType.includes("Loan") ? "al préstamo" : "al crédito";
+    return `${user} registró un pago de ${amount} ${parent}.`;
+  }
+
+  // --- CAMBIOS DE ESTADO (Humanizado) ---
+  if (event === "updated" && new_values?.status) {
+    const statusMap = {
+      paid: "PAGADO",
+      pending: "PENDIENTE",
+      overdue: "VENCIDO",
+      cancelled: "ANULADO",
+      loaned: "EN PRÉSTAMO",
+      returned: "DEVUELTO",
+      damaged: "DAÑADO",
+      lost: "PERDIDO",
+    };
+    const newStatus = statusMap[new_values.status] || new_values.status;
+    const oldStatus = statusMap[old_values?.status] || old_values?.status || "pendiente";
+
+    if (cleanType === "AssetLoan") {
+      const asset = metadata?.asset_name || "el activo";
+      if (new_values.status === "returned") {
+        return `${user} registró el retorno de ${asset}. El activo ha sido devuelto satisfactoriamente al inventario.`;
+      }
+      if (new_values.status === "damaged") {
+        return `${user} marcó ${asset} como DAÑADO tras el préstamo. Se requiere revisión o mantenimiento.`;
+      }
+      if (new_values.status === "lost") {
+        return `${user} marcó ${asset} como PERDIDO. No se pudo recuperar el bien tras el préstamo.`;
+      }
     }
-    return `${user} creó ${modelName}${details}.`;
+
+    if (new_values.status === "paid") return `${user} marcó ${modelName} como COMPLETADO (pago total recibido).`;
+    if (new_values.status === "overdue") return `${user} marcó ${modelName} como VENCIDO.`;
+
+    return `${user} cambió el estado de ${modelName} de ${oldStatus} a ${newStatus}.`;
+  }
+
+  // --- LÓGICA GENERAL FALLBACK ---
+  if (event === "created") {
+    return `${user} creó ${modelName}.`;
   }
 
   if (event === "deleted") {
     return `${user} eliminó ${modelName}.`;
   }
 
-  // --- HISTORIA PARA PAGOS ---
-  if (cleanType.includes("Payment") && event === "created") {
-    const amount = formatCurrency(metadata?.amount || new_values?.amount || 0, currency);
-    return `${user} registró ${modelName} por ${amount}.`;
-  }
-
-  // --- CAMBIOS DE ESTADO ---
-  if (event === "updated" && new_values?.status) {
-    return `${user} cambió el estado de ${modelName} de "${old_values?.status || 'desconocido'}" a "${new_values.status}".`;
-  }
-
   // --- ACTUALIZACIONES GENERALES ---
   if (event === "updated") {
-      return `${user} actualizó ${modelName}.`;
+      return `${user} actualizó información en ${modelName}.`;
   }
 
   // --- DEFAULT ---
@@ -137,8 +204,8 @@ export const AuditTimeline = ({ logs, loading, currency = "PEN" }) => {
     );
   }
 
-  // Clonamos y revertimos para que lo más reciente aparezca arriba (como en ventas)
-  const sortedLogs = [...logs].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  // Ordenamos de forma ascendente (el más antiguo primero) para que la historia se lea de arriba a abajo
+  const sortedLogs = [...logs].sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
   return (
     <Box sx={{ p: 1 }}>

@@ -29,6 +29,7 @@ import {
   CircularProgress,
   Tab,
   Tabs,
+  alpha,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -40,24 +41,26 @@ import {
   ShoppingCart as ShoppingCartIcon,
   Build as BuildIcon,
   History as HistoryIcon,
+  Close as CloseIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { creditsAPI } from "../utils/api";
 import { AuditTimeline } from "../components/AuditTimeline";
+import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
 
 export const Credits = () => {
   const { hasPermission } = useAuth();
 
   const [salesCredits, setSalesCredits] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchFilters, setSearchFilters] = useState({});
+  const [searchFilters, setSearchFilters] = useState({ status: "pending" });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
   const [selectedCredit, setSelectedCredit] = useState(null);
-  const [paymentAmount, setPaymentAmount] = useState("");
+  const [payments, setPayments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Edit Dialog State
@@ -110,34 +113,69 @@ export const Credits = () => {
 
   const handleOpenPaymentDialog = (credit) => {
     setSelectedCredit(credit);
-    setPaymentAmount(credit.pending_amount.toString());
+    setPayments([
+      {
+        id: Date.now(),
+        payment_method: "cash",
+        amount: credit.pending_amount.toString(),
+        reference: "",
+        payment_image: null,
+      },
+    ]);
     setOpenPaymentDialog(true);
   };
 
   const handleProcessPayment = async () => {
     try {
-      const amount = parseFloat(paymentAmount);
-      if (amount <= 0 || amount > selectedCredit.pending_amount) {
-        notificationSwal("Error", "Monto de pago inválido.", "error");
+      const totalPaid = payments.reduce(
+        (sum, p) => sum + parseFloat(p.amount || 0),
+        0,
+      );
+
+      if (totalPaid <= 0) {
+        notificationSwal("Error", "El monto total debe ser mayor a 0.", "error");
         return;
       }
 
+      if (totalPaid > selectedCredit.pending_amount + 0.01) {
+        notificationSwal(
+          "Error",
+          "El monto total excede el saldo pendiente.",
+          "error",
+        );
+        return;
+      }
+
+      const formData = new FormData();
+      payments.forEach((p, index) => {
+        formData.append(`payments[${index}][payment_method]`, p.payment_method);
+        formData.append(`payments[${index}][amount]`, p.amount);
+        formData.append(`payments[${index}][reference]`, p.reference || "");
+        if (p.payment_image) {
+          formData.append(`payments[${index}][payment_image]`, p.payment_image);
+        }
+      });
+
       setIsSubmitting(true);
-      await creditsAPI.processPayment(selectedCredit.id, { amount });
+      await creditsAPI.processPayment(selectedCredit.id, formData);
 
       notificationSwal(
         "Pago Registrado",
-        `Se ha registrado un pago de ${formatCurrency(amount)}.`,
+        `Se ha registrado un pago de ${formatCurrency(totalPaid)}.`,
         "success",
       );
 
       setOpenPaymentDialog(false);
       setSelectedCredit(null);
-      setPaymentAmount("");
+      setPayments([]);
       loadCredits();
     } catch (error) {
       console.error("Error processing payment:", error);
-      notificationSwal("Error", "Error al procesar el pago.", "error");
+      const msg =
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        "Error al procesar el pago.";
+      notificationSwal("Error", msg, "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -277,6 +315,17 @@ export const Credits = () => {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={12} md={2}>
+              <TextField
+                fullWidth
+                label="Fecha"
+                type="date"
+                name="date"
+                value={searchFilters.date || ""}
+                onChange={handleChangeFilter}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
           </Grid>
 
           <TableContainer component={Paper} variant="outlined">
@@ -285,9 +334,10 @@ export const Credits = () => {
                 <TableRow>
                   <TableCell>Cliente</TableCell>
                   <TableCell>Venta</TableCell>
-                  <TableCell>Total</TableCell>
-                  <TableCell>Pagado</TableCell>
+                  <TableCell>Emisión</TableCell>
                   <TableCell>Pendiente</TableCell>
+                  <TableCell>Pagado</TableCell>
+                  <TableCell>Total</TableCell>
                   <TableCell>Vencimiento</TableCell>
                   <TableCell>Estado</TableCell>
                   <TableCell align="right">Acciones</TableCell>
@@ -307,13 +357,8 @@ export const Credits = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {formatCurrency(credit.total_amount)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="success.main">
-                        {formatCurrency(credit.paid_amount)}
+                      <Typography variant="body2">
+                        {formatDate(credit.created_at)}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -323,6 +368,16 @@ export const Credits = () => {
                         sx={{ fontWeight: 600 }}
                       >
                         {formatCurrency(credit.pending_amount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" color="success.main">
+                        {formatCurrency(credit.paid_amount)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {formatCurrency(credit.total_amount)}
                       </Typography>
                     </TableCell>
                     <TableCell>{formatDate(credit.due_date)}</TableCell>
@@ -379,54 +434,64 @@ export const Credits = () => {
         </CardContent>
       </Card>
 
-      {/* Dialog para procesar pago */}
       <Dialog
         open={openPaymentDialog}
         onClose={() => setOpenPaymentDialog(false)}
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Registrar Pago</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          Registrar Pago
+          <IconButton onClick={() => setOpenPaymentDialog(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
           {selectedCredit && (
-            <Box sx={{ py: 2 }}>
-              <Typography variant="h6" sx={{ mb: 2 }}>
-                Cliente: {selectedCredit.customer_name}
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 2 }}>
-                Venta: {selectedCredit.sale_number}
-              </Typography>
-              <Typography variant="body1" sx={{ mb: 3 }}>
-                Monto Pendiente: {formatCurrency(selectedCredit.pending_amount)}
-              </Typography>
-
-              <TextField
-                fullWidth
-                label="Monto a Pagar"
-                type="number"
-                step="0.01"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                inputProps={{
-                  max: selectedCredit.pending_amount,
-                  min: 0.01,
-                }}
-              />
+            <Box sx={{ mb: 3 }}>
+              <Grid container spacing={1}>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Cliente</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>{selectedCredit.customer_name}</Typography>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="caption" color="text.secondary">Venta</Typography>
+                  <Typography variant="body2">{selectedCredit.sale?.sale_number}</Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Paper variant="outlined" sx={{ p: 1.5, textAlign: 'center', bgcolor: alpha('#673ab7', 0.05) }}>
+                    <Typography variant="caption" color="text.secondary">Monto Pendiente</Typography>
+                    <Typography variant="h5" sx={{ fontWeight: 900, color: '#673ab7' }}>
+                      {formatCurrency(selectedCredit.pending_amount)}
+                    </Typography>
+                  </Paper>
+                </Grid>
+              </Grid>
             </Box>
           )}
+
+          <PaymentMethodSelector
+            totalAmount={selectedCredit?.pending_amount || 0}
+            payments={payments}
+            setPayments={setPayments}
+          />
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: 2 }}>
           <Button
             onClick={() => setOpenPaymentDialog(false)}
             disabled={isSubmitting}
+            variant="outlined"
           >
             Cancelar
           </Button>
           <Button
             onClick={handleProcessPayment}
             variant="contained"
+            fullWidth
             disabled={
-              !paymentAmount || parseFloat(paymentAmount) <= 0 || isSubmitting
+              isSubmitting || 
+              payments.length === 0 || 
+              payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) <= 0
             }
             sx={{
               background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
@@ -434,10 +499,10 @@ export const Credits = () => {
             startIcon={
               isSubmitting ? (
                 <CircularProgress size={20} color="inherit" />
-              ) : null
+              ) : <PaymentIcon />
             }
           >
-            Registrar Pago
+            {isSubmitting ? "Procesando..." : "Registrar Pago"}
           </Button>
         </DialogActions>
       </Dialog>

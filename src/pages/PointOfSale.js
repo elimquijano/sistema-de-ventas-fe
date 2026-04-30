@@ -67,6 +67,8 @@ import {
   servicesAPI,
 } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
+import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
+import { CashRegisterReport } from "../components/CashRegisterReport";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -1053,150 +1055,13 @@ export const PointOfSale = () => {
               placeholder="Cliente General"
             />
             <Divider>Métodos de Pago</Divider>
-            {payments.map((p) => (
-              <Paper key={p.id} variant="outlined" sx={{ p: 2 }}>
-                <Stack spacing={2}>
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                    }}
-                  >
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                      {
-                        PAYMENT_METHODS.find(
-                          (m) => m.value === p.payment_method
-                        )?.label
-                      }
-                    </Typography>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleRemovePayment(p.id)}
-                    >
-                      <DeleteForeverIcon color="error" />
-                    </IconButton>
-                  </Box>
-                  <TextField
-                    fullWidth
-                    label="Monto"
-                    type="number"
-                    value={p.amount}
-                    onChange={(e) =>
-                      handlePaymentChange(p.id, "amount", e.target.value)
-                    }
-                  />
-                  {["yape", "plin", "transfer", "vale", "card"].includes(p.payment_method) && (
-                    <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}>
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        component="label"
-                        startIcon={<AddIcon />}
-                        color={p.payment_image ? "success" : "primary"}
-                        sx={{ flex: 1, textTransform: "none" }}
-                      >
-                        {p.payment_image ? "Imagen Cargada" : "Subir Comprobante"}
-                        <input
-                          type="file"
-                          hidden
-                          accept="image/*"
-                          onChange={async (e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                              try {
-                                const compressedFile = await compressImage(file);
-                                handlePaymentChange(p.id, "payment_image", compressedFile);
-                              } catch (error) {
-                                console.error("Error al procesar la imagen de pago:", error);
-                                handlePaymentChange(p.id, "payment_image", file);
-                              }
-                            }
-                          }}
-                        />
-                      </Button>
-                      {p.payment_image && (
-                        <IconButton 
-                          size="small" 
-                          color="error" 
-                          onClick={() => handlePaymentChange(p.id, "payment_image", null)}
-                        >
-                          <ClearIcon />
-                        </IconButton>
-                      )}
-                    </Box>
-                  )}
-                </Stack>
-              </Paper>
-            ))}
-
-            {remainingAmount > 0.001 && (
-              <Box>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Añadir Pago:
-                </Typography>
-                {isMobile ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      overflowX: "auto",
-                      gap: 1,
-                      pb: 1,
-                      "::-webkit-scrollbar": { height: 4 },
-                      "::-webkit-scrollbar-thumb": {
-                        backgroundColor: "#ccc",
-                        borderRadius: 4,
-                      },
-                    }}
-                  >
-                    {PAYMENT_METHODS.map((method) => (
-                      <Button
-                        key={method.value}
-                        variant="outlined"
-                        onClick={() => handleAddPayment(method.value)}
-                        startIcon={method.icon}
-                        size="small"
-                        sx={{
-                          minWidth: 130,
-                          flexShrink: 0,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {method.label}
-                      </Button>
-                    ))}
-                  </Box>
-                ) : (
-                  <Grid container spacing={1}>
-                    {PAYMENT_METHODS.map((method) => (
-                      <Grid item xs={4} key={method.value}>
-                        <Button
-                          fullWidth
-                          variant="outlined"
-                          onClick={() => handleAddPayment(method.value)}
-                          startIcon={method.icon}
-                        >
-                          {method.label}
-                        </Button>
-                      </Grid>
-                    ))}
-                  </Grid>
-                )}
-              </Box>
-            )}
-
-            <Divider />
-
-            <Stack direction="row" justifyContent="space-between">
-              <Typography variant="h6">Faltante:</Typography>
-              <Typography
-                variant="h6"
-                color={remainingAmount > 0 ? "error.main" : "success.main"}
-                sx={{ fontWeight: 700 }}
-              >
-                {formatCurrency(remainingAmount, currency)}
-              </Typography>
-            </Stack>
+            
+            <PaymentMethodSelector
+              totalAmount={totalAmount}
+              payments={payments}
+              setPayments={setPayments}
+              currency={currency}
+            />
 
             {payments.some((p) => p.payment_method === "cash") && (
               <>
@@ -1288,192 +1153,19 @@ export const PointOfSale = () => {
             }}
           >
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Reportes del Día
+              Reportes del Turno
             </Typography>
             <IconButton onClick={() => setOpenReportsDialog(false)}>
               <CloseIcon />
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: { xs: 1, md: 3 } }}>
-          {reportData && (
-            <>
-              <Grid
-                container
-                spacing={isMobile ? 1 : 3}
-                sx={{ mb: { xs: 1, md: 3 } }}
-              >
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "primary.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {reportData.sales.length}
-                    </Typography>
-                    <Typography variant="body2">Ventas Totales</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "info.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.initial_amount, currency)}
-                    </Typography>
-                    <Typography variant="body2">Dinero Inicial</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "success.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.total_in_cash, currency)}
-                    </Typography>
-                    <Typography variant="body2">Efectivo en Caja</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "warning.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.manual_inflow, currency)}
-                    </Typography>
-                    <Typography variant="body2">Ingresos Manuales</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "error.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.expected_amount, currency)}
-                    </Typography>
-                    <Typography variant="body2">Total General</Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-
-              <Tabs
-                value={reportType}
-                onChange={(e, newValue) => setReportType(newValue)}
-                sx={{
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  mb: { xs: 1, md: 3 },
-                }}
-              >
-                <Tab label="Ventas del Día" value="sales" />
-                <Tab label="Resumen de Productos" value="products" />
-              </Tabs>
-
-              {reportType === "sales" && (
-                <Box>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Ventas Realizadas ({reportData.sales.length})
-                  </Typography>
-                  {reportData.sales.length > 0 ? (
-                    <List>
-                      {reportData.sales.map((sale) => (
-                        <ListItem
-                          key={sale.id}
-                          sx={{
-                            border: 1,
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            mb: 1,
-                          }}
-                        >
-                          <ListItemText
-                            primary={`${sale.sale_number} - ${sale.customer_name}`}
-                            secondary={`${sale.items.length} productos - ${
-                              sale.status === "completed"
-                                ? "Pagado"
-                                : "Por cobrar"
-                            }`}
-                          />
-                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {formatCurrency(sale.total_amount, currency)}
-                          </Typography>
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            sx={{ ml: 2 }}
-                            onClick={() => handlePrintReceipt(sale.id)}
-                            disabled={isPrinting}
-                          >
-                            <PrintIcon />
-                          </IconButton>
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ textAlign: "center", py: 4 }}
-                    >
-                      No hay ventas registradas hoy
-                    </Typography>
-                  )}
-                </Box>
-              )}
-
-              {reportType === "products" && (
-                <Box>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Productos Más Vendidos
-                  </Typography>
-                  {reportData.productSummary.length > 0 ? (
-                    <List>
-                      {reportData.productSummary.map((product) => (
-                        <ListItem key={product.item_name}>
-                          <ListItemText
-                            primary={product.item_name}
-                            secondary={`Cantidad vendida: ${product.quantity}`}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ textAlign: "center", py: 4 }}
-                    >
-                      No se han vendido productos hoy.
-                    </Typography>
-                  )}
-                </Box>
-              )}
-            </>
-          )}
+        <DialogContent sx={{ p: { xs: 1, md: 3 } }} dividers>
+          <CashRegisterReport 
+            reportData={reportData} 
+            onPrintReceipt={handlePrintReceipt}
+            isPrinting={isPrinting}
+          />
         </DialogContent>
       </Dialog>
     </Box>

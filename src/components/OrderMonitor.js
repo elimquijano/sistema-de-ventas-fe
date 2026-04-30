@@ -46,7 +46,8 @@ import {
   AddCard as AddCardIcon,
   Add as AddIcon,
   Clear as ClearIcon,
-} from "@mui/icons-material";
+  Directions as DirectionsIcon,
+  } from "@mui/icons-material";
 import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -55,6 +56,7 @@ import { formatCurrency, formatDate } from "../utils/formatters";
 import { salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { compressImage } from "../utils/imageCompression";
+import { PaymentMethodSelector } from "./PaymentMethodSelector";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -113,6 +115,8 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
     if (url) window.open(url, "_blank");
     else notificationSwal("Error", "No hay ubicación ni dirección disponible.", "error");
   };
+
+  const phoneNumber = order.delivery_phone || order.phone || order.client?.phone;
 
   return (
     <Card
@@ -192,8 +196,18 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
         <Stack spacing={0.8}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
             <PhoneIcon sx={{ fontSize: 14, color: "success.main" }} />
-            <Typography variant="caption" sx={{ fontWeight: 600 }}>
-              {order.delivery_phone || order.phone || order.client?.phone || "S/T"}
+            <Typography
+              variant="caption"
+              component="a"
+              href={phoneNumber ? `tel:${phoneNumber}` : "#"}
+              sx={{
+                fontWeight: 600,
+                color: "inherit",
+                textDecoration: "none",
+                "&:hover": { textDecoration: "underline" },
+              }}
+            >
+              {phoneNumber || "S/T"}
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
@@ -447,6 +461,38 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
     }
   };
 
+  const handleOpenRouteInGoogleMaps = () => {
+    const validOrders = orders.filter(
+      (o) => (o.latitude || o.client?.latitude) && (o.longitude || o.client?.longitude)
+    );
+
+    if (validOrders.length === 0) {
+      return notificationSwal("Aviso", "No hay pedidos con ubicación para generar la ruta.", "warning");
+    }
+
+    let url = "https://www.google.com/maps/dir/?api=1";
+    
+    if (userLocation) {
+      url += `&origin=${userLocation.lat},${userLocation.lng}`;
+    } else {
+      url += "&origin=My+Location";
+    }
+
+    const waypoints = validOrders.map(o => {
+      const lat = o.latitude || o.client.latitude;
+      const lng = o.longitude || o.client.longitude;
+      return `${lat},${lng}`;
+    });
+
+    const destination = waypoints.pop();
+    if (waypoints.length > 0) {
+      url += `&waypoints=${waypoints.join("|")}`;
+    }
+    url += `&destination=${destination}`;
+
+    window.open(url, "_blank");
+  };
+
   const orderMarkerIcon = (color = theme.palette.primary.main) =>
     new L.divIcon({
       html: renderToString(
@@ -470,7 +516,19 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ mb: 1, display: "flex", justifyContent: "flex-end" }}>
+      <Box sx={{ mb: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
+        <IconButton 
+          size="small" 
+          color="primary" 
+          onClick={handleOpenRouteInGoogleMaps}
+          title="Ver Ruta en Google Maps"
+          sx={{ 
+            bgcolor: alpha(theme.palette.primary.main, 0.1),
+            "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+          }}
+        >
+          <DirectionsIcon fontSize="small" />
+        </IconButton>
         <ToggleButtonGroup
           size="small"
           value={monitorView}
@@ -524,6 +582,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                 <LayersControl.BaseLayer checked name="Google Calles">
                   <TileLayer
                     url="http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+                    subdomains={["mt0", "mt1", "mt2", "mt3"]}
+                  />
+                </LayersControl.BaseLayer>
+                <LayersControl.BaseLayer name="Google Híbrido">
+                  <TileLayer
+                    url="http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
                     subdomains={["mt0", "mt1", "mt2", "mt3"]}
                   />
                 </LayersControl.BaseLayer>
@@ -718,106 +782,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
             <Typography variant="caption" fontWeight="600" color="text.secondary">TOTAL A RECIBIR</Typography>
           </Paper>
           
-          <Stack spacing={1.5}>
-            {payments.map((p) => (
-              <Box
-                key={p.id}
-                sx={{ p: 1.5, position: "relative", borderRadius: 1, border: "1px solid", borderColor: "divider", bgcolor: "background.paper" }}
-              >
-                <Typography variant="caption" fontWeight="700" color="text.secondary" sx={{ position: "absolute", top: -8, left: 10, bgcolor: "background.paper", px: 0.5 }}>
-                  {PAYMENT_METHODS.find((m) => m.value === p.payment_method)?.label}
-                </Typography>
-                <TextField
-                  fullWidth
-                  variant="standard"
-                  type="number"
-                  value={p.amount}
-                  onChange={(e) =>
-                    setPayments(payments.map((x) => x.id === p.id ? { ...x, amount: e.target.value } : x))
-                  }
-                  InputProps={{
-                    disableUnderline: true,
-                    sx: { fontWeight: 700, fontSize: "1.1rem" },
-                  }}
-                  autoFocus
-                />
-                {["yape", "plin", "transfer", "vale", "card"].includes(p.payment_method) && (
-                  <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      component="label"
-                      startIcon={<AddIcon />}
-                      color={p.payment_image ? "success" : "primary"}
-                      sx={{ flex: 1, textTransform: "none", fontSize: 11 }}
-                    >
-                      {p.payment_image ? "Imagen Cargada" : "Subir Comprobante"}
-                      <input
-                        type="file"
-                        hidden
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            try {
-                              const compressedFile = await compressImage(file);
-                              setPayments(payments.map((x) => x.id === p.id ? { ...x, payment_image: compressedFile } : x));
-                            } catch (error) {
-                              console.error("Error al procesar la imagen de pago:", error);
-                              setPayments(payments.map((x) => x.id === p.id ? { ...x, payment_image: file } : x));
-                            }
-                          }
-                        }}
-                      />
-                    </Button>
-                    {p.payment_image && (
-                      <IconButton 
-                        size="small" 
-                        color="error" 
-                        onClick={() => setPayments(payments.map((x) => x.id === p.id ? { ...x, payment_image: null } : x))}
-                      >
-                        <ClearIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    )}
-                  </Box>
-                )}
-                <IconButton
-                  size="small"
-                  color="error"
-                  sx={{ position: "absolute", top: 10, right: 10 }}
-                  onClick={() => setPayments(payments.filter((x) => x.id !== p.id))}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            ))}
-            
-            <Grid container spacing={1}>
-              {PAYMENT_METHODS.map((m) => (
-                <Grid item xs={4} key={m.value}>
-                  <Button
-                    fullWidth
-                    variant="outlined"
-                    size="small"
-                    onClick={() =>
-                      setPayments([
-                        ...payments,
-                        {
-                          id: Date.now(),
-                          payment_method: m.value,
-                          amount: remainingAmount > 0 ? remainingAmount.toFixed(2) : "0",
-                          reference: ""
-                        },
-                      ])
-                    }
-                    sx={{ fontSize: 10, borderRadius: 1, fontWeight: 600, height: 32, borderColor: "divider" }}
-                  >
-                    {m.label}
-                  </Button>
-                </Grid>
-              ))}
-            </Grid>
-          </Stack>
+          <PaymentMethodSelector
+            totalAmount={selectedOrderToConfirm?.total_amount || 0}
+            payments={payments}
+            setPayments={setPayments}
+            currency={currency}
+          />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
           <Button

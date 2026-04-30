@@ -400,19 +400,33 @@ export const Sales = () => {
             </Grid>
             <Grid item xs={12} md={2}>
               <FormControl fullWidth>
-                <InputLabel>Responsable</InputLabel>
+                <InputLabel>Vendedor</InputLabel>
                 <Select
                   name="created_by"
                   value={searchFilters.created_by || ""}
-                  label="Responsable"
+                  label="Vendedor"
                   onChange={handleChangeFilter}
                 >
                   <MenuItem value="">Todos</MenuItem>
-                  {users.map((user) => {
-                    return (
-                      <MenuItem value={user.id}>{user.full_name}</MenuItem>
-                    );
-                  })}
+                  {users.map((user) => (
+                    <MenuItem key={user.id} value={user.id}>{user.full_name}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <FormControl fullWidth>
+                <InputLabel>Motorizado</InputLabel>
+                <Select
+                  name="rider_id"
+                  value={searchFilters.rider_id || ""}
+                  label="Motorizado"
+                  onChange={handleChangeFilter}
+                >
+                  <MenuItem value="">Todos</MenuItem>
+                  {users.map((user) => (
+                    <MenuItem key={user.id} value={user.id}>{user.full_name}</MenuItem>
+                  ))}
                 </Select>
               </FormControl>
             </Grid>
@@ -436,17 +450,18 @@ export const Sales = () => {
                   <TableCell>Número</TableCell>
                   <TableCell>Cliente</TableCell>
                   <TableCell>Total</TableCell>
-                  <TableCell>Métodos de Pago</TableCell>
+                  <TableCell>Método</TableCell>
                   <TableCell>Estado</TableCell>
                   <TableCell>Fecha</TableCell>
                   <TableCell>Vendedor</TableCell>
+                  <TableCell>Motorizado</TableCell>
                   <TableCell align="right">Acciones</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={8} align="center">
+                    <TableCell colSpan={9} align="center">
                       {/* <CircularProgress /> */}
                     </TableCell>
                   </TableRow>
@@ -482,7 +497,8 @@ export const Sales = () => {
                         )}
                       </TableCell>
                       <TableCell>{formatDate(sale.created_at)}</TableCell>
-                      <TableCell>{sale.creator.full_name}</TableCell>
+                      <TableCell>{sale.creator?.full_name || "-"}</TableCell>
+                      <TableCell>{sale.rider?.full_name || "-"}</TableCell>
                       <TableCell align="right">
                         <IconButton
                           size="small"

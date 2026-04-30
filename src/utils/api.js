@@ -372,4 +372,31 @@ export const cashRegisterAPI = {
   addInflow: (id, data) => api.post(`/cash-registers/${id}/add-inflow`, data, { loaderMessage: "Agregando dinero a caja..." }),
 };
 
+export const assetsAPI = {
+  getAll: (params = {}) => api.get("/assets", { params, loaderMessage: "Cargando activos..." }),
+  getById: (id) => api.get(`/assets/${id}`, { loaderMessage: "Obteniendo detalles del activo..." }),
+  create: (assetData) => api.post("/assets", assetData, { loaderMessage: "Creando activo..." }),
+  update: (id, assetData) => api.put(`/assets/${id}`, assetData, { loaderMessage: "Actualizando activo..." }),
+  delete: (id) => api.delete(`/assets/${id}`, { loaderMessage: "Eliminando activo..." }),
+  getTimeline: (id) => api.get(`/assets/${id}/timeline`, { loaderMessage: "Cargando historial de activo..." }),
+};
+
+export const assetLoansAPI = {
+  getAll: (params = {}) => api.get("/asset-loans", { params, loaderMessage: "Cargando préstamos de activos..." }),
+  create: (loanData) => api.post("/asset-loans", loanData, { loaderMessage: "Registrando préstamo..." }),
+  returnLoan: (id, returnData) => api.post(`/asset-loans/${id}/return`, returnData, { loaderMessage: "Registrando devolución..." }),
+  timeline: (id) => api.get(`/asset-loans/${id}/timeline`, { loaderMessage: "Cargando historial..." }),
+};
+
+export const payrollAPI = {
+  getConfig: (userId) => api.get(`/payroll/config/${userId}`, { loaderMessage: "Obteniendo configuración de planilla..." }),
+  setConfig: (userId, configData) => api.post(`/payroll/config/${userId}`, configData, { loaderMessage: "Configurando planilla..." }),
+  getAttendance: (params = {}) => api.get("/payroll/attendance", { params, loaderMessage: "Cargando asistencia..." }),
+  saveAttendance: (attendanceData) => api.post("/payroll/attendance", attendanceData, { loaderMessage: "Registrando asistencia..." }),
+  getAdvances: (params = {}) => api.get("/payroll/advances", { params, loaderMessage: "Cargando adelantos..." }),
+  saveAdvance: (advanceData) => api.post("/payroll/advances", advanceData, { loaderMessage: "Registrando adelanto..." }),
+  calculate: (userId, params) => api.get(`/payroll/calculate/${userId}`, { params, loaderMessage: "Calculando pago..." }),
+  pay: (userId, paymentData) => api.post(`/payroll/pay/${userId}`, paymentData, { loaderMessage: "Procesando pago de planilla..." }),
+};
+
 export default api;

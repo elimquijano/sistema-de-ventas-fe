@@ -23,6 +23,9 @@ import { CashRegisters } from "../pages/CashRegisters";
 import { Clients } from "../pages/Clients";
 import { Orders } from "../pages/Orders";
 import { RiderOrders } from "../pages/RiderOrders";
+import { Assets } from "../pages/Assets";
+import { AssetLoans } from "../pages/AssetLoans";
+import { Payroll } from "../pages/Payroll";
 import NotificationsPage from "../pages/Notifications";
 import LocationTracker from "../pages/LocationTracker";
 
@@ -50,6 +53,9 @@ import {
   Store,
   LocalShipping,
   History,
+  Work,
+  AssignmentReturn,
+  Payments,
 } from "@mui/icons-material";
 
 // Mapeo de componentes - AQUÍ AGREGAS NUEVOS COMPONENTES
@@ -79,6 +85,9 @@ export const componentMap = {
   Orders,
   LocationTracker,
   RiderOrders,
+  Assets,
+  AssetLoans,
+  Payroll,
 };
 
 // Mapeo de iconos - AQUÍ TIENES TODOS LOS ICONOS DISPONIBLES
@@ -104,6 +113,9 @@ export const iconMap = {
   Store: <Store />,
   LocalShipping: <LocalShipping />,
   History: <History />,
+  Work: <Work />,
+  AssignmentReturn: <AssignmentReturn />,
+  Payments: <Payments />,
 };
 
 // Función para obtener icono por nombre

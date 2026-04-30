@@ -24,7 +24,14 @@ const getEventStory = (log, currency) => {
     "App\\Models\\Sale": "la venta",
     "App\\Models\\SaleItem": "un producto",
     "App\\Models\\SalePayment": "un pago",
+    "App\\Models\\Loan": "el préstamo",
+    "App\\Models\\LoanPayment": "un pago de préstamo",
+    "App\\Models\\Credit": "el crédito",
+    "App\\Models\\CreditPayment": "un pago de crédito",
   };
+
+  const cleanType = auditable_type?.split('\\').pop() || "registro";
+  const modelName = typeMap[auditable_type] || `el ${cleanType.toLowerCase()}`;
 
   // --- HISTORIA PARA CREACIÓN DE VENTA ---
   if (auditable_type.includes("Sale") && event === "created" && !auditable_type.includes("Item") && !auditable_type.includes("Payment")) {
@@ -48,12 +55,29 @@ const getEventStory = (log, currency) => {
     return `${user} procesó un pago de ${amount} mediante ${method}.`;
   }
 
-  // --- HISTORIA PARA CAMBIOS DE ESTADO (Cancelado, Reabierto, Completado) ---
+  // --- HISTORIA PARA CRÉDITOS Y PRÉSTAMOS (Si aparecen en la venta) ---
+  if ((cleanType === "Credit" || cleanType === "Loan") && event === "created") {
+      const amountVal = new_values?.total_amount || new_values?.amount || metadata?.amount || 0;
+      const amount = formatCurrency(amountVal, currency);
+      return `${user} generó ${modelName} por un monto de ${amount}.`;
+  }
+
+  // --- HISTORIA PARA CAMBIOS DE ESTADO ---
   if (event === "updated" && new_values?.status) {
-    const status = new_values.status;
-    if (status === "cancelled") return `${user} canceló el pedido (estaba en ${old_values?.status || 'pendiente'}).`;
-    if (status === "pending" && old_values?.status === "completed") return `${user} reabrió la venta (volvió a ponerla como pendiente para editar).`;
-    if (status === "completed") return `${user} marcó la entrega como completada (confirmó el cobro).`;
+    const statusMap = {
+        cancelled: "ANULADO",
+        pending: "PENDIENTE",
+        completed: "COMPLETADO",
+        paid: "PAGADO",
+        overdue: "VENCIDO"
+    };
+    const newStatus = statusMap[new_values.status] || new_values.status;
+    
+    if (new_values.status === "cancelled") return `${user} canceló el pedido (estaba en ${old_values?.status || 'pendiente'}).`;
+    if (new_values.status === "pending" && old_values?.status === "completed") return `${user} reabrió la venta (volvió a ponerla como pendiente para editar).`;
+    if (new_values.status === "completed") return `${user} marcó la entrega como completada (confirmó el cobro).`;
+    
+    return `${user} cambió el estado de ${modelName} a ${newStatus}.`;
   }
 
   // --- HISTORIA PARA CAMBIO DE MOTORIZADO ---
@@ -61,8 +85,20 @@ const getEventStory = (log, currency) => {
       return `${user} cambió el motorizado asignado al pedido.`;
   }
 
+  // --- ACTUALIZACIONES GENERALES (DESCRIPTIVAS) ---
+  if (event === "updated" && new_values) {
+      const fields = Object.keys(new_values).map(k => {
+          const labels = { customer_name: "cliente", total_amount: "total", amount: "monto", description: "descripción", due_date: "vencimiento" };
+          return labels[k] || k.replace(/_/g, ' ');
+      }).join(", ");
+      return `${user} actualizó ${fields} en ${modelName}.`;
+  }
+
+  if (event === "created") return `${user} creó ${modelName}.`;
+  if (event === "deleted") return `${user} eliminó ${modelName}.`;
+
   // --- DEFAULT ---
-  return `${user} realizó una actualización en ${typeMap[auditable_type] || "el sistema"}.`;
+  return `${user} realizó una acción (${event}) en ${modelName}.`;
 };
 
 const TimelineItem = ({ log, isLast, currency }) => {

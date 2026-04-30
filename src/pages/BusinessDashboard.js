@@ -66,6 +66,7 @@ import {
 import { businessAPI, cashRegisterAPI, salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
+import { CashRegisterReport } from "../components/CashRegisterReport";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -866,170 +867,12 @@ export const BusinessDashboard = () => {
             </IconButton>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ p: { xs: 1, md: 3 } }}>
-          {reportData && (
-            <>
-              <Grid
-                container
-                spacing={isMobile ? 1 : 3}
-                sx={{ mb: { xs: 1, md: 3 } }}
-              >
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "primary.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {reportData.sales.length}
-                    </Typography>
-                    <Typography variant="body2">Ventas Totales</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "success.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.initial_amount, currency)}
-                    </Typography>
-                    <Typography variant="body2">Dinero Inicial</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "info.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.total_in_cash, currency)}
-                    </Typography>
-                    <Typography variant="body2">Efectivo en Caja</Typography>
-                  </Paper>
-                </Grid>
-                <Grid item xs={6} md={3}>
-                  <Paper
-                    sx={{
-                      p: 2,
-                      textAlign: "center",
-                      bgcolor: "warning.light",
-                      color: "white",
-                    }}
-                  >
-                    <Typography variant="h4" sx={{ fontWeight: 700 }}>
-                      {formatCurrency(reportData.expected_amount, currency)}
-                    </Typography>
-                    <Typography variant="body2">Total General</Typography>
-                  </Paper>
-                </Grid>
-              </Grid>
-
-              <Tabs
-                value={reportType}
-                onChange={(e, newValue) => setReportType(newValue)}
-                sx={{
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  mb: { xs: 1, md: 3 },
-                }}
-              >
-                <Tab label="Ventas del Día" value="sales" />
-                <Tab label="Resumen de Productos" value="products" />
-              </Tabs>
-
-              {reportType === "sales" && (
-                <Box>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Ventas Realizadas ({reportData.sales.length})
-                  </Typography>
-                  {reportData.sales.length > 0 ? (
-                    <List>
-                      {reportData.sales.map((sale) => (
-                        <ListItem
-                          key={sale.id}
-                          sx={{
-                            border: 1,
-                            borderColor: "divider",
-                            borderRadius: 1,
-                            mb: 1,
-                          }}
-                        >
-                          <ListItemText
-                            primary={`${sale.sale_number} - ${sale.customer_name}`}
-                            secondary={`${sale.items.length} productos - ${
-                              sale.status === "completed"
-                                ? "Pagado"
-                                : "Por cobrar"
-                            }`}
-                          />
-                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {formatCurrency(sale.total_amount, currency)}
-                          </Typography>
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            sx={{ ml: 2 }}
-                            onClick={() => handlePrintReceipt(sale.id)}
-                            disabled={isPrinting}
-                          >
-                            <PrintIcon />
-                          </IconButton>
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ textAlign: "center", py: 4 }}
-                    >
-                      No hay ventas registradas hoy
-                    </Typography>
-                  )}
-                </Box>
-              )}
-
-              {reportType === "products" && (
-                <Box>
-                  <Typography variant="h6" sx={{ mb: 2, fontWeight: 600 }}>
-                    Productos Más Vendidos
-                  </Typography>
-                  {reportData.productSummary.length > 0 ? (
-                    <List>
-                      {reportData.productSummary.map((product) => (
-                        <ListItem key={product.item_name}>
-                          <ListItemText
-                            primary={product.item_name}
-                            secondary={`Cantidad vendida: ${product.quantity}`}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  ) : (
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ textAlign: "center", py: 4 }}
-                    >
-                      No se han vendido productos hoy.
-                    </Typography>
-                  )}
-                </Box>
-              )}
-            </>
-          )}
+        <DialogContent sx={{ p: { xs: 1, md: 3 } }} dividers>
+          <CashRegisterReport 
+            reportData={reportData} 
+            onPrintReceipt={handlePrintReceipt}
+            isPrinting={isPrinting}
+          />
         </DialogContent>
       </Dialog>
     </Box>

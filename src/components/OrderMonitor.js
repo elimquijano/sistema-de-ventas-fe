@@ -47,11 +47,11 @@ import {
   Add as AddIcon,
   Clear as ClearIcon,
   Directions as DirectionsIcon,
+  Notes as NotesIcon,
   } from "@mui/icons-material";
 import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { renderToString } from "react-dom/server";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
@@ -167,29 +167,82 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
         <Typography
           variant="subtitle1"
           fontWeight="700"
-          noWrap
           sx={{ mb: 0.5, color: "text.primary", lineHeight: 1.2 }}
         >
           {order.customer_name}
         </Typography>
         {order.items?.length > 0 && (
-          <Box sx={{ mb: 1.5, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+          <Box sx={{ mb: 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
             {order.items.map((it, idx) => (
-              <Chip
+              <Box
                 key={idx}
-                label={`${it.quantity}x ${it.item_name}`}
-                size="small"
-                variant="outlined"
                 sx={{
-                  height: 18,
-                  fontSize: 9,
-                  fontWeight: 600,
-                  borderColor: "primary.light",
-                  color: "primary.main",
-                  borderRadius: 1
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  bgcolor: alpha(theme.palette.primary.main, 0.08),
+                  p: 0.8,
+                  borderRadius: 1,
+                  border: "1px solid",
+                  borderColor: alpha(theme.palette.primary.main, 0.2),
                 }}
-              />
+              >
+                <Typography
+                  variant="subtitle2"
+                  fontWeight="900"
+                  color="primary.main"
+                  sx={{
+                    minWidth: 28,
+                    height: 28,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    bgcolor: "primary.main",
+                    color: "white",
+                    borderRadius: "50%",
+                    fontSize: 12,
+                  }}
+                >
+                  {it.quantity}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  fontWeight="700"
+                  sx={{ color: "primary.dark", flex: 1 }}
+                >
+                  {it.item_name}
+                </Typography>
+              </Box>
             ))}
+          </Box>
+        )}
+
+        {(order.delivery_notes || order.notes) && (
+          <Box
+            sx={{
+              mb: 1.5,
+              p: 1,
+              bgcolor: alpha(theme.palette.warning.main, 0.08),
+              borderRadius: 1,
+              border: "1px dashed",
+              borderColor: "warning.main",
+            }}
+          >
+            <Typography
+              variant="caption"
+              fontWeight="800"
+              color="warning.dark"
+              sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.3 }}
+            >
+              <NotesIcon sx={{ fontSize: 14 }} /> NOTAS:
+            </Typography>
+            <Typography
+              variant="caption"
+              fontWeight="600"
+              sx={{ color: "text.primary", fontStyle: "italic", display: "block" }}
+            >
+              {order.delivery_notes || order.notes}
+            </Typography>
           </Box>
         )}
 
@@ -238,24 +291,6 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
               })()}
             </Typography>
           </Box>
-          {order.scheduled_at && (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                color: "error.main",
-                bgcolor: alpha(theme.palette.error.main, 0.08),
-                p: 0.5,
-                borderRadius: 1,
-              }}
-            >
-              <ScheduleIcon sx={{ fontSize: 14 }} />
-              <Typography variant="caption" fontWeight="800" sx={{ fontSize: 9 }}>
-                ENTREGA: {formatDate(order.scheduled_at)}
-              </Typography>
-            </Box>
-          )}
         </Stack>
         <Box sx={{ mt: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
            <Typography variant="caption" fontWeight="700" color="text.secondary">TOTAL:</Typography>
@@ -351,7 +386,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
     setEditingOrder({
       id: order.id,
       rider_id: order.rider_id || "",
-      notes: order.notes || "",
+      delivery_notes: order.delivery_notes || order.notes || "",
       scheduled_at: order.scheduled_at ? order.scheduled_at.slice(0, 16) : "",
       total_amount: order.total_amount || 0,
       quantity: order.items?.[0]?.quantity || 1,
@@ -367,7 +402,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   const handleUpdateOrder = async () => {
     setIsSubmitting(true);
     try {
-      await salesAPI.updateQuickOrder(editingOrder.id, editingOrder);
+      // Enviar tanto delivery_notes como notes para asegurar compatibilidad
+      const updateData = {
+        ...editingOrder,
+        notes: editingOrder.delivery_notes, // Copiar para compatibilidad
+      };
+      await salesAPI.updateQuickOrder(editingOrder.id, updateData);
       notificationSwal("Éxito", "Pedido actualizado.", "success");
       setOpenEditDialog(false);
       onRefresh();
@@ -495,9 +535,11 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
 
   const orderMarkerIcon = (color = theme.palette.primary.main) =>
     new L.divIcon({
-      html: renderToString(
-        <LocationOnIcon style={{ fontSize: 32, color: color }} />,
-      ),
+      html: `
+        <svg viewBox="0 0 24 24" width="32" height="32" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+          <path fill="${color}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      `,
       iconSize: [32, 32],
       iconAnchor: [16, 32],
       popupAnchor: [0, -32],
@@ -505,11 +547,11 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
     });
 
   const userMarkerIcon = new L.divIcon({
-    html: renderToString(
-      <LocationOnIcon
-        style={{ fontSize: 28, color: theme.palette.secondary.main }}
-      />,
-    ),
+    html: `
+      <svg viewBox="0 0 24 24" width="28" height="28" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+        <path fill="${theme.palette.secondary.main}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      </svg>
+    `,
     iconSize: [28, 28],
     iconAnchor: [14, 28],
   });
@@ -700,8 +742,8 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
               </Grid>
               <TextField
                 label="Notas / Referencia"
-                name="notes"
-                value={editingOrder.notes}
+                name="delivery_notes"
+                value={editingOrder.delivery_notes}
                 onChange={handleEditChange}
                 fullWidth
                 size="small"

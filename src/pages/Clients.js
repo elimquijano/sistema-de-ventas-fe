@@ -16,7 +16,6 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { renderToString } from "react-dom/server";
 
 import {
   Box,
@@ -72,48 +71,21 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
 });
 
-// Función para crear el marcador tipo bandera (estilo inDrive)
-const createFlagIcon = (name, isActive = false, theme) => {
+// Función para crear el marcador tipo PIN CLÁSICO (Optimizado)
+const createClassicPinIcon = (isActive = false, theme) => {
   const color = isActive ? theme.palette.secondary.main : theme.palette.primary.main;
+  const size = isActive ? 38 : 30;
   
   return L.divIcon({
-    html: renderToString(
-      <div style={{
-        display: "inline-flex",
-        alignItems: "flex-end",
-        position: "relative",
-        filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.3))",
-        pointerEvents: "none"
-      }}>
-        {/* Asta / Punta */}
-        <div style={{
-          width: "2px",
-          height: "14px",
-          backgroundColor: color,
-          borderRadius: "0 0 2px 2px",
-          flexShrink: 0
-        }} />
-        {/* Bandera / Rectángulo */}
-        <div style={{
-          backgroundColor: color,
-          color: "white",
-          padding: "2px 8px",
-          borderRadius: "6px 6px 6px 0",
-          fontSize: "11px",
-          fontWeight: "bold",
-          whiteSpace: "nowrap",
-          marginBottom: "10px",
-          marginLeft: "-1px",
-          boxShadow: "0 1px 2px rgba(0,0,0,0.2)"
-        }}>
-          {name}
-        </div>
-      </div>
-    ),
-    className: "custom-flag-icon",
-    iconSize: null,
-    iconAnchor: [1, 24], 
-    popupAnchor: [10, -25]
+    html: `
+      <svg viewBox="0 0 24 24" width="${size}" height="${size}" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));">
+        <path fill="${color}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+      </svg>
+    `,
+    className: "custom-pin-icon",
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size], 
+    popupAnchor: [0, -size]
   });
 };
 
@@ -369,17 +341,115 @@ export const Clients = () => {
   const userMarkerIcon = useMemo(
     () =>
       new L.divIcon({
-        html: renderToString(
-          <PersonPinCircle
-            style={{ fontSize: 40, color: theme.palette.secondary.main }}
-          />,
-        ),
+        html: `
+          <svg viewBox="0 0 24 24" width="36" height="36" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+            <circle cx="12" cy="12" r="8" fill="white" />
+            <circle cx="12" cy="12" r="6" fill="${theme.palette.secondary.main}" />
+            <circle cx="12" cy="12" r="3" fill="white" />
+          </svg>
+        `,
         className: "user-location-icon",
-        iconSize: [40, 40],
-        iconAnchor: [20, 40],
+        iconSize: [36, 36],
+        iconAnchor: [18, 18],
       }),
     [theme.palette.secondary.main],
   );
+
+  const clientMarkers = useMemo(() => {
+    return clients.map((client) => (
+      <Marker
+        key={client.id}
+        position={[client.latitude, client.longitude]}
+        icon={createClassicPinIcon(selectedClient?.id === client.id, theme)}
+        title={client.name}
+        eventHandlers={{ click: () => setSelectedClient(client) }}
+      >
+        <Popup minWidth={200} closeButton={false}>
+          <Box sx={{ p: 0.5 }}>
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.2, mb: 0.5 }}
+            >
+              {client.name}
+            </Typography>
+
+            <Stack spacing={0.5}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <PhoneIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                  {client.phone || "---"}
+                </Typography>
+              </Box>
+              
+              <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                <HomeIcon sx={{ fontSize: 14, color: "text.secondary", mt: 0.2 }} />
+                <Typography variant="caption" sx={{ lineHeight: 1.2, color: "text.primary" }}>
+                  {client.address} {client.address_detail && `• ${client.address_detail}`}
+                </Typography>
+              </Box>
+
+              <Grid container spacing={0.5} sx={{ mt: 0.5 }}>
+                <Grid item xs={6}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
+                    <TimeIcon sx={{ fontSize: 12, color: "secondary.main" }} />
+                    <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
+                      {client.estimated_time || "N/A"}
+                    </Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={6}>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
+                    <RouteIcon sx={{ fontSize: 12, color: "secondary.main" }} />
+                    <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
+                      {client.approximate_distance || "N/A"}
+                    </Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+            </Stack>
+
+            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1, pt: 1, borderTop: "1px dashed", borderColor: "grey.300", gap: 0.5 }}>
+              <Box sx={{ display: "flex", gap: 0.5 }}>
+                {client.image_path && (
+                  <IconButton
+                    size="small"
+                    onClick={() => setOpenImageDialog(true)}
+                    sx={{ bgcolor: "primary.light", color: "primary.contrastText", p: 0.5, "&:hover": { bgcolor: "primary.main" } }}
+                  >
+                    <ViewIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                )}
+                {hasPermission("clientes.edit") && (
+                  <IconButton
+                    size="small"
+                    onClick={() => handleOpenCRUD(client)}
+                    sx={{ bgcolor: "grey.100", p: 0.5 }}
+                  >
+                    <EditIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                )}
+              </Box>
+              
+              <Button
+                size="small"
+                variant="contained"
+                color="secondary"
+                disableElevation
+                onClick={() => {
+                  const url = `https://www.google.com/maps/dir/?api=1&destination=${client.latitude},${client.longitude}&travelmode=driving`;
+                  window.open(url, "_blank");
+                }}
+                sx={{ fontSize: "0.65rem", py: 0, px: 1, minWidth: "auto", height: 24, borderRadius: 1 }}
+                startIcon={<MyLocationIcon sx={{ fontSize: "12px !important" }} />}
+              >
+                GPS
+              </Button>
+            </Box>
+          </Box>
+        </Popup>
+      </Marker>
+    ));
+  }, [clients, selectedClient, theme, hasPermission]);
 
   return (
     <Box sx={{ height: "calc(100vh - 100px)", position: "relative", m: -1 }}>
@@ -415,98 +485,7 @@ export const Clients = () => {
           </Marker>
         )}
 
-        {clients.map((client) => (
-          <Marker
-            key={client.id}
-            position={[client.latitude, client.longitude]}
-            icon={createFlagIcon(client.name, selectedClient?.id === client.id, theme)}
-            eventHandlers={{ click: () => setSelectedClient(client) }}
-          >
-            <Popup minWidth={200} closeButton={false}>
-              <Box sx={{ p: 0.5 }}>
-                <Typography
-                  variant="subtitle2"
-                  sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.2, mb: 0.5 }}
-                >
-                  {client.name}
-                </Typography>
-
-                <Stack spacing={0.5}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <PhoneIcon sx={{ fontSize: 14, color: "text.secondary" }} />
-                    <Typography variant="caption" sx={{ fontWeight: 500 }}>
-                      {client.phone || "---"}
-                    </Typography>
-                  </Box>
-                  
-                  <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
-                    <HomeIcon sx={{ fontSize: 14, color: "text.secondary", mt: 0.2 }} />
-                    <Typography variant="caption" sx={{ lineHeight: 1.2, color: "text.primary" }}>
-                      {client.address} {client.address_detail && `• ${client.address_detail}`}
-                    </Typography>
-                  </Box>
-
-                  <Grid container spacing={0.5} sx={{ mt: 0.5 }}>
-                    <Grid item xs={6}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
-                        <TimeIcon sx={{ fontSize: 12, color: "secondary.main" }} />
-                        <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
-                          {client.estimated_time || "N/A"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
-                        <RouteIcon sx={{ fontSize: 12, color: "secondary.main" }} />
-                        <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
-                          {client.approximate_distance || "N/A"}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </Stack>
-
-                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1, pt: 1, borderTop: "1px dashed", borderColor: "grey.300", gap: 0.5 }}>
-                  <Box sx={{ display: "flex", gap: 0.5 }}>
-                    {client.image_path && (
-                      <IconButton
-                        size="small"
-                        onClick={() => setOpenImageDialog(true)}
-                        sx={{ bgcolor: "primary.light", color: "primary.contrastText", p: 0.5, "&:hover": { bgcolor: "primary.main" } }}
-                      >
-                        <ViewIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    )}
-                    {hasPermission("clientes.edit") && (
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenCRUD(client)}
-                        sx={{ bgcolor: "grey.100", p: 0.5 }}
-                      >
-                        <EditIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    )}
-                  </Box>
-                  
-                  <Button
-                    size="small"
-                    variant="contained"
-                    color="secondary"
-                    disableElevation
-                    onClick={() => {
-                      const url = `https://www.google.com/maps/dir/?api=1&destination=${client.latitude},${client.longitude}&travelmode=driving`;
-                      window.open(url, "_blank");
-                    }}
-                    sx={{ fontSize: "0.65rem", py: 0, px: 1, minWidth: "auto", height: 24, borderRadius: 1 }}
-                    startIcon={<MyLocationIcon sx={{ fontSize: "12px !important" }} />}
-                  >
-                    GPS
-                  </Button>
-                </Box>
-              </Box>
-            </Popup>
-          </Marker>
-        ))}
+        {clientMarkers}
       </MapContainer>
 
       <Box sx={{ position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1000, width: "90%", maxWidth: 500 }}>

@@ -42,6 +42,7 @@ import {
   AttachMoney as MoneyIcon,
   Calculate as CalculateIcon,
   CheckCircle as PayIcon,
+  Visibility as ViewIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
@@ -61,6 +62,7 @@ export const Payroll = () => {
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [calcDialogOpen, setCalcDialogOpen] = useState(false);
+  const [advancesDetailsDialogOpen, setAdvancesDetailsDialogOpen] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState(null);
   
@@ -507,8 +509,15 @@ export const Payroll = () => {
                         <Typography variant="body1" fontWeight="700">{formatCurrency(calcResult?.summary?.gross_salary)}</Typography>
                       </Grid>
 
-                      <Grid item xs={6}>
+                      <Grid item xs={6} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography variant="body2" color="error.main">Adelantos a Descontar:</Typography>
+                        {calcResult?.advances_details?.length > 0 && (
+                          <Tooltip title="Ver detalle de adelantos">
+                            <IconButton size="small" color="error" onClick={() => setAdvancesDetailsDialogOpen(true)}>
+                              <ViewIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </Grid>
                       <Grid item xs={6} align="right">
                         <Typography variant="body1" color="error.main" fontWeight="700">-{formatCurrency(calcResult?.summary?.advances_to_discount)}</Typography>
@@ -565,6 +574,49 @@ export const Payroll = () => {
                Confirmar Pago Total
              </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Advances Details Dialog */}
+      <Dialog open={advancesDetailsDialogOpen} onClose={() => setAdvancesDetailsDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ViewIcon color="error" /> Detalle de Adelantos: {selectedUser?.full_name}
+        </DialogTitle>
+        <DialogContent dividers>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: alpha(theme.palette.error.main, 0.05) }}>
+                  <TableCell sx={{ fontWeight: 700 }}>Fecha</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Descripción</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Monto</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(calcResult?.advances_details || [])
+                  .slice()
+                  .sort((a, b) => new Date(a.date) - new Date(b.date))
+                  .map((advance) => (
+                    <TableRow key={advance.id} hover>
+                      <TableCell>{formatDate(advance.date)}</TableCell>
+                      <TableCell>{advance.description || "Sin descripción"}</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>{formatCurrency(advance.amount)}</TableCell>
+                    </TableRow>
+                  ))}
+                <TableRow>
+                  <TableCell colSpan={2} sx={{ fontWeight: 800, pt: 2 }}>Total a Descontar</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 800, color: 'error.main', pt: 2 }}>
+                    -{formatCurrency(calcResult?.summary?.advances_to_discount)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAdvancesDetailsDialogOpen(false)} variant="contained" color="inherit">
+            Cerrar
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

@@ -86,7 +86,6 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { renderToString } from "react-dom/server";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import {
@@ -214,10 +213,20 @@ export const Orders = () => {
     const type = itemTabValue === 0 ? "product" : "service";
     let all = type === "product" ? products : services;
 
-    if (!searchQuery) return all;
-    return all.filter((item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()),
-    );
+    // Filter out products with stock <= 0
+    if (type === "product") {
+      all = all.filter((p) => p.stock > 0);
+    }
+
+    let filtered = all;
+    if (searchQuery) {
+      filtered = all.filter((item) =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      );
+    }
+
+    // Sort alphabetically by name
+    return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }, [products, services, searchQuery, itemTabValue]);
 
   const totalPaid = useMemo(
@@ -397,6 +406,7 @@ export const Orders = () => {
         discount: discount,
         rider_id: selectedRider,
         notes: orderNotes,
+        delivery_notes: orderNotes,
         scheduled_at: scheduledAt || null,
       });
       notificationSwal("Registrado", "Pedido creado con éxito.", "success");
@@ -442,11 +452,11 @@ export const Orders = () => {
   const userMarkerIcon = useMemo(
     () =>
       new L.divIcon({
-        html: renderToString(
-          <MyLocationIcon
-            style={{ fontSize: 28, color: theme.palette.secondary.main }}
-          />,
-        ),
+        html: `
+          <svg viewBox="0 0 24 24" width="28" height="28" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+            <path fill="${theme.palette.secondary.main}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+          </svg>
+        `,
         iconSize: [28, 28],
         iconAnchor: [14, 28],
       }),
@@ -455,9 +465,11 @@ export const Orders = () => {
 
   const orderMarkerIcon = (color = theme.palette.primary.main) =>
     new L.divIcon({
-      html: renderToString(
-        <LocationOnIcon style={{ fontSize: 32, color: color }} />,
-      ),
+      html: `
+        <svg viewBox="0 0 24 24" width="32" height="32" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
+          <path fill="${color}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      `,
       iconSize: [32, 32],
       iconAnchor: [16, 32],
       popupAnchor: [0, -32],
@@ -740,7 +752,6 @@ export const Orders = () => {
                             transition: "all 0.1s",
                             cursor: "pointer",
                             position: "relative",
-                            opacity: item.type === "product" && item.stock <= 0 ? 0.6 : 1,
                             "&:hover": { 
                               boxShadow: theme.shadows[2],
                               borderColor: "divider",
@@ -811,24 +822,6 @@ export const Orders = () => {
                             >
                               {formatCurrency(item.price, currency)}
                             </Typography>
-
-                            {item.type === "product" && item.stock <= 0 && (
-                              <Box
-                                sx={{
-                                  position: "absolute",
-                                  inset: 0,
-                                  bgcolor: "rgba(0,0,0,0.6)",
-                                  color: "white",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  borderRadius: 1,
-                                  zIndex: 3
-                                }}
-                              >
-                                <Typography variant="caption" fontWeight="900" sx={{ fontSize: 9 }}>AGOTADO</Typography>
-                              </Box>
-                            )}
                           </CardContent>
                         </Card>
                       </Grid>

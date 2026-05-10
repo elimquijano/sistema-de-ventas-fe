@@ -355,30 +355,43 @@ export const CashRegisterReport = ({ reportData, onPrintReceipt, isPrinting }) =
                     key={idx}
                     divider={idx < productSummary.length - 1}
                     sx={{ 
-                      px: 2, 
+                      px: isMobile ? 1 : 2, 
                       py: 2,
+                      flexDirection: isMobile ? 'column' : 'row',
+                      alignItems: isMobile ? 'flex-start' : 'center',
                       '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.02) }
                     }}
                   >
-                    <Avatar sx={{ mr: 2.5, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', width: 48, height: 48 }}>
-                      <InventoryIcon />
-                    </Avatar>
-                    <ListItemText
-                      primary={<Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary' }}>{item.name}</Typography>}
-                      secondary={
-                        <Chip 
-                          label={item.type} 
-                          size="small" 
-                          sx={{ height: 18, fontSize: '0.6rem', fontWeight: 800, mt: 0.5 }} 
-                        />
-                      }
-                    />
-                    <Stack direction="row" spacing={4} alignItems="center">
-                      <Box sx={{ textAlign: 'center' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%', mb: isMobile ? 2 : 0 }}>
+                      <Avatar sx={{ mr: 2.5, bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main', width: 48, height: 48 }}>
+                        <InventoryIcon />
+                      </Avatar>
+                      <ListItemText
+                        primary={<Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.2 }}>{item.name}</Typography>}
+                        secondary={
+                          <Chip 
+                            label={item.type} 
+                            size="small" 
+                            sx={{ height: 18, fontSize: '0.6rem', fontWeight: 800, mt: 0.5 }} 
+                          />
+                        }
+                      />
+                    </Box>
+                    <Stack 
+                      direction="row" 
+                      spacing={isMobile ? 0 : 4} 
+                      alignItems="center" 
+                      sx={{ 
+                        width: isMobile ? '100%' : 'auto',
+                        justifyContent: isMobile ? 'space-between' : 'flex-end',
+                        pl: isMobile ? 0 : 2
+                      }}
+                    >
+                      <Box sx={{ textAlign: isMobile ? 'left' : 'center' }}>
                         <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', fontWeight: 800, letterSpacing: 1 }}>CANT.</Typography>
                         <Typography variant="h6" sx={{ fontWeight: 900 }}>{item.quantity}</Typography>
                       </Box>
-                      <Box sx={{ textAlign: 'right', minWidth: 100 }}>
+                      <Box sx={{ textAlign: 'right', minWidth: isMobile ? 'auto' : 100 }}>
                         <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', fontWeight: 800, letterSpacing: 1 }}>TOTAL</Typography>
                         <Typography variant="h6" sx={{ fontWeight: 900, color: 'primary.main' }}>
                           {formatCurrency(item.total, currency)}

@@ -113,15 +113,7 @@ export const Credits = () => {
 
   const handleOpenPaymentDialog = (credit) => {
     setSelectedCredit(credit);
-    setPayments([
-      {
-        id: Date.now(),
-        payment_method: "cash",
-        amount: credit.pending_amount.toString(),
-        reference: "",
-        payment_image: null,
-      },
-    ]);
+    setPayments([]); // Empezar sin ningún método, el usuario debe elegir uno
     setOpenPaymentDialog(true);
   };
 
@@ -134,6 +126,12 @@ export const Credits = () => {
 
       if (totalPaid <= 0) {
         notificationSwal("Error", "El monto total debe ser mayor a 0.", "error");
+        return;
+      }
+
+      // Validar que todos los pagos tengan método seleccionado
+      if (payments.some(p => !p.payment_method)) {
+        notificationSwal("Error", "Debe seleccionar un método de pago para cada monto.", "error");
         return;
       }
 

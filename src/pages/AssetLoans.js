@@ -69,6 +69,7 @@ export const AssetLoans = () => {
   const [returnData, setReturnData] = useState({
     status: "returned",
     notes: "",
+    quantity: "",
   });
 
   useEffect(() => {
@@ -131,6 +132,7 @@ export const AssetLoans = () => {
     setReturnData({
       status: "returned",
       notes: "",
+      quantity: loan.pending_quantity || loan.quantity,
     });
     setOpenReturnDialog(true);
   };
@@ -138,14 +140,17 @@ export const AssetLoans = () => {
   const handleReturnLoan = async () => {
     setIsSubmitting(true);
     try {
-      await assetLoansAPI.returnLoan(selectedLoan.id, returnData);
+      await assetLoansAPI.returnLoan(selectedLoan.id, {
+        ...returnData,
+        quantity: parseFloat(returnData.quantity)
+      });
       notificationSwal("Devolución Registrada", "La devolución ha sido registrada exitosamente.", "success");
       setOpenReturnDialog(false);
       loadLoans();
       loadAssets();
     } catch (error) {
       console.error("Error returning loan:", error);
-      notificationSwal("Error", "Error al registrar la devolución.", "error");
+      notificationSwal("Error", error.response?.data?.message || "Error al registrar la devolución.", "error");
     } finally {
       setIsSubmitting(false);
     }
@@ -251,8 +256,8 @@ export const AssetLoans = () => {
                     <TableCell>Beneficiario</TableCell>
                     <TableCell>Cant.</TableCell>
                     <TableCell>Fecha Préstamo</TableCell>
-                    <TableCell>Fecha Venc.</TableCell>
                     <TableCell>Estado</TableCell>
+                    <TableCell>Registrado por</TableCell>
                     <TableCell align="right">Acciones</TableCell>
                   </TableRow>
                 </TableHead>
@@ -267,8 +272,8 @@ export const AssetLoans = () => {
                       </TableCell>
                       <TableCell>{loan.quantity}</TableCell>
                       <TableCell>{formatDate(loan.loan_date)}</TableCell>
-                      <TableCell>{loan.due_date ? formatDate(loan.due_date) : "-"}</TableCell>
                       <TableCell>{getStatusChip(loan.status)}</TableCell>
+                      <TableCell>{loan.creator?.full_name || "N/A"}</TableCell>
                       <TableCell align="right">
                         {loan.status === "loaned" && hasPermission("assets.loan.complete") && (
                           <Tooltip title="Registrar Devolución">
@@ -345,16 +350,6 @@ export const AssetLoans = () => {
                 required
               />
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Fecha de Vencimiento"
-                type="date"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -389,9 +384,19 @@ export const AssetLoans = () => {
               Activo: <strong>{selectedLoan?.asset?.name}</strong>
             </Typography>
             <Typography variant="body2" gutterBottom>
-              Cantidad: <strong>{selectedLoan?.quantity}</strong>
+              Cantidad Pendiente: <strong>{selectedLoan?.pending_quantity || selectedLoan?.quantity}</strong>
             </Typography>
             <Grid container spacing={2} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Cantidad a devolver"
+                  type="number"
+                  value={returnData.quantity}
+                  onChange={(e) => setReturnData({ ...returnData, quantity: e.target.value })}
+                  required
+                />
+              </Grid>
               <Grid item xs={12}>
                 <FormControl fullWidth>
                   <InputLabel>Estado de Devolución</InputLabel>

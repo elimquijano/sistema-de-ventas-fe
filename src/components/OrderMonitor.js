@@ -160,7 +160,7 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
           fontWeight="600"
           sx={{ fontSize: 10, color: "text.secondary" }}
         >
-          {formatDate(order.created_at)}
+          {formatDate(order.created_at)} - {new Date(order.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false })}
         </Typography>
       </Box>
       <CardContent sx={{ flex: 1, p: 1.5 }}>

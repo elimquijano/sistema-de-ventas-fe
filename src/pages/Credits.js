@@ -336,8 +336,8 @@ export const Credits = () => {
                   <TableCell>Pendiente</TableCell>
                   <TableCell>Pagado</TableCell>
                   <TableCell>Total</TableCell>
-                  <TableCell>Vencimiento</TableCell>
                   <TableCell>Estado</TableCell>
+                  <TableCell>Registrado por</TableCell>
                   <TableCell align="right">Acciones</TableCell>
                 </TableRow>
               </TableHead>
@@ -378,13 +378,17 @@ export const Credits = () => {
                         {formatCurrency(credit.total_amount)}
                       </Typography>
                     </TableCell>
-                    <TableCell>{formatDate(credit.due_date)}</TableCell>
                     <TableCell>
                       <Chip
                         label={getStatusLabel(credit.status)}
                         size="small"
                         color={getStatusColor(credit.status)}
                       />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {credit.creator?.full_name || "N/A"}
+                      </Typography>
                     </TableCell>
                     <TableCell align="right">
                       {hasPermission("creditos.pay") &&
@@ -516,22 +520,6 @@ export const Credits = () => {
         <DialogContent>
           {editingCredit && (
             <Grid container spacing={2} sx={{ mt: 1 }}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Fecha de Vencimiento"
-                  type="date"
-                  value={editFormData.due_date}
-                  onChange={(e) =>
-                    setEditFormData({
-                      ...editFormData,
-                      due_date: e.target.value,
-                    })
-                  }
-                  InputLabelProps={{ shrink: true }}
-                  disabled={isSubmitting}
-                />
-              </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth

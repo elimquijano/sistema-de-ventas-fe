@@ -67,25 +67,29 @@ export const Payroll = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   
   // Form States
+  const getCurrentPeruDate = () => {
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+  };
+
   const [configData, setConfigData] = useState({
     base_salary: "",
     payment_frequency: "monthly",
   });
 
   const [attendanceData, setAttendanceData] = useState({
-    date: new Date().toISOString().split("T")[0],
+    date: getCurrentPeruDate(),
     status: "absent",
     notes: ""
   });
 
   const [advanceData, setAdvanceData] = useState({
     amount: "",
-    date: new Date().toISOString().split("T")[0],
+    date: getCurrentPeruDate(),
     description: ""
   });
 
   const [calcParams, setCalcParams] = useState({
-    end_date: new Date().toISOString().split("T")[0],
+    end_date: getCurrentPeruDate(),
   });
 
   const [calcResult, setCalcResult] = useState(null);

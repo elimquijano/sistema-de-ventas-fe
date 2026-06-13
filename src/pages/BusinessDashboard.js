@@ -21,6 +21,7 @@ import {
   Tooltip as MuiTooltip,
   Divider,
   Chip,
+  TextField,
 } from "@mui/material";
 import {
   TrendingUp,
@@ -56,7 +57,7 @@ import {
   Area,
 } from "recharts";
 import { formatCurrency, formatDate } from "../utils/formatters";
-import { businessAPI, cashRegisterAPI, salesAPI } from "../utils/api";
+import { businessAPI, cashRegisterAPI, salesAPI, default as api } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
 import { CashRegisterReport } from "../components/CashRegisterReport";
@@ -83,15 +84,22 @@ const SmartTooltip = ({ active, payload, label, currency }) => {
       >
         {label && <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1 }}>{label}</Typography>}
         {payload.map((item, index) => (
-          <Stack key={index} direction="row" spacing={3} justifyContent="space-between" alignItems="center" sx={{ color: item.fill || item.color }}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: item.fill || item.color }} />
-              <Typography variant="caption" sx={{ fontWeight: 700 }}>{item.name}:</Typography>
+          <Box key={index} sx={{ mb: index === payload.length - 1 ? 0 : 1 }}>
+            <Stack direction="row" spacing={3} justifyContent="space-between" alignItems="center" sx={{ color: item.fill || item.color }}>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: item.fill || item.color }} />
+                <Typography variant="caption" sx={{ fontWeight: 700 }}>{item.name}:</Typography>
+              </Stack>
+              <Typography variant="caption" sx={{ fontWeight: 800 }}>
+                {typeof item.value === 'number' ? formatCurrency(item.value, currency) : item.value}
+              </Typography>
             </Stack>
-            <Typography variant="caption" sx={{ fontWeight: 800 }}>
-              {typeof item.value === 'number' ? formatCurrency(item.value, currency) : item.value}
-            </Typography>
-          </Stack>
+            {item.payload?.quantity !== undefined && (
+              <Typography variant="caption" display="block" sx={{ textAlign: 'right', fontWeight: 600, color: 'text.secondary', mt: -0.5 }}>
+                Cant: {item.payload.quantity}
+              </Typography>
+            )}
+          </Box>
         ))}
       </Paper>
     );
@@ -164,6 +172,10 @@ export const BusinessDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("week");
+  const [customDates, setCustomDates] = useState({
+    from: new Date().toISOString().split('T')[0],
+    to: new Date().toISOString().split('T')[0]
+  });
   const isInitialMount = useRef(true);
 
   const [openReportsDialog, setOpenReportsDialog] = useState(false);
@@ -184,7 +196,20 @@ export const BusinessDashboard = () => {
   const loadDashboardData = async (selectedPeriod, isInitial = false) => {
     if (isInitial) setLoading(true);
     try {
-      const response = await businessAPI.getStats(user.business_id, selectedPeriod);
+      let response;
+      if (selectedPeriod === 'custom') {
+        response = await api.get(`/businesses/${user.business_id}/dashboard`, { 
+          params: { 
+            period: 'custom',
+            from: customDates.from,
+            to: customDates.to
+          }, 
+          loaderMessage: "Cargando estadísticas..." 
+        });
+      } else {
+        response = await businessAPI.getStats(user.business_id, selectedPeriod);
+      }
+      
       setDashboardData(response.data);
       if (isInitial) {
         const businessRes = await businessAPI.getById(user.business_id);
@@ -203,8 +228,14 @@ export const BusinessDashboard = () => {
 
   useEffect(() => {
     if (isInitialMount.current) { isInitialMount.current = false; return; }
-    loadDashboardData(period);
+    if (period !== 'custom') {
+      loadDashboardData(period);
+    }
   }, [period]);
+
+  const handleCustomDateChange = () => {
+    loadDashboardData('custom');
+  };
 
   const handleOpenReports = async (cashRegisterId) => {
     try {
@@ -265,7 +296,11 @@ export const BusinessDashboard = () => {
   const pieUser = charts.profit_by_user.map(u => ({ name: u.name, value: safeNum(u.value) })).filter(v => v.value > 0);
   const pieCat = charts.expenses_by_category.map(c => ({ name: c.name, value: safeNum(c.value) })).filter(v => v.value > 0);
   
-  const barProducts = top_products.slice(0, 5).map(p => ({ name: p.name, revenue: safeNum(p.revenue) }));
+  const barProducts = top_products.slice(0, 5).map(p => ({ 
+    name: p.name, 
+    revenue: safeNum(p.revenue),
+    quantity: safeNum(p.quantity)
+  }));
   const barClients = charts.top_clients.slice(0, 5).map(c => ({ name: c.name, value: safeNum(c.value) }));
 
   return (
@@ -277,12 +312,38 @@ export const BusinessDashboard = () => {
           <Typography variant="body1" color="text.secondary" sx={{ fontWeight: 600 }}>{business?.name} • Inteligencia Operativa</Typography>
         </Box>
         <Paper elevation={0} sx={{ p: 0.5, borderRadius: "16px", bgcolor: alpha(theme.palette.divider, 0.05), border: "1px solid", borderColor: theme.palette.divider }}>
-          <ToggleButtonGroup value={period} exclusive onChange={(e, v) => v && setPeriod(v)} size="medium">
-            <ToggleButton value="day" sx={{ borderRadius: "12px", px: 3, border: "none" }}>Hoy</ToggleButton>
-            <ToggleButton value="week" sx={{ borderRadius: "12px", px: 3, border: "none" }}>Semana</ToggleButton>
-            <ToggleButton value="month" sx={{ borderRadius: "12px", px: 3, border: "none" }}>Mes</ToggleButton>
-            <ToggleButton value="year" sx={{ borderRadius: "12px", px: 3, border: "none" }}>Año</ToggleButton>
-          </ToggleButtonGroup>
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1} alignItems="center">
+            {period === 'custom' && (
+              <Stack direction="row" spacing={1} sx={{ mr: 1 }}>
+                <TextField
+                  type="date"
+                  size="small"
+                  label="Desde"
+                  value={customDates.from}
+                  onChange={(e) => setCustomDates({ ...customDates, from: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <TextField
+                  type="date"
+                  size="small"
+                  label="Hasta"
+                  value={customDates.to}
+                  onChange={(e) => setCustomDates({ ...customDates, to: e.target.value })}
+                  InputLabelProps={{ shrink: true }}
+                />
+                <IconButton color="primary" onClick={handleCustomDateChange}>
+                  <Timeline />
+                </IconButton>
+              </Stack>
+            )}
+            <ToggleButtonGroup value={period} exclusive onChange={(e, v) => v && setPeriod(v)} size="medium">
+              <ToggleButton value="day" sx={{ borderRadius: "12px", px: 2, border: "none" }}>Hoy</ToggleButton>
+              <ToggleButton value="week" sx={{ borderRadius: "12px", px: 2, border: "none" }}>Semana</ToggleButton>
+              <ToggleButton value="month" sx={{ borderRadius: "12px", px: 2, border: "none" }}>Mes</ToggleButton>
+              <ToggleButton value="year" sx={{ borderRadius: "12px", px: 2, border: "none" }}>Año</ToggleButton>
+              <ToggleButton value="custom" sx={{ borderRadius: "12px", px: 2, border: "none" }}>Personalizado</ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
         </Paper>
       </Stack>
 

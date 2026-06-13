@@ -6,13 +6,9 @@ import React, {
   useMemo,
 } from "react";
 import {
-  MapContainer,
-  TileLayer,
-  Marker,
   LayersControl,
-  ZoomControl,
+  Marker,
   Popup,
-  Tooltip,
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -59,9 +55,10 @@ import {
   MyLocation as MyLocationIcon,
 } from "@mui/icons-material";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
-import { clientsAPI } from "../utils/api";
+import { clientsAPI, businessAPI } from "../utils/api";
 import { compressImage } from "../utils/imageCompression";
 import { useAuth } from "../contexts/AuthContext";
+import { MapComponent } from "../components/MapComponent";
 
 // --- CONFIGURACIÓN DE ÍCONOS LEAFLET ---
 delete L.Icon.Default.prototype._getIconUrl;
@@ -94,13 +91,14 @@ const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 // --- COMPONENTE PRINCIPAL ---
 export const Clients = () => {
   const theme = useTheme();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { BaseLayer } = LayersControl;
 
   // Estados de Datos
   const [clients, setClients] = useState([]);
   const [userLocation, setUserLocation] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [business, setBusiness] = useState(null);
 
   // Estados de UI
   const [selectedClient, setSelectedClient] = useState(null);
@@ -139,13 +137,18 @@ export const Clients = () => {
         (c) => c.latitude && c.longitude,
       );
       setClients(validClients);
+
+      if (user?.business_id) {
+        const bizRes = await businessAPI.getById(user.business_id);
+        setBusiness(bizRes.data);
+      }
     } catch (error) {
       console.error("Error loading clients:", error);
       notificationSwal("Error", "No se pudieron cargar los clientes.", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.business_id]);
 
   useEffect(() => {
     loadClients();
@@ -453,40 +456,106 @@ export const Clients = () => {
 
   return (
     <Box sx={{ height: "calc(100vh - 100px)", position: "relative", m: -1 }}>
-      <MapContainer
-        center={[-12.0464, -77.0428]}
+      <MapComponent
+        center={userLocation}
         zoom={13}
-        style={{ height: "100%", width: "100%" }}
-        zoomControl={false}
-        ref={mapRef}
-      >
-        <ZoomControl position="bottomright" />
-        <LayersControl position="topright">
-          <BaseLayer checked name="Google Híbrido">
-            <TileLayer
-              url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
-              subdomains={["mt0", "mt1", "mt2", "mt3"]}
-            />
-          </BaseLayer>
-          <BaseLayer name="Google Satélite">
-            <TileLayer
-              url="http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-              subdomains={["mt0", "mt1", "mt2", "mt3"]}
-            />
-          </BaseLayer>
-          <BaseLayer name="OpenStreetMap">
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          </BaseLayer>
-        </LayersControl>
+        height="100%"
+        onMapInstance={(instance) => { mapRef.current = instance; }}
+        businessData={business ? {
+          lat: parseFloat(business.latitude),
+          lng: parseFloat(business.longitude),
+          name: business.name,
+          address: business.address
+        } : null}
+        markers={clients.map(client => ({
+          lat: client.latitude,
+          lng: client.longitude,
+          icon: createClassicPinIcon(selectedClient?.id === client.id, theme),
+          popup: (
+            <Box sx={{ p: 0.5 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{ fontWeight: 800, color: "primary.main", lineHeight: 1.2, mb: 0.5 }}
+              >
+                {client.name}
+              </Typography>
 
-        {userLocation && (
-          <Marker position={userLocation} icon={userMarkerIcon}>
-            <Tooltip>Tu ubicación</Tooltip>
-          </Marker>
-        )}
+              <Stack spacing={0.5}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <PhoneIcon sx={{ fontSize: 14, color: "text.secondary" }} />
+                  <Typography variant="caption" sx={{ fontWeight: 500 }}>
+                    {client.phone || "---"}
+                  </Typography>
+                </Box>
+                
+                <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1 }}>
+                  <HomeIcon sx={{ fontSize: 14, color: "text.secondary", mt: 0.2 }} />
+                  <Typography variant="caption" sx={{ lineHeight: 1.2, color: "text.primary" }}>
+                    {client.address} {client.address_detail && `• ${client.address_detail}`}
+                  </Typography>
+                </Box>
 
-        {clientMarkers}
-      </MapContainer>
+                <Grid container spacing={0.5} sx={{ mt: 0.5 }}>
+                  <Grid item xs={6}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
+                      <TimeIcon sx={{ fontSize: 12, color: "secondary.main" }} />
+                      <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
+                        {client.estimated_time || "N/A"}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, bgcolor: "grey.50", p: 0.4, borderRadius: 1, border: "1px solid", borderColor: "grey.200" }}>
+                      <RouteIcon sx={{ fontSize: 12, color: "secondary.main" }} />
+                      <Typography variant="caption" sx={{ fontSize: "0.65rem", fontWeight: 700 }}>
+                        {client.approximate_distance || "N/A"}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Stack>
+
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mt: 1, pt: 1, borderTop: "1px dashed", borderColor: "grey.300", gap: 0.5 }}>
+                <Box sx={{ display: "flex", gap: 0.5 }}>
+                  {client.image_path && (
+                    <IconButton
+                      size="small"
+                      onClick={() => setOpenImageDialog(true)}
+                      sx={{ bgcolor: "primary.light", color: "primary.contrastText", p: 0.5, "&:hover": { bgcolor: "primary.main" } }}
+                    >
+                      <ViewIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  )}
+                  {hasPermission("clientes.edit") && (
+                    <IconButton
+                      size="small"
+                      onClick={() => handleOpenCRUD(client)}
+                      sx={{ bgcolor: "grey.100", p: 0.5 }}
+                    >
+                      <EditIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  )}
+                </Box>
+                
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="secondary"
+                  disableElevation
+                  onClick={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${client.latitude},${client.longitude}&travelmode=driving`;
+                    window.open(url, "_blank");
+                  }}
+                  sx={{ fontSize: "0.65rem", py: 0, px: 1, minWidth: "auto", height: 24, borderRadius: 1 }}
+                  startIcon={<MyLocationIcon sx={{ fontSize: "12px !important" }} />}
+                >
+                  GPS
+                </Button>
+              </Box>
+            </Box>
+          )
+        }))}
+      />
 
       <Box sx={{ position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1000, width: "90%", maxWidth: 500 }}>
         <Paper elevation={4} sx={{ p: 0.5, borderRadius: 3, display: "flex", alignItems: "center" }}>
@@ -587,25 +656,18 @@ export const Clients = () => {
       <Dialog open={openLocationDialog} onClose={() => setOpenLocationDialog(false)} maxWidth="md" fullWidth>
         <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Typography variant="h6" fontWeight="700">Ajustar Ubicación</Typography>
-          <Stack direction="row" spacing={1}>
-            <MuiTooltip title="Usar GPS">
-              <IconButton color={locationMode === "tracking" ? "primary" : "default"} onClick={() => setLocationMode("tracking")}><GpsFixed /></IconButton>
-            </MuiTooltip>
-            <MuiTooltip title="Ajuste Manual">
-              <IconButton color={locationMode === "manual" ? "primary" : "default"} onClick={() => setLocationMode("manual")}><EditLocationAlt /></IconButton>
-            </MuiTooltip>
-          </Stack>
         </DialogTitle>
         <DialogContent sx={{ p: 0, height: 400, position: "relative" }}>
-          <MapContainer center={tempLocation ? [tempLocation.lat, tempLocation.lng] : [-12.0464, -77.0428]} zoom={18} style={{ height: "100%", width: "100%" }} ref={locationMapRef}>
-            <TileLayer url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}" subdomains={["mt0", "mt1", "mt2", "mt3"]} />
-            {locationMode === "tracking" && tempLocation && <Marker position={[tempLocation.lat, tempLocation.lng]} icon={userMarkerIcon} />}
-          </MapContainer>
-          {locationMode === "manual" && (
-            <Box sx={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", zIndex: 1000, pointerEvents: "none" }}>
-              <PersonPinCircle sx={{ fontSize: 50, color: theme.palette.primary.main, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.5))" }} />
-            </Box>
-          )}
+          <MapComponent
+            center={tempLocation}
+            zoom={18}
+            isPicker={true}
+            locationMode={locationMode}
+            onModeChange={setLocationMode}
+            onLocationSelect={setTempLocation}
+            height="100%"
+            onMapInstance={(instance) => { locationMapRef.current = instance; }}
+          />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenLocationDialog(false)}>Cancelar</Button>

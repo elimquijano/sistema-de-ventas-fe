@@ -83,9 +83,6 @@ import {
   Info as InfoIcon,
   AddCard as AddCardIcon,
 } from "@mui/icons-material";
-import { MapContainer, TileLayer, Marker, Popup, useMap, LayersControl } from "react-leaflet";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import {
@@ -99,30 +96,15 @@ import {
   categoriesAPI,
 } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
+import { MapComponent } from "../components/MapComponent";
 
 import { OrderMonitor } from "../components/OrderMonitor";
-
-// --- CONFIGURACIÓN DE ÍCONOS LEAFLET ---
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
-  iconUrl: require("leaflet/dist/images/marker-icon.png"),
-  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
-});
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
-
-const MapRecenter = ({ location, zoom = 17 }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (location) map.flyTo([location.lat, location.lng], zoom);
-  }, [location, map, zoom]);
-  return null;
-};
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -364,6 +346,34 @@ export const Orders = () => {
     );
     const data = await res.json();
     setCustomerAddress(data.features?.[0]?.place_name || "");
+    
+    // Calcular distancia y tiempo desde el negocio
+    if (user?.business?.latitude && user?.business?.longitude) {
+      calculateDistanceAndTime(
+        { lat: parseFloat(user.business.latitude), lng: parseFloat(user.business.longitude) },
+        { lat, lng }
+      );
+    }
+  };
+
+  const calculateDistanceAndTime = async (origin, dest) => {
+    if (!MAPBOX_TOKEN) return;
+    try {
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${origin.lng},${origin.lat};${dest.lng},${dest.lat}?access_token=${MAPBOX_TOKEN}&geometries=geojson`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const distanceKm = (route.distance / 1000).toFixed(2);
+        const durationMin = Math.round(route.duration / 60);
+        
+        // Guardar en notas para referencia visual o enviarlo al backend
+        const infoStr = `Distancia: ${distanceKm} km | Tiempo aprox: ${durationMin} min`;
+        setOrderNotes(prev => prev ? `${prev}\n${infoStr}` : infoStr);
+      }
+    } catch (error) {
+      console.error("Error calculating Mapbox directions:", error);
+    }
   };
 
   const handleConfirmLocation = () => {
@@ -448,33 +458,6 @@ export const Orders = () => {
       );
     }
   };
-
-  const userMarkerIcon = useMemo(
-    () =>
-      new L.divIcon({
-        html: `
-          <svg viewBox="0 0 24 24" width="28" height="28" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
-            <path fill="${theme.palette.secondary.main}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-          </svg>
-        `,
-        iconSize: [28, 28],
-        iconAnchor: [14, 28],
-      }),
-    [theme.palette.secondary.main],
-  );
-
-  const orderMarkerIcon = (color = theme.palette.primary.main) =>
-    new L.divIcon({
-      html: `
-        <svg viewBox="0 0 24 24" width="32" height="32" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
-          <path fill="${color}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-        </svg>
-      `,
-      iconSize: [32, 32],
-      iconAnchor: [16, 32],
-      popupAnchor: [0, -32],
-      className: "order-marker",
-    });
 
   return (
     <Box
@@ -657,16 +640,29 @@ export const Orders = () => {
                           InputProps={{
                             ...p.InputProps,
                             endAdornment: (
-                              <IconButton
-                                size="small"
-                                color="secondary"
-                                onClick={() => {
-                                  setTempLocation(customerLocation || userLocation);
-                                  setOpenLocationDialog(true);
-                                }}
-                              >
-                                <MapIcon fontSize="small" />
-                              </IconButton>
+                              <React.Fragment>
+                                {p.InputProps.endAdornment}
+                                <InputAdornment position="end">
+                                  <MuiTooltip title="Seleccionar en mapa">
+                                    <IconButton
+                                      size="small"
+                                      color="primary"
+                                      onClick={() => {
+                                        // Prioridad: Ubicación ya puesta > Ubicación GPS > Ubicación Negocio (esto lo maneja MapComponent si mandamos null)
+                                        setTempLocation(customerLocation || userLocation || null);
+                                        setOpenLocationDialog(true);
+                                      }}
+                                      sx={{ 
+                                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                                        "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.2) },
+                                        ml: 0.5
+                                      }}
+                                    >
+                                      <MapIcon fontSize="small" />
+                                    </IconButton>
+                                  </MuiTooltip>
+                                </InputAdornment>
+                              </React.Fragment>
                             ),
                           }}
                         />
@@ -1035,66 +1031,18 @@ export const Orders = () => {
           }}
         >
           <Typography variant="subtitle1" fontWeight="700">FIJAR UBICACIÓN</Typography>
-          <Stack direction="row" spacing={1}>
-            <IconButton
-              size="small"
-              onClick={() => setLocationMode("tracking")}
-              sx={{ color: locationMode === "tracking" ? "white" : alpha("#fff", 0.5) }}
-            >
-              <GpsFixedIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => setLocationMode("manual")}
-              sx={{ color: locationMode === "manual" ? "white" : alpha("#fff", 0.5) }}
-            >
-              <EditLocationIcon fontSize="small" />
-            </IconButton>
-          </Stack>
         </DialogTitle>
         <DialogContent sx={{ p: 0, height: 400, position: "relative" }}>
-          <MapContainer
-            center={tempLocation ? [tempLocation.lat, tempLocation.lng] : [-9.93, -76.24]}
+          <MapComponent
+            center={tempLocation}
             zoom={15}
-            style={{ height: "100%", width: "100%" }}
-            ref={locationMapRef}
-          >
-            <LayersControl position="topright">
-              <LayersControl.BaseLayer checked name="Google Calles">
-                <TileLayer
-                  url="http://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
-                  subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                />
-              </LayersControl.BaseLayer>
-              <LayersControl.BaseLayer name="Google Satélite">
-                <TileLayer
-                  url="http://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}"
-                  subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                />
-              </LayersControl.BaseLayer>
-              <LayersControl.BaseLayer name="Google Híbrido">
-                <TileLayer
-                  url="http://{s}.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
-                  subdomains={["mt0", "mt1", "mt2", "mt3"]}
-                />
-              </LayersControl.BaseLayer>
-            </LayersControl>
-            <MapRecenter location={tempLocation} />
-          </MapContainer>
-          {locationMode === "manual" && (
-            <Box
-              sx={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -100%)",
-                zIndex: 1000,
-                pointerEvents: "none",
-              }}
-            >
-              <LocationOnIcon sx={{ fontSize: 40, color: "primary.main", filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }} />
-            </Box>
-          )}
+            isPicker={true}
+            locationMode={locationMode}
+            onModeChange={setLocationMode}
+            onLocationSelect={setTempLocation}
+            height="100%"
+            onMapInstance={(instance) => { locationMapRef.current = instance; }}
+          />
         </DialogContent>
         <DialogActions sx={{ p: 1.5 }}>
           <Button onClick={() => setOpenLocationDialog(false)} color="inherit" sx={{ fontWeight: 600 }}>

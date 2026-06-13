@@ -313,27 +313,36 @@ export const DashboardLayout = () => {
         <Box
           sx={{
             borderRadius: "50%",
-            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             mr: sidebarCollapsed ? 0 : 1,
+            overflow: "hidden",
+            width: 32,
+            height: 32,
           }}
         >
-          <Logo height={32} />
+          {user?.business?.logo_url ? (
+            <img src={user.business.logo_url} alt="Logo" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <Logo height={32} />
+          )}
         </Box>
         {!sidebarCollapsed && (
           <Typography
             variant="h6"
             sx={{
-              fontWeight: 700,
+              fontWeight: 800,
               color: theme.palette.primary.main,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              textTransform: "uppercase",
+              fontSize: "0.9rem",
+              lineHeight: 1.1
             }}
           >
-            STOCK MASTER
+            {user?.business?.name || "STOCK MASTER"}
           </Typography>
         )}
       </Box>

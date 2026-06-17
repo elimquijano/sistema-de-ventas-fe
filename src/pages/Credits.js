@@ -55,7 +55,11 @@ export const Credits = () => {
 
   const [salesCredits, setSalesCredits] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchFilters, setSearchFilters] = useState({ status: "pending" });
+  const [searchFilters, setSearchFilters] = useState({ 
+    search: "", 
+    status: "pending", 
+    date: "" 
+  });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
@@ -102,13 +106,7 @@ export const Credits = () => {
   const handleChangeFilter = (event) => {
     const { name, value } = event.target;
     setPage(1);
-    setSearchFilters((prevFilters) => {
-      if (value === "") {
-        const { [name]: _, ...newFilters } = prevFilters;
-        return newFilters;
-      }
-      return { ...prevFilters, [name]: value };
-    });
+    setSearchFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleOpenPaymentDialog = (credit) => {

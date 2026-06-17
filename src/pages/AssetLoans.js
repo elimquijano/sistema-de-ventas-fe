@@ -27,6 +27,7 @@ import {
   Grid,
   CircularProgress,
   Tooltip,
+  Pagination,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -45,8 +46,10 @@ export const AssetLoans = () => {
   const [loans, setLoans] = useState([]);
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("loaned");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [searchFilters, setSearchFilters] = useState({ status: "loaned", search: "" });
+  
   const [openDialog, setOpenDialog] = useState(false);
   const [openReturnDialog, setOpenReturnDialog] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
@@ -74,14 +77,18 @@ export const AssetLoans = () => {
 
   useEffect(() => {
     loadLoans();
+  }, [page, searchFilters]);
+
+  useEffect(() => {
     loadAssets();
   }, []);
 
   const loadLoans = async () => {
     try {
       setLoading(true);
-      const response = await assetLoansAPI.getAll();
+      const response = await assetLoansAPI.getAll({ page, ...searchFilters });
       setLoans(response.data.data || []);
+      setTotalPages(response.data.last_page || 1);
     } catch (error) {
       console.error("Error loading loans:", error);
       notificationSwal("Error", "Error al cargar los préstamos.", "error");
@@ -97,6 +104,12 @@ export const AssetLoans = () => {
     } catch (error) {
       console.error("Error loading assets:", error);
     }
+  };
+
+  const handleChangeFilter = (event) => {
+    const { name, value } = event.target;
+    setPage(1);
+    setSearchFilters((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleOpenDialog = () => {
@@ -181,14 +194,6 @@ export const AssetLoans = () => {
     return <Chip label={style.label} size="small" color={style.color} />;
   };
 
-  const filteredLoans = loans.filter((loan) => {
-    const assetName = loan.asset?.name.toLowerCase() || "";
-    const borrowerName = (loan.borrower_name || "").toLowerCase();
-    const matchesSearch = assetName.includes(searchTerm.toLowerCase()) || borrowerName.includes(searchTerm.toLowerCase());
-    const matchesStatus = !statusFilter || loan.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
-
   return (
     <Box>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
@@ -214,8 +219,9 @@ export const AssetLoans = () => {
               <TextField
                 fullWidth
                 placeholder="Buscar por activo o beneficiario..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                name="search"
+                value={searchFilters.search}
+                onChange={handleChangeFilter}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
@@ -229,9 +235,10 @@ export const AssetLoans = () => {
               <FormControl fullWidth>
                 <InputLabel>Estado</InputLabel>
                 <Select
-                  value={statusFilter}
+                  name="status"
+                  value={searchFilters.status}
                   label="Estado"
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={handleChangeFilter}
                 >
                   <MenuItem value="">Todos</MenuItem>
                   <MenuItem value="loaned">En Préstamo</MenuItem>
@@ -248,53 +255,70 @@ export const AssetLoans = () => {
               <CircularProgress />
             </Box>
           ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Activo</TableCell>
-                    <TableCell>Beneficiario</TableCell>
-                    <TableCell>Cant.</TableCell>
-                    <TableCell>Fecha Préstamo</TableCell>
-                    <TableCell>Estado</TableCell>
-                    <TableCell>Registrado por</TableCell>
-                    <TableCell align="right">Acciones</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filteredLoans.map((loan) => (
-                    <TableRow key={loan.id}>
-                      <TableCell>
-                        <Typography variant="subtitle2">{loan.asset?.name}</Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{loan.borrower_name}</Typography>
-                      </TableCell>
-                      <TableCell>{loan.quantity}</TableCell>
-                      <TableCell>{formatDate(loan.loan_date)}</TableCell>
-                      <TableCell>{getStatusChip(loan.status)}</TableCell>
-                      <TableCell>{loan.creator?.full_name || "N/A"}</TableCell>
-                      <TableCell align="right">
-                        {loan.status === "loaned" && hasPermission("assets.loan.complete") && (
-                          <Tooltip title="Registrar Devolución">
-                            <IconButton color="primary" onClick={() => handleOpenReturnDialog(loan)}>
-                              <ReturnIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                        {hasPermission("assets.loan.audit") && (
-                          <Tooltip title="Ver Historial">
-                            <IconButton size="small" onClick={() => handleOpenTimeline(loan.id)}>
-                              <HistoryIcon />
-                            </IconButton>
-                          </Tooltip>
-                        )}
-                      </TableCell>
+            <>
+              <TableContainer component={Paper} variant="outlined">
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Activo</TableCell>
+                      <TableCell>Beneficiario</TableCell>
+                      <TableCell>Cant.</TableCell>
+                      <TableCell>Fecha Préstamo</TableCell>
+                      <TableCell>Estado</TableCell>
+                      <TableCell>Registrado por</TableCell>
+                      <TableCell align="right">Acciones</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                  </TableHead>
+                  <TableBody>
+                    {loans.map((loan) => (
+                      <TableRow key={loan.id}>
+                        <TableCell>
+                          <Typography variant="subtitle2">{loan.asset?.name}</Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{loan.borrower_name}</Typography>
+                        </TableCell>
+                        <TableCell>{loan.quantity}</TableCell>
+                        <TableCell>{formatDate(loan.loan_date)}</TableCell>
+                        <TableCell>{getStatusChip(loan.status)}</TableCell>
+                        <TableCell>{loan.creator?.full_name || "N/A"}</TableCell>
+                        <TableCell align="right">
+                          {loan.status === "loaned" && hasPermission("assets.loan.complete") && (
+                            <Tooltip title="Registrar Devolución">
+                              <IconButton color="primary" onClick={() => handleOpenReturnDialog(loan)}>
+                                <ReturnIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {hasPermission("assets.loan.audit") && (
+                            <Tooltip title="Ver Historial">
+                              <IconButton size="small" onClick={() => handleOpenTimeline(loan.id)}>
+                                <HistoryIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {loans.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                          No se encontraron préstamos.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+              <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+                <Pagination
+                  count={totalPages}
+                  page={page}
+                  onChange={(e, v) => setPage(v)}
+                  color="primary"
+                />
+              </Box>
+            </>
           )}
         </CardContent>
       </Card>

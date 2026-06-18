@@ -97,8 +97,9 @@ const MapFitBounds = ({ orders }) => {
   return null;
 };
 
-const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onChangeRider, onEdit, isRiderView, currency }) => {
+const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onChangeRider, onEdit, isRiderView, currency, markerColor }) => {
   const theme = useTheme();
+  const cardColor = markerColor || (order.scheduled_at ? theme.palette.error.main : theme.palette.primary.main);
 
   const handleOpenGoogleMaps = () => {
     const lat = order.latitude || order.client?.latitude;
@@ -127,7 +128,7 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
         display: "flex",
         flexDirection: "column",
         border: "1px solid",
-        borderColor: order.scheduled_at ? "error.light" : "divider",
+        borderColor: markerColor ? alpha(markerColor, 0.5) : (order.scheduled_at ? "error.light" : "divider"),
         transition: "all 0.2s",
         "&:hover": { boxShadow: theme.shadows[3] },
       }}
@@ -139,15 +140,21 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          bgcolor: order.scheduled_at ? alpha(theme.palette.error.main, 0.04) : alpha(theme.palette.primary.main, 0.04),
+          bgcolor: alpha(cardColor, 0.04),
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           <Chip
             label={`#${order.sale_number}`}
             size="small"
-            color={order.scheduled_at ? "error" : "primary"}
-            sx={{ fontWeight: 800, height: 20, fontSize: 10, borderRadius: 1 }}
+            sx={{ 
+              fontWeight: 800, 
+              height: 20, 
+              fontSize: 10, 
+              borderRadius: 1,
+              bgcolor: cardColor,
+              color: "white"
+            }}
           />
           {!isRiderView && (
             <IconButton size="small" onClick={() => onEdit(order)} sx={{ p: 0.2 }} title="Editar Pedido">
@@ -350,11 +357,29 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
     </Card>
   );
 };
-
 export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderView = false, currency = "PEN" }) => {
   const theme = useTheme();
   const [monitorView, setMonitorView] = useState("cards");
-  
+
+  const getRiderColor = (riderId) => {
+    if (!riderId) return theme.palette.text.disabled;
+    const colors = [
+      "#673ab7", "#2196f3", "#00c853", "#ff9100", "#f50057", 
+      "#00b0ff", "#d500f9", "#00bfa5", "#3d5afe", "#4caf50"
+    ];
+    const idStr = riderId.toString();
+    let hash = 0;
+    for (let i = 0; i < idStr.length; i++) {
+      hash = idStr.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  const isMultiRider = useMemo(() => {
+    const activeRiderIds = new Set(orders.map(o => o.rider_id).filter(id => id));
+    return activeRiderIds.size > 1;
+  }, [orders]);
+
   // States for Edit Order
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
@@ -608,6 +633,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                     isRiderView={isRiderView}
                     currency={currency}
                     onChangeRider={handleOpenChangeRider}
+                    markerColor={isMultiRider ? getRiderColor(order.rider_id) : null}
                   />
                 </Grid>
               ))}
@@ -649,7 +675,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                       parseFloat(order.latitude || order.client.latitude),
                       parseFloat(order.longitude || order.client.longitude),
                     ]}
-                    icon={orderMarkerIcon(order.scheduled_at ? theme.palette.error.main : theme.palette.primary.main)}
+                    icon={orderMarkerIcon(isMultiRider ? getRiderColor(order.rider_id) : theme.palette.primary.main)}
                   >
                     <Popup minWidth={280}>
                       <Box sx={{ p: 0.2 }}>
@@ -663,6 +689,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                           isRiderView={isRiderView}
                           currency={currency}
                           onChangeRider={handleOpenChangeRider}
+                          markerColor={isMultiRider ? getRiderColor(order.rider_id) : null}
                         />
                       </Box>
                     </Popup>

@@ -196,8 +196,23 @@ export const notificationsAPI = {
 export const businessAPI = {
   getAll: (params = {}) => api.get("/businesses", { params, loaderMessage: "Cargando negocios..." }),
   getById: (id) => api.get(`/businesses/${id}`, { loaderMessage: "Obteniendo detalles del negocio..." }),
-  create: (businessData) => api.post("/businesses", businessData, { loaderMessage: "Registrando negocio..." }),
-  update: (id, businessData) => api.put(`/businesses/${id}`, businessData, { loaderMessage: "Actualizando negocio..." }),
+  create: (businessData) =>
+    api.post("/businesses", businessData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      loaderMessage: "Registrando negocio..."
+    }),
+  update: (id, businessData) => {
+    // FormData should be sent with a POST request, but we can spoof the method
+    businessData.append("_method", "PUT");
+    return api.post(`/businesses/${id}`, businessData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      loaderMessage: "Actualizando negocio..."
+    });
+  },
   delete: (id) => api.delete(`/businesses/${id}`, { loaderMessage: "Eliminando negocio..." }),
   getStats: (id, period) =>
     api.get(`/businesses/${id}/dashboard`, { params: { period }, loaderMessage: "Cargando estadísticas..." }),

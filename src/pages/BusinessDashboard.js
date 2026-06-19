@@ -143,7 +143,7 @@ const KpiCard = ({ title, value, detail, icon, color, trend, percentage, avgValu
         "&:hover": { transform: "translateY(-4px)" }
       }}
     >
-      {avgValue && (
+      {!!avgValue && (
         <Chip 
           label={`Prom: ${formatCurrency(avgValue, currency)}`}
           size="small"

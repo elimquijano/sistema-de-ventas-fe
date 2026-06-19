@@ -124,7 +124,7 @@ export const Business = () => {
         longitude: business.longitude || "",
         zoom: business.zoom || 13,
       });
-      setImagePreview(business.logo_path);
+      setImagePreview(business.logo_url);
       if (business.latitude && business.longitude) {
         setTempLocation({ lat: parseFloat(business.latitude), lng: parseFloat(business.longitude) });
         setTempZoom(parseInt(business.zoom) || 13);
@@ -201,7 +201,7 @@ export const Business = () => {
     const data = new FormData();
     Object.keys(formData).forEach(key => {
       if (key === 'image') {
-        if (formData.image) data.append('image', formData.image);
+        if (formData.image) data.append('logo', formData.image);
       } else {
         data.append(key, formData[key] !== null ? formData[key] : '');
       }
@@ -311,8 +311,8 @@ export const Business = () => {
                   <TableRow key={business.id}>
                     <TableCell>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                        {business.logo_path ? (
-                          <Avatar src={business.logo_path} variant="rounded" sx={{ width: 40, height: 40 }} />
+                        {business.logo_url ? (
+                          <Avatar src={business.logo_url} variant="rounded" sx={{ width: 40, height: 40 }} />
                         ) : (
                           <Avatar variant="rounded" sx={{ width: 40, height: 40, bgcolor: "primary.main" }}>
                             <StoreIcon />

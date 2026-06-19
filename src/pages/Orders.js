@@ -2,7 +2,6 @@ import React, {
   useState,
   useEffect,
   useMemo,
-  useCallback,
   useRef,
 } from "react";
 import {
@@ -10,7 +9,6 @@ import {
   Grid,
   Card,
   CardContent,
-  CardActions,
   Typography,
   Button,
   IconButton,
@@ -21,7 +19,6 @@ import {
   TextField,
   Chip,
   Avatar,
-  Divider,
   Badge,
   FormControl,
   InputLabel,
@@ -30,11 +27,8 @@ import {
   Tab,
   Tabs,
   useTheme,
-  Paper,
-  Slide,
   AppBar,
   Toolbar,
-  Container,
   useMediaQuery,
   InputAdornment,
   Stack,
@@ -42,9 +36,6 @@ import {
   CircularProgress,
   Tooltip as MuiTooltip,
   alpha,
-  CardActionArea,
-  ToggleButton,
-  ToggleButtonGroup,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -83,8 +74,8 @@ import {
   Info as InfoIcon,
   AddCard as AddCardIcon,
 } from "@mui/icons-material";
-import { formatCurrency, formatDate } from "../utils/formatters";
-import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
+import { formatCurrency } from "../utils/formatters";
+import { notificationSwal } from "../utils/swal-helpers";
 import {
   API_STORAGE_URL,
   cashRegisterAPI,
@@ -99,12 +90,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { MapComponent } from "../components/MapComponent";
 
 import { OrderMonitor } from "../components/OrderMonitor";
+import { StrictAutocomplete } from "../components/StrictAutocomplete";
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 
-const Transition = React.forwardRef(function Transition(props, ref) {
-  return <Slide direction="up" ref={ref} {...props} />;
-});
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -122,16 +111,6 @@ function TabPanel(props) {
   );
 }
 
-const PAYMENT_METHODS = [
-  { value: "cash", label: "Efectivo", icon: <MoneyIcon /> },
-  { value: "yape", label: "Yape", icon: <PriceCheckIcon /> },
-  { value: "plin", label: "Plin", icon: <PriceCheckIcon /> },
-  { value: "card", label: "Tarjeta", icon: <CreditCardIcon /> },
-  { value: "transfer", label: "Transferencia", icon: <CreditCardIcon /> },
-  { value: "credit", label: "Crédito", icon: <ScheduleIcon /> },
-  { value: "vale", label: "Vale", icon: <AddCardIcon /> },
-];
-
 const getNowDateTimeLocal = () => {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
@@ -146,7 +125,6 @@ export const Orders = () => {
 
   const [tabValue, setTabValue] = useState(0);
   const [itemTabValue, setItemTabValue] = useState(0);
-  const [monitorView, setMonitorView] = useState("cards");
   const [products, setProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [allClients, setAllClients] = useState([]);
@@ -154,7 +132,6 @@ export const Orders = () => {
   const [riders, setRiders] = useState([]);
   const [pendingOrders, setPendingOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSearchingClient, setIsSearchingClient] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -165,7 +142,6 @@ export const Orders = () => {
   const [customerName, setCustomerName] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [customerLocation, setCustomerLocation] = useState(null);
-  const [isNewCustomer, setIsNewCustomer] = useState(true);
   const [selectedRider, setSelectedRider] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [scheduledAt, setScheduledAt] = useState(getNowDateTimeLocal());
@@ -176,10 +152,6 @@ export const Orders = () => {
   const [locationMode, setLocationMode] = useState("manual");
   const [tempLocation, setTempLocation] = useState(null);
   const locationMapRef = useRef();
-
-  const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
-  const [selectedOrderToConfirm, setSelectedOrderToConfirm] = useState(null);
-  const [payments, setPayments] = useState([]);
 
   const calculatedTotal = useMemo(() => {
     if (!selectedProduct) return 0;
@@ -210,18 +182,6 @@ export const Orders = () => {
     // Sort alphabetically by name
     return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
   }, [products, services, searchQuery, itemTabValue]);
-
-  const totalPaid = useMemo(
-    () => payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0),
-    [payments],
-  );
-  const remainingAmount = useMemo(
-    () =>
-      selectedOrderToConfirm
-        ? parseFloat(selectedOrderToConfirm.total_amount) - totalPaid
-        : 0,
-    [selectedOrderToConfirm, totalPaid],
-  );
 
   useEffect(() => {
     loadData();
@@ -297,31 +257,6 @@ export const Orders = () => {
     }
   };
 
-  const handleSearchCustomer = async () => {
-    if (!customerPhone) return;
-    setIsSearchingClient(true);
-    try {
-      const res = await clientsAPI.getAll({ phone: customerPhone });
-      const clients = res.data.data || [];
-      if (clients.length > 0) {
-        const c = clients[0];
-        setCustomerName(c.name);
-        setCustomerAddress(c.address);
-        setCustomerLocation({
-          lat: parseFloat(c.latitude),
-          lng: parseFloat(c.longitude),
-        });
-        setIsNewCustomer(false);
-      } else {
-        setIsNewCustomer(true);
-        setCustomerName("");
-        setCustomerAddress("");
-        setCustomerLocation(null);
-      }
-    } finally {
-      setIsSearchingClient(false);
-    }
-  };
 
   const handleAddressSearch = async (query) => {
     if (!query || query.length < 3 || !MAPBOX_TOKEN) return;
@@ -346,12 +281,15 @@ export const Orders = () => {
     );
     const data = await res.json();
     setCustomerAddress(data.features?.[0]?.place_name || "");
-    
+
     // Calcular distancia y tiempo desde el negocio
     if (user?.business?.latitude && user?.business?.longitude) {
       calculateDistanceAndTime(
-        { lat: parseFloat(user.business.latitude), lng: parseFloat(user.business.longitude) },
-        { lat, lng }
+        {
+          lat: parseFloat(user.business.latitude),
+          lng: parseFloat(user.business.longitude),
+        },
+        { lat, lng },
       );
     }
   };
@@ -366,10 +304,10 @@ export const Orders = () => {
         const route = data.routes[0];
         const distanceKm = (route.distance / 1000).toFixed(2);
         const durationMin = Math.round(route.duration / 60);
-        
+
         // Guardar en notas para referencia visual o enviarlo al backend
         const infoStr = `Distancia: ${distanceKm} km | Tiempo aprox: ${durationMin} min`;
-        setOrderNotes(prev => prev ? `${prev}\n${infoStr}` : infoStr);
+        setOrderNotes((prev) => (prev ? `${prev}\n${infoStr}` : infoStr));
       }
     } catch (error) {
       console.error("Error calculating Mapbox directions:", error);
@@ -440,25 +378,6 @@ export const Orders = () => {
     }
   };
 
-  const handleWhatsappResend = async (saleId) => {
-    try {
-      const response = await salesAPI.whatsappResend(saleId);
-      notificationSwal(
-        "WhatsApp Enviado",
-        `Mensaje enviado correctamente al número: ${response.data.target_phone}`,
-        "success",
-      );
-    } catch (error) {
-      console.error("Error resending WhatsApp:", error);
-      notificationSwal(
-        "Error",
-        error.response?.data?.message ||
-          "No se pudo reenviar el mensaje de WhatsApp.",
-        "error",
-      );
-    }
-  };
-
   return (
     <Box
       sx={{
@@ -467,40 +386,62 @@ export const Orders = () => {
         flexDirection: "column",
       }}
     >
-      <AppBar position="static" color="inherit" elevation={0} sx={{ borderBottom: 1, borderColor: "divider" }}>
-        <Toolbar variant="dense" sx={{ justifyContent: "space-between", px: { xs: 0.5, sm: 1.5 }, minHeight: 48 }}>
+      <AppBar
+        position="static"
+        color="inherit"
+        elevation={0}
+        sx={{ borderBottom: 1, borderColor: "divider" }}
+      >
+        <Toolbar
+          variant="dense"
+          sx={{
+            justifyContent: "space-between",
+            px: { xs: 0.5, sm: 1.5 },
+            minHeight: 48,
+          }}
+        >
           <Tabs
             value={tabValue}
             onChange={(e, v) => setTabValue(v)}
             variant={isMobile ? "fullWidth" : "standard"}
-            sx={{ 
+            sx={{
               minHeight: 48,
-              "& .MuiTab-root": { minHeight: 48, fontWeight: 700, px: { xs: 1, sm: 3 } }
+              "& .MuiTab-root": {
+                minHeight: 48,
+                fontWeight: 700,
+                px: { xs: 1, sm: 3 },
+              },
             }}
           >
-            <Tab 
-              label={isMobile ? "" : "Nueva Orden"} 
-              icon={<AddIcon fontSize="small" />} 
-              iconPosition="start" 
+            <Tab
+              label={isMobile ? "" : "Nueva Orden"}
+              icon={<AddIcon fontSize="small" />}
+              iconPosition="start"
               sx={{ minWidth: isMobile ? 50 : 140 }}
             />
             <Tab
-              label={isMobile ? "" : (
-                <Badge
-                  badgeContent={pendingOrders.length}
-                  color="error"
-                  overlap="rectangular"
-                  sx={{ "& .MuiBadge-badge": { fontWeight: 800, fontSize: 10 } }}
-                >
-                  Monitor
-                </Badge>
-              )}
+              label={
+                isMobile ? (
+                  ""
+                ) : (
+                  <Badge
+                    badgeContent={pendingOrders.length}
+                    color="error"
+                    overlap="rectangular"
+                    sx={{
+                      "& .MuiBadge-badge": { fontWeight: 800, fontSize: 10 },
+                    }}
+                  >
+                    Monitor
+                  </Badge>
+                )
+              }
               icon={<LocalShippingIcon fontSize="small" />}
               iconPosition="start"
               sx={{ minWidth: isMobile ? 50 : 140 }}
             />
           </Tabs>
-          
+
           <Stack direction="row" spacing={0.5} alignItems="center">
             <IconButton
               size="small"
@@ -519,9 +460,21 @@ export const Orders = () => {
 
       <Box sx={{ flex: 1, overflow: "hidden", p: { xs: 0.5, sm: 1 } }}>
         <TabPanel value={tabValue} index={0}>
-          <Grid container spacing={1} sx={{ height: "100%", overflowY: isTablet ? "auto" : "hidden" }}>
-            <Grid item xs={12} md={3} sx={{ height: isTablet ? "auto" : "100%" }}>
-              <Card variant="outlined" sx={{ height: "100%", borderRadius: 1.5 }}>
+          <Grid
+            container
+            spacing={1}
+            sx={{ height: "100%", overflowY: isTablet ? "auto" : "hidden" }}
+          >
+            <Grid
+              item
+              xs={12}
+              md={3}
+              sx={{ height: isTablet ? "auto" : "100%" }}
+            >
+              <Card
+                variant="outlined"
+                sx={{ height: "100%", borderRadius: 1.5 }}
+              >
                 <CardContent sx={{ p: 1.5 }}>
                   <Typography
                     variant="subtitle2"
@@ -554,81 +507,72 @@ export const Orders = () => {
                     </IconButton>
                   </Typography>
                   <Stack spacing={1.5}>
-                    <Autocomplete
-                      freeSolo
-                      size="small"
+                    <StrictAutocomplete
                       options={allClients}
-                      getOptionLabel={(option) => {
-                        if (typeof option === 'string') return option;
-                        return option.phone || "";
-                      }}
+                      filterKey="phone"
+                      matchMode="start"
+                      getOptionLabel={(o) => o.phone}
+                      getOptionSublabel={(o) => o.name}
                       value={customerPhone}
-                      onInputChange={(event, newInputValue) => {
-                        setCustomerPhone(newInputValue);
+                      onInputChange={(v) => setCustomerPhone(v)}
+                      onChange={(client) => {
+                        setCustomerPhone(client.phone || "");
+                        setCustomerName(client.name || "");
+                        setCustomerAddress(client.address || "");
+                        if (client.latitude && client.longitude)
+                          setCustomerLocation({
+                            lat: parseFloat(client.latitude),
+                            lng: parseFloat(client.longitude),
+                          });
                       }}
-                      onChange={(event, newValue) => {
-                        if (newValue && typeof newValue !== 'string') {
-                          setCustomerName(newValue.name || "");
-                          setCustomerPhone(newValue.phone || "");
-                          setCustomerAddress(newValue.address || "");
-                          if (newValue.latitude && newValue.longitude) {
-                            setCustomerLocation({
-                              lat: parseFloat(newValue.latitude),
-                              lng: parseFloat(newValue.longitude),
-                            });
-                          }
-                          setIsNewCustomer(false);
-                        }
+                      TextFieldProps={{
+                        fullWidth: true,
+                        size: "small",
+                        label: "Teléfono",
+                        InputProps: {
+                          startAdornment: (
+                            <PhoneIcon
+                              sx={{
+                                mr: 1,
+                                color: "text.secondary",
+                                fontSize: 18,
+                              }}
+                            />
+                          ),
+                        },
                       }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Teléfono"
-                          InputProps={{
-                            ...params.InputProps,
-                            startAdornment: <PhoneIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />,
-                          }}
-                        />
-                      )}
                     />
-                    <Autocomplete
-                      freeSolo
-                      size="small"
+                    <StrictAutocomplete
                       options={allClients}
-                      getOptionLabel={(option) => {
-                        if (typeof option === 'string') return option;
-                        return option.name || "";
-                      }}
+                      filterKey="name"
+                      matchMode="any"
+                      getOptionLabel={(o) => o.name}
+                      getOptionSublabel={(o) => o.phone}
                       value={customerName}
-                      onInputChange={(event, newInputValue) => {
-                        setCustomerName(newInputValue);
+                      onInputChange={(v) => setCustomerName(v)}
+                      onChange={(client) => {
+                        setCustomerPhone(client.phone || "");
+                        setCustomerName(client.name || "");
+                        setCustomerAddress(client.address || "");
+                        if (client.latitude && client.longitude)
+                          setCustomerLocation({
+                            lat: parseFloat(client.latitude),
+                            lng: parseFloat(client.longitude),
+                          });
                       }}
-                      onChange={(event, newValue) => {
-                        if (newValue && typeof newValue !== 'string') {
-                          setCustomerName(newValue.name || "");
-                          setCustomerPhone(newValue.phone || "");
-                          setCustomerAddress(newValue.address || "");
-                          if (newValue.latitude && newValue.longitude) {
-                            setCustomerLocation({
-                              lat: parseFloat(newValue.latitude),
-                              lng: parseFloat(newValue.longitude),
-                            });
-                          }
-                          setIsNewCustomer(false);
-                        }
+                      TextFieldProps={{
+                        fullWidth: true,
+                        size: "small",
+                        label: "Nombre",
                       }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Nombre"
-                        />
-                      )}
                     />
                     <Autocomplete
                       freeSolo
                       size="small"
                       options={addressSuggestions}
-                      getOptionLabel={(o) => typeof o === "string" ? o : o.place_name || ""}
+                      getOptionLabel={(o) =>
+                        typeof o === "string" ? o : o.place_name || ""
+                      }
                       onInputChange={(e, v) => handleAddressSearch(v)}
                       onChange={(e, v) => handleSelectSuggestion(v)}
                       inputValue={customerAddress}
@@ -649,13 +593,25 @@ export const Orders = () => {
                                       color="primary"
                                       onClick={() => {
                                         // Prioridad: Ubicación ya puesta > Ubicación GPS > Ubicación Negocio (esto lo maneja MapComponent si mandamos null)
-                                        setTempLocation(customerLocation || userLocation || null);
+                                        setTempLocation(
+                                          customerLocation ||
+                                            userLocation ||
+                                            null,
+                                        );
                                         setOpenLocationDialog(true);
                                       }}
-                                      sx={{ 
-                                        bgcolor: alpha(theme.palette.primary.main, 0.1),
-                                        "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.2) },
-                                        ml: 0.5
+                                      sx={{
+                                        bgcolor: alpha(
+                                          theme.palette.primary.main,
+                                          0.1,
+                                        ),
+                                        "&:hover": {
+                                          bgcolor: alpha(
+                                            theme.palette.primary.main,
+                                            0.2,
+                                          ),
+                                        },
+                                        ml: 0.5,
                                       }}
                                     >
                                       <MapIcon fontSize="small" />
@@ -691,7 +647,12 @@ export const Orders = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={6} sx={{ height: isTablet ? "55vh" : "100%" }}>
+            <Grid
+              item
+              xs={12}
+              md={6}
+              sx={{ height: isTablet ? "55vh" : "100%" }}
+            >
               <Card
                 variant="outlined"
                 sx={{
@@ -707,8 +668,14 @@ export const Orders = () => {
                     onChange={(e, v) => setItemTabValue(v)}
                     variant="fullWidth"
                   >
-                    <Tab label={`Productos (${products.length})`} sx={{ fontWeight: 700 }} />
-                    <Tab label={`Servicios (${services.length})`} sx={{ fontWeight: 700 }} />
+                    <Tab
+                      label={`Productos (${products.length})`}
+                      sx={{ fontWeight: 700 }}
+                    />
+                    <Tab
+                      label={`Servicios (${services.length})`}
+                      sx={{ fontWeight: 700 }}
+                    />
                   </Tabs>
                 </Box>
                 <Box
@@ -727,7 +694,9 @@ export const Orders = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     InputProps={{
                       startAdornment: (
-                        <SearchIcon sx={{ mr: 1, color: "text.secondary", fontSize: 18 }} />
+                        <SearchIcon
+                          sx={{ mr: 1, color: "text.secondary", fontSize: 18 }}
+                        />
                       ),
                     }}
                   />
@@ -735,48 +704,72 @@ export const Orders = () => {
                 <Box sx={{ flex: 1, overflowY: "auto", p: 0.5 }}>
                   <Grid container spacing={1}>
                     {filteredItems.map((item) => (
-                      <Grid item xs={6} sm={4} md={4} lg={3} key={`${item.type}-${item.id}`}>
+                      <Grid
+                        item
+                        xs={6}
+                        sm={4}
+                        md={4}
+                        lg={3}
+                        key={`${item.type}-${item.id}`}
+                      >
                         <Card
                           elevation={0}
                           sx={{
                             borderRadius: 1,
                             border: "1px solid",
-                            borderColor: selectedProduct?.id === item.id ? "divider" : theme.palette.warning.main,
-                            bgcolor: selectedProduct?.id === item.id 
-                              ? theme.palette.background.paper
-                              : alpha(theme.palette.warning.main, 0.08),
+                            borderColor:
+                              selectedProduct?.id === item.id
+                                ? "divider"
+                                : theme.palette.warning.main,
+                            bgcolor:
+                              selectedProduct?.id === item.id
+                                ? theme.palette.background.paper
+                                : alpha(theme.palette.warning.main, 0.08),
                             transition: "all 0.1s",
                             cursor: "pointer",
                             position: "relative",
-                            "&:hover": { 
+                            "&:hover": {
                               boxShadow: theme.shadows[2],
                               borderColor: "divider",
-                              bgcolor: theme.palette.mode === "light" ? alpha(theme.palette.common.black, 0.03) : theme.palette.background.default
-                            }
+                              bgcolor:
+                                theme.palette.mode === "light"
+                                  ? alpha(theme.palette.common.black, 0.03)
+                                  : theme.palette.background.default,
+                            },
                           }}
                           onClick={() => handleItemClick(item)}
                         >
-                          <CardContent sx={{ p: 0.8, textAlign: "center", "&:last-child": { pb: 0.8 } }}>
+                          <CardContent
+                            sx={{
+                              p: 0.8,
+                              textAlign: "center",
+                              "&:last-child": { pb: 0.8 },
+                            }}
+                          >
                             {item.type === "product" && (
                               <Chip
                                 label={`Stock: ${item.stock}`}
                                 size="small"
                                 color={item.stock <= 5 ? "error" : "success"}
-                                sx={{ 
-                                  position: "absolute", 
-                                  top: 3, 
-                                  right: 3, 
-                                  height: 14, 
-                                  fontSize: 8, 
+                                sx={{
+                                  position: "absolute",
+                                  top: 3,
+                                  right: 3,
+                                  height: 14,
+                                  fontSize: 8,
                                   fontWeight: 900,
                                   zIndex: 2,
                                   px: 0.5,
-                                  minWidth: 18
+                                  minWidth: 18,
                                 }}
                               />
                             )}
                             <Avatar
-                              src={item.image_path ? `${API_STORAGE_URL}/${item.image_path}` : null}
+                              src={
+                                item.image_path
+                                  ? `${API_STORAGE_URL}/${item.image_path}`
+                                  : null
+                              }
                               variant="rounded"
                               sx={{
                                 width: 44,
@@ -785,13 +778,19 @@ export const Orders = () => {
                                 mb: 0.5,
                                 bgcolor: "background.paper",
                                 border: "1px solid",
-                                borderColor: "grey.200"
+                                borderColor: "grey.200",
                               }}
                             >
                               {item.type === "product" ? (
-                                <InventoryIcon sx={{ fontSize: 22 }} color="primary" />
+                                <InventoryIcon
+                                  sx={{ fontSize: 22 }}
+                                  color="primary"
+                                />
                               ) : (
-                                <BuildIcon sx={{ fontSize: 22 }} color="secondary" />
+                                <BuildIcon
+                                  sx={{ fontSize: 22 }}
+                                  color="secondary"
+                                />
                               )}
                             </Avatar>
                             <Typography
@@ -827,7 +826,12 @@ export const Orders = () => {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={3} sx={{ height: isTablet ? "auto" : "100%" }}>
+            <Grid
+              item
+              xs={12}
+              md={3}
+              sx={{ height: isTablet ? "auto" : "100%" }}
+            >
               <Card
                 elevation={0}
                 sx={{
@@ -840,8 +844,19 @@ export const Orders = () => {
                   overflow: "hidden",
                 }}
               >
-                <Box sx={{ bgcolor: theme.palette.warning.main, py: 0.8, textAlign: "center" }}>
-                  <Typography variant="caption" fontWeight="800" color="white" sx={{ letterSpacing: 1 }}>
+                <Box
+                  sx={{
+                    bgcolor: theme.palette.warning.main,
+                    py: 0.8,
+                    textAlign: "center",
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    fontWeight="800"
+                    color="white"
+                    sx={{ letterSpacing: 1 }}
+                  >
                     ORDEN DE VENTA
                   </Typography>
                 </Box>
@@ -855,8 +870,21 @@ export const Orders = () => {
                 >
                   {selectedProduct ? (
                     <Box sx={{ flex: 1 }}>
-                      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}>
-                        <Typography variant="body2" fontWeight="700" sx={{ color: theme.palette.warning.main, lineHeight: 1.2 }}>
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          mb: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          fontWeight="700"
+                          sx={{
+                            color: theme.palette.warning.main,
+                            lineHeight: 1.2,
+                          }}
+                        >
                           {selectedProduct.name}
                         </Typography>
                         <IconButton
@@ -867,8 +895,13 @@ export const Orders = () => {
                           <ClearIcon fontSize="small" />
                         </IconButton>
                       </Box>
-                      
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{ mb: 2 }}
+                      >
                         <Box
                           sx={{
                             display: "flex",
@@ -880,12 +913,16 @@ export const Orders = () => {
                         >
                           <IconButton
                             size="small"
-                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                            onClick={() =>
+                              setQuantity(Math.max(1, quantity - 1))
+                            }
                             sx={{ color: theme.palette.warning.main, p: 0.5 }}
                           >
                             <RemoveIcon fontSize="small" />
                           </IconButton>
-                          <Typography sx={{ mx: 1.5, fontWeight: 700, fontSize: 14 }}>
+                          <Typography
+                            sx={{ mx: 1.5, fontWeight: 700, fontSize: 14 }}
+                          >
                             {quantity}
                           </Typography>
                           <IconButton
@@ -897,12 +934,17 @@ export const Orders = () => {
                           </IconButton>
                         </Box>
                         <Typography variant="subtitle2" fontWeight="700">
-                          {formatCurrency(selectedProduct.price * quantity, currency)}
+                          {formatCurrency(
+                            selectedProduct.price * quantity,
+                            currency,
+                          )}
                         </Typography>
                       </Stack>
 
                       <FormControl fullWidth size="small" sx={{ mb: 2 }}>
-                        <InputLabel sx={{ fontSize: 13 }}>Motorizado</InputLabel>
+                        <InputLabel sx={{ fontSize: 13 }}>
+                          Motorizado
+                        </InputLabel>
                         <Select
                           value={selectedRider}
                           label="Motorizado"
@@ -910,8 +952,13 @@ export const Orders = () => {
                           sx={{ borderRadius: 1, fontSize: 13 }}
                         >
                           {riders.map((r) => (
-                            <MenuItem key={r.id} value={r.id} sx={{ fontSize: 13 }}>
-                              {r.full_name || `${r.first_name} ${r.last_name || ""}`}
+                            <MenuItem
+                              key={r.id}
+                              value={r.id}
+                              sx={{ fontSize: 13 }}
+                            >
+                              {r.full_name ||
+                                `${r.first_name} ${r.last_name || ""}`}
                             </MenuItem>
                           ))}
                         </Select>
@@ -931,7 +978,12 @@ export const Orders = () => {
                           variant="caption"
                           color="info.main"
                           fontWeight="700"
-                          sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 0.5 }}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.5,
+                            mb: 0.5,
+                          }}
                         >
                           <ReceiptIcon sx={{ fontSize: 14 }} /> TOTAL A PAGAR
                         </Typography>
@@ -945,7 +997,11 @@ export const Orders = () => {
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
-                                <Typography fontWeight="800" color="info.main" variant="subtitle1">
+                                <Typography
+                                  fontWeight="800"
+                                  color="info.main"
+                                  variant="subtitle1"
+                                >
                                   {currency === "PEN" ? "S/" : "$"}
                                 </Typography>
                               </InputAdornment>
@@ -972,8 +1028,16 @@ export const Orders = () => {
                         py: 4,
                       }}
                     >
-                      <ShoppingCartIcon sx={{ fontSize: 60, mb: 1, color: theme.palette.warning.main }} />
-                      <Typography variant="caption" fontWeight="700">LISTA VACÍA</Typography>
+                      <ShoppingCartIcon
+                        sx={{
+                          fontSize: 60,
+                          mb: 1,
+                          color: theme.palette.warning.main,
+                        }}
+                      />
+                      <Typography variant="caption" fontWeight="700">
+                        LISTA VACÍA
+                      </Typography>
                     </Box>
                   )}
 
@@ -982,8 +1046,19 @@ export const Orders = () => {
                     variant="contained"
                     size="medium"
                     onClick={handleCreateQuickOrder}
-                    disabled={isLoading || !selectedProduct || !customerPhone || !selectedRider}
-                    startIcon={isLoading ? <CircularProgress size={18} color="inherit" /> : <SendIcon fontSize="small" />}
+                    disabled={
+                      isLoading ||
+                      !selectedProduct ||
+                      !customerPhone ||
+                      !selectedRider
+                    }
+                    startIcon={
+                      isLoading ? (
+                        <CircularProgress size={18} color="inherit" />
+                      ) : (
+                        <SendIcon fontSize="small" />
+                      )
+                    }
                     sx={{
                       py: 1,
                       borderRadius: 1,
@@ -1027,10 +1102,12 @@ export const Orders = () => {
             bgcolor: "primary.main",
             color: "white",
             py: 1,
-            px: 2
+            px: 2,
           }}
         >
-          <Typography variant="subtitle1" fontWeight="700">FIJAR UBICACIÓN</Typography>
+          <Typography variant="subtitle1" fontWeight="700">
+            FIJAR UBICACIÓN
+          </Typography>
         </DialogTitle>
         <DialogContent sx={{ p: 0, height: 400, position: "relative" }}>
           <MapComponent
@@ -1041,11 +1118,17 @@ export const Orders = () => {
             onModeChange={setLocationMode}
             onLocationSelect={setTempLocation}
             height="100%"
-            onMapInstance={(instance) => { locationMapRef.current = instance; }}
+            onMapInstance={(instance) => {
+              locationMapRef.current = instance;
+            }}
           />
         </DialogContent>
         <DialogActions sx={{ p: 1.5 }}>
-          <Button onClick={() => setOpenLocationDialog(false)} color="inherit" sx={{ fontWeight: 600 }}>
+          <Button
+            onClick={() => setOpenLocationDialog(false)}
+            color="inherit"
+            sx={{ fontWeight: 600 }}
+          >
             Cancelar
           </Button>
           <Button

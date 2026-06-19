@@ -15,7 +15,6 @@ import {
   Chip,
   IconButton,
   TextField,
-  InputAdornment,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -28,28 +27,35 @@ import {
   CircularProgress,
   Tooltip,
   Pagination,
+  Autocomplete,
 } from "@mui/material";
 import {
   Add as AddIcon,
-  Search as SearchIcon,
   AssignmentReturn as ReturnIcon,
   History as HistoryIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { assetsAPI, assetLoansAPI } from "../utils/api";
+import { assetsAPI, assetLoansAPI, usersAPI } from "../utils/api";
 import { AuditTimeline } from "../components/AuditTimeline";
 
 export const AssetLoans = () => {
   const { hasPermission } = useAuth();
   const [loans, setLoans] = useState([]);
   const [assets, setAssets] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [searchFilters, setSearchFilters] = useState({ status: "loaned", search: "" });
-  
+  const [searchFilters, setSearchFilters] = useState({
+    status: "loaned",
+    search: "",
+    loan_date: "",
+    return_date: "",
+    created_by: "",
+  });
+
   const [openDialog, setOpenDialog] = useState(false);
   const [openReturnDialog, setOpenReturnDialog] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
@@ -81,6 +87,7 @@ export const AssetLoans = () => {
 
   useEffect(() => {
     loadAssets();
+    loadUsers();
   }, []);
 
   const loadLoans = async () => {
@@ -106,6 +113,15 @@ export const AssetLoans = () => {
     }
   };
 
+  const loadUsers = async () => {
+    try {
+      const response = await usersAPI.getAll();
+      setUsers(response.data.data || []);
+    } catch (error) {
+      console.error("Error loading users:", error);
+    }
+  };
+
   const handleChangeFilter = (event) => {
     const { name, value } = event.target;
     setPage(1);
@@ -128,13 +144,21 @@ export const AssetLoans = () => {
     setIsSubmitting(true);
     try {
       await assetLoansAPI.create(formData);
-      notificationSwal("Préstamo Registrado", "El préstamo ha sido registrado exitosamente.", "success");
+      notificationSwal(
+        "Préstamo Registrado",
+        "El préstamo ha sido registrado exitosamente.",
+        "success",
+      );
       setOpenDialog(false);
       loadLoans();
       loadAssets(); // Refresh available quantity
     } catch (error) {
       console.error("Error saving loan:", error);
-      notificationSwal("Error", error.response?.data?.message || "Error al registrar el préstamo.", "error");
+      notificationSwal(
+        "Error",
+        error.response?.data?.message || "Error al registrar el préstamo.",
+        "error",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -155,15 +179,23 @@ export const AssetLoans = () => {
     try {
       await assetLoansAPI.returnLoan(selectedLoan.id, {
         ...returnData,
-        quantity: parseFloat(returnData.quantity)
+        quantity: parseFloat(returnData.quantity),
       });
-      notificationSwal("Devolución Registrada", "La devolución ha sido registrada exitosamente.", "success");
+      notificationSwal(
+        "Devolución Registrada",
+        "La devolución ha sido registrada exitosamente.",
+        "success",
+      );
       setOpenReturnDialog(false);
       loadLoans();
       loadAssets();
     } catch (error) {
       console.error("Error returning loan:", error);
-      notificationSwal("Error", error.response?.data?.message || "Error al registrar la devolución.", "error");
+      notificationSwal(
+        "Error",
+        error.response?.data?.message || "Error al registrar la devolución.",
+        "error",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -196,7 +228,14 @@ export const AssetLoans = () => {
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 3,
+        }}
+      >
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
           Préstamos de Activos
         </Typography>
@@ -205,7 +244,9 @@ export const AssetLoans = () => {
             variant="contained"
             startIcon={<AddIcon />}
             onClick={handleOpenDialog}
-            sx={{ background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)" }}
+            sx={{
+              background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
+            }}
           >
             Registrar Préstamo
           </Button>
@@ -215,23 +256,16 @@ export const AssetLoans = () => {
       <Card>
         <CardContent>
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={4}>
               <TextField
                 fullWidth
-                placeholder="Buscar por activo o beneficiario..."
+                placeholder="Buscar activo/beneficiario..."
                 name="search"
                 value={searchFilters.search}
                 onChange={handleChangeFilter}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
               />
             </Grid>
-            <Grid item xs={12} md={3}>
+            <Grid item xs={6} md={2}>
               <FormControl fullWidth>
                 <InputLabel>Estado</InputLabel>
                 <Select
@@ -248,6 +282,52 @@ export const AssetLoans = () => {
                 </Select>
               </FormControl>
             </Grid>
+            <Grid item xs={6} md={2}>
+              <TextField
+                fullWidth
+                label="Fecha Préstamo"
+                type="date"
+                name="loan_date"
+                value={searchFilters.loan_date}
+                onChange={handleChangeFilter}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={6} md={2}>
+              <TextField
+                fullWidth
+                label="Fecha Devolución"
+                type="date"
+                name="return_date"
+                value={searchFilters.return_date}
+                onChange={handleChangeFilter}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            {hasPermission("assets.loan.audit") && (
+              <Grid item xs={6} md={2}>
+                <Autocomplete
+                  options={users}
+                  getOptionLabel={(user) =>
+                    `${user.first_name} ${user.last_name}`
+                  }
+                  value={
+                    users.find((u) => u.id === searchFilters.created_by) || null
+                  }
+                  onChange={(e, newValue) =>
+                    handleChangeFilter({
+                      target: {
+                        name: "created_by",
+                        value: newValue ? newValue.id : "",
+                      },
+                    })
+                  }
+                  renderInput={(params) => (
+                    <TextField {...params} label="Registrado por" fullWidth />
+                  )}
+                />
+              </Grid>
+            )}
           </Grid>
 
           {loading ? (
@@ -262,8 +342,10 @@ export const AssetLoans = () => {
                     <TableRow>
                       <TableCell>Activo</TableCell>
                       <TableCell>Beneficiario</TableCell>
-                      <TableCell>Cant.</TableCell>
-                      <TableCell>Fecha Préstamo</TableCell>
+                      <TableCell>Cant. Inicial</TableCell>
+                      <TableCell>Cant. Pendiente</TableCell>
+                      <TableCell>F. Préstamo</TableCell>
+                      <TableCell>F. Devolución</TableCell>
                       <TableCell>Estado</TableCell>
                       <TableCell>Registrado por</TableCell>
                       <TableCell align="right">Acciones</TableCell>
@@ -273,26 +355,49 @@ export const AssetLoans = () => {
                     {loans.map((loan) => (
                       <TableRow key={loan.id}>
                         <TableCell>
-                          <Typography variant="subtitle2">{loan.asset?.name}</Typography>
+                          <Typography variant="subtitle2">
+                            {loan.asset?.name}
+                          </Typography>
                         </TableCell>
                         <TableCell>
-                          <Typography variant="body2">{loan.borrower_name}</Typography>
+                          <Typography variant="body2">
+                            {loan.borrower_name}
+                          </Typography>
                         </TableCell>
                         <TableCell>{loan.quantity}</TableCell>
+                        <TableCell
+                          sx={{ color: "error.main", fontWeight: "bold" }}
+                        >
+                          {loan.pending_quantity}
+                        </TableCell>
                         <TableCell>{formatDate(loan.loan_date)}</TableCell>
+                        <TableCell>
+                          {loan.return_date
+                            ? formatDate(loan.return_date)
+                            : "-"}
+                        </TableCell>
                         <TableCell>{getStatusChip(loan.status)}</TableCell>
-                        <TableCell>{loan.creator?.full_name || "N/A"}</TableCell>
+                        <TableCell>
+                          {loan.creator?.full_name || "N/A"}
+                        </TableCell>
                         <TableCell align="right">
-                          {loan.status === "loaned" && hasPermission("assets.loan.complete") && (
-                            <Tooltip title="Registrar Devolución">
-                              <IconButton color="primary" onClick={() => handleOpenReturnDialog(loan)}>
-                                <ReturnIcon />
-                              </IconButton>
-                            </Tooltip>
-                          )}
+                          {loan.status === "loaned" &&
+                            hasPermission("assets.loan.complete") && (
+                              <Tooltip title="Registrar Devolución">
+                                <IconButton
+                                  color="primary"
+                                  onClick={() => handleOpenReturnDialog(loan)}
+                                >
+                                  <ReturnIcon />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                           {hasPermission("assets.loan.audit") && (
                             <Tooltip title="Ver Historial">
-                              <IconButton size="small" onClick={() => handleOpenTimeline(loan.id)}>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpenTimeline(loan.id)}
+                              >
                                 <HistoryIcon />
                               </IconButton>
                             </Tooltip>
@@ -302,7 +407,7 @@ export const AssetLoans = () => {
                     ))}
                     {loans.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                        <TableCell colSpan={9} align="center" sx={{ py: 3 }}>
                           No se encontraron préstamos.
                         </TableCell>
                       </TableRow>
@@ -324,7 +429,12 @@ export const AssetLoans = () => {
       </Card>
 
       {/* Dialog para registrar préstamo */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={openDialog}
+        onClose={() => setOpenDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>Registrar Nuevo Préstamo</DialogTitle>
         <DialogContent>
           <Grid container spacing={2} sx={{ mt: 1 }}>
@@ -334,7 +444,9 @@ export const AssetLoans = () => {
                 <Select
                   value={formData.asset_id}
                   label="Activo"
-                  onChange={(e) => setFormData({ ...formData, asset_id: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, asset_id: e.target.value })
+                  }
                 >
                   {assets.map((asset) => (
                     <MenuItem key={asset.id} value={asset.id}>
@@ -349,7 +461,9 @@ export const AssetLoans = () => {
                 fullWidth
                 label="Nombre de la Persona"
                 value={formData.borrower_name}
-                onChange={(e) => setFormData({ ...formData, borrower_name: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, borrower_name: e.target.value })
+                }
                 required
               />
             </Grid>
@@ -359,7 +473,9 @@ export const AssetLoans = () => {
                 label="Cantidad"
                 type="number"
                 value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, quantity: e.target.value })
+                }
                 required
               />
             </Grid>
@@ -369,7 +485,9 @@ export const AssetLoans = () => {
                 label="Fecha de Préstamo"
                 type="date"
                 value={formData.loan_date}
-                onChange={(e) => setFormData({ ...formData, loan_date: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, loan_date: e.target.value })
+                }
                 InputLabelProps={{ shrink: true }}
                 required
               />
@@ -381,18 +499,26 @@ export const AssetLoans = () => {
                 multiline
                 rows={2}
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, notes: e.target.value })
+                }
               />
             </Grid>
           </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenDialog(false)} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={() => setOpenDialog(false)} disabled={isSubmitting}>
+            Cancelar
+          </Button>
           <Button
             onClick={handleSaveLoan}
             variant="contained"
-            disabled={!formData.asset_id || !formData.borrower_name || isSubmitting}
-            sx={{ background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)" }}
+            disabled={
+              !formData.asset_id || !formData.borrower_name || isSubmitting
+            }
+            sx={{
+              background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)",
+            }}
           >
             Registrar
           </Button>
@@ -400,7 +526,12 @@ export const AssetLoans = () => {
       </Dialog>
 
       {/* Dialog para registrar devolución */}
-      <Dialog open={openReturnDialog} onClose={() => setOpenReturnDialog(false)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={openReturnDialog}
+        onClose={() => setOpenReturnDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle>Registrar Devolución</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 1 }}>
@@ -408,7 +539,10 @@ export const AssetLoans = () => {
               Activo: <strong>{selectedLoan?.asset?.name}</strong>
             </Typography>
             <Typography variant="body2" gutterBottom>
-              Cantidad Pendiente: <strong>{selectedLoan?.pending_quantity || selectedLoan?.quantity}</strong>
+              Cantidad Pendiente:{" "}
+              <strong>
+                {selectedLoan?.pending_quantity || selectedLoan?.quantity}
+              </strong>
             </Typography>
             <Grid container spacing={2} sx={{ mt: 1 }}>
               <Grid item xs={12}>
@@ -417,7 +551,9 @@ export const AssetLoans = () => {
                   label="Cantidad a devolver"
                   type="number"
                   value={returnData.quantity}
-                  onChange={(e) => setReturnData({ ...returnData, quantity: e.target.value })}
+                  onChange={(e) =>
+                    setReturnData({ ...returnData, quantity: e.target.value })
+                  }
                   required
                 />
               </Grid>
@@ -427,9 +563,13 @@ export const AssetLoans = () => {
                   <Select
                     value={returnData.status}
                     label="Estado de Devolución"
-                    onChange={(e) => setReturnData({ ...returnData, status: e.target.value })}
+                    onChange={(e) =>
+                      setReturnData({ ...returnData, status: e.target.value })
+                    }
                   >
-                    <MenuItem value="returned">Devuelto en buen estado</MenuItem>
+                    <MenuItem value="returned">
+                      Devuelto en buen estado
+                    </MenuItem>
                     <MenuItem value="damaged">Dañado</MenuItem>
                     <MenuItem value="lost">Perdido</MenuItem>
                   </Select>
@@ -442,14 +582,21 @@ export const AssetLoans = () => {
                   multiline
                   rows={2}
                   value={returnData.notes}
-                  onChange={(e) => setReturnData({ ...returnData, notes: e.target.value })}
+                  onChange={(e) =>
+                    setReturnData({ ...returnData, notes: e.target.value })
+                  }
                 />
               </Grid>
             </Grid>
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenReturnDialog(false)} disabled={isSubmitting}>Cancelar</Button>
+          <Button
+            onClick={() => setOpenReturnDialog(false)}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
           <Button
             onClick={handleReturnLoan}
             variant="contained"

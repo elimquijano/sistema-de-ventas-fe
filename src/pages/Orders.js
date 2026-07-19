@@ -112,9 +112,19 @@ function TabPanel(props) {
 }
 
 const getNowDateTimeLocal = () => {
-  const now = new Date();
-  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-  return now.toISOString().slice(0, 16);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  })
+    .formatToParts(new Date())
+    .reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 };
 
 export const Orders = () => {
@@ -145,6 +155,8 @@ export const Orders = () => {
   const [selectedRider, setSelectedRider] = useState("");
   const [orderNotes, setOrderNotes] = useState("");
   const [scheduledAt, setScheduledAt] = useState(getNowDateTimeLocal());
+  const [isScheduledAtEditable, setIsScheduledAtEditable] = useState(false);
+  const lastScheduledAtTap = useRef(0);
   const [userLocation, setUserLocation] = useState(null);
 
   const [addressSuggestions, setAddressSuggestions] = useState([]);
@@ -157,6 +169,17 @@ export const Orders = () => {
     if (!selectedProduct) return 0;
     return selectedProduct.price * quantity;
   }, [selectedProduct, quantity]);
+
+  const handleScheduledAtTap = () => {
+    const now = Date.now();
+    if (now - lastScheduledAtTap.current < 500) {
+      setScheduledAt(getNowDateTimeLocal());
+      setIsScheduledAtEditable(true);
+      lastScheduledAtTap.current = 0;
+      return;
+    }
+    lastScheduledAtTap.current = now;
+  };
 
   useEffect(() => {
     if (selectedProduct) setEditableTotal(calculatedTotal.toString());
@@ -365,7 +388,8 @@ export const Orders = () => {
       setCustomerLocation(null);
       setOrderNotes("");
       setSelectedRider("");
-      // No limpiar scheduledAt
+      setScheduledAt(getNowDateTimeLocal());
+      setIsScheduledAtEditable(false);
       loadPendingOrders();
     } catch (e) {
       notificationSwal(
@@ -498,7 +522,8 @@ export const Orders = () => {
                         setCustomerAddress("");
                         setCustomerLocation(null);
                         setOrderNotes("");
-                        // No limpiar scheduledAt
+                        setScheduledAt(getNowDateTimeLocal());
+                        setIsScheduledAtEditable(false);
                         setSelectedProduct(null);
                       }}
                       color="error"
@@ -624,15 +649,35 @@ export const Orders = () => {
                         />
                       )}
                     />
-                    <TextField
-                      fullWidth
-                      size="small"
-                      type="datetime-local"
-                      label="Programar entrega"
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                    />
+                    <Box
+                      onClick={handleScheduledAtTap}
+                      onMouseDown={(e) => {
+                        if (e.detail > 1) e.preventDefault();
+                      }}
+                      title="Doble clic o doble toque para editar"
+                      sx={{
+                        userSelect: "none",
+                        WebkitUserSelect: "none",
+                        touchAction: "manipulation",
+                      }}
+                    >
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type="datetime-local"
+                        label="Programar entrega"
+                        value={scheduledAt}
+                        disabled={!isScheduledAtEditable}
+                        onChange={(e) => setScheduledAt(e.target.value)}
+                        onBlur={() => setIsScheduledAtEditable(false)}
+                        InputLabelProps={{ shrink: true }}
+                        sx={
+                          isScheduledAtEditable
+                            ? undefined
+                            : { pointerEvents: "none" }
+                        }
+                      />
+                    </Box>
                     <TextField
                       fullWidth
                       size="small"

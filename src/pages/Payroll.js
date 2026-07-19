@@ -63,12 +63,22 @@ export const Payroll = () => {
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [calcDialogOpen, setCalcDialogOpen] = useState(false);
   const [advancesDetailsDialogOpen, setAdvancesDetailsDialogOpen] = useState(false);
+  const [absencesDetailsDialogOpen, setAbsencesDetailsDialogOpen] = useState(false);
 
   const [selectedUser, setSelectedUser] = useState(null);
   
   // Form States
   const getCurrentPeruDate = () => {
-    return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Lima' });
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Lima",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    })
+      .formatToParts(new Date())
+      .reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+
+    return `${parts.year}-${parts.month}-${parts.day}`;
   };
 
   const [configData, setConfigData] = useState({
@@ -102,7 +112,10 @@ export const Payroll = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await usersAPI.getAll({ per_page: -1 });
+      const response = await usersAPI.getAll({
+        per_page: -1,
+        status: "active",
+      });
       setUsers(response.data.data || []);
     } catch (error) {
       console.error("Error loading users:", error);
@@ -146,7 +159,7 @@ export const Payroll = () => {
   const handleOpenAttendance = (user) => {
     setSelectedUser(user);
     setAttendanceData({
-      date: new Date().toISOString().split("T")[0],
+      date: getCurrentPeruDate(),
       status: "absent",
       notes: ""
     });
@@ -174,7 +187,7 @@ export const Payroll = () => {
     setSelectedUser(user);
     setAdvanceData({
       amount: "",
-      date: new Date().toISOString().split("T")[0],
+      date: getCurrentPeruDate(),
       description: ""
     });
     setAdvanceDialogOpen(true);
@@ -196,7 +209,7 @@ export const Payroll = () => {
   const handleOpenCalculate = (user) => {
     setSelectedUser(user);
     setCalcResult(null);
-    setCalcParams({ end_date: new Date().toISOString().split("T")[0] });
+    setCalcParams({ end_date: getCurrentPeruDate() });
     setCalcDialogOpen(true);
   };
 
@@ -229,7 +242,7 @@ export const Payroll = () => {
       try {
         await payrollAPI.pay(selectedUser.id, {
           end_date: calcResult?.period?.end,
-          payment_date: new Date().toISOString().split("T")[0],
+          payment_date: getCurrentPeruDate(),
           notes: `Pago de planilla: ${selectedUser?.full_name}. Periodo ${formatDate(calcResult?.period?.start)} al ${formatDate(calcResult?.period?.end)}`
         });
         notificationSwal("Pago Exitoso", "El pago de planilla ha sido procesado correctamente.", "success");
@@ -500,7 +513,16 @@ export const Payroll = () => {
                         <Typography variant="body1" fontWeight="700" color="success.main">{calcResult?.summary?.days_worked} días</Typography>
                       </Grid>
                       <Grid item xs={6} align="right">
-                        <Typography variant="body2">Faltas detectadas:</Typography>
+                        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 1 }}>
+                          <Typography variant="body2">Faltas detectadas:</Typography>
+                          {calcResult?.absences_details?.length > 0 && (
+                            <Tooltip title="Ver detalle de faltas">
+                              <IconButton size="small" color="error" onClick={() => setAbsencesDetailsDialogOpen(true)}>
+                                <ViewIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
                         <Typography variant="body1" fontWeight="700" color="error.main">{calcResult?.summary?.absences} días</Typography>
                       </Grid>
 
@@ -578,6 +600,49 @@ export const Payroll = () => {
                Confirmar Pago Total
              </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Absences Details Dialog */}
+      <Dialog open={absencesDetailsDialogOpen} onClose={() => setAbsencesDetailsDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <AbsentIcon color="error" /> Detalle de Faltas: {selectedUser?.full_name}
+        </DialogTitle>
+        <DialogContent dividers>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead>
+                <TableRow sx={{ bgcolor: alpha(theme.palette.error.main, 0.05) }}>
+                  <TableCell sx={{ fontWeight: 700 }}>Fecha</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Motivo / Notas</TableCell>
+                  <TableCell sx={{ fontWeight: 700 }}>Estado</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {(calcResult?.absences_details || [])
+                  .slice()
+                  .sort((a, b) => new Date(a.date) - new Date(b.date))
+                  .map((absence) => (
+                    <TableRow key={absence.id} hover>
+                      <TableCell>{formatDate(absence.date)}</TableCell>
+                      <TableCell>{absence.notes || "Sin motivo registrado"}</TableCell>
+                      <TableCell><Chip label="Falta" size="small" color="error" /></TableCell>
+                    </TableRow>
+                  ))}
+                <TableRow>
+                  <TableCell colSpan={2} sx={{ fontWeight: 800, pt: 2 }}>Total de Faltas</TableCell>
+                  <TableCell sx={{ fontWeight: 800, color: "error.main", pt: 2 }}>
+                    {calcResult?.summary?.absences} días
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAbsencesDetailsDialogOpen(false)} variant="contained" color="inherit">
+            Cerrar
+          </Button>
         </DialogActions>
       </Dialog>
 

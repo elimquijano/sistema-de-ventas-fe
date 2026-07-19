@@ -46,7 +46,7 @@ export const Loans = () => {
   const { hasPermission } = useAuth();
   const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchFilters, setSearchFilters] = useState({});
+  const [searchFilters, setSearchFilters] = useState({ status: "pending" });
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);

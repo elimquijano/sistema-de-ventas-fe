@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   Box,
   Grid,
@@ -118,6 +118,9 @@ export const PointOfSale = () => {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditingTotal, setIsEditingTotal] = useState(false);
+  const [editingTotal, setEditingTotal] = useState("");
+  const lastTotalTap = useRef(0);
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [reportType, setReportType] = useState("sales");
 
@@ -349,6 +352,46 @@ export const PointOfSale = () => {
     );
   };
 
+  const handleTotalTap = () => {
+    const now = Date.now();
+    if (now - lastTotalTap.current < 500) {
+      setEditingTotal(totalAmount.toFixed(2));
+      setIsEditingTotal(true);
+      lastTotalTap.current = 0;
+      return;
+    }
+    lastTotalTap.current = now;
+  };
+
+  const handleSaveTotal = () => {
+    const finalTotal = Number(editingTotal);
+    if (!Number.isFinite(finalTotal) || finalTotal < 0) {
+      notificationSwal(
+        "Precio inválido",
+        "Ingrese un precio final válido.",
+        "warning"
+      );
+      return;
+    }
+
+    setCart((prev) => {
+      const currentTotal = prev.reduce(
+        (sum, item) => sum + item.price * item.quantity,
+        0
+      );
+      if (currentTotal > 0) {
+        const factor = finalTotal / currentTotal;
+        return prev.map((item) => ({ ...item, price: item.price * factor }));
+      }
+      return prev.map((item, index) => ({
+        ...item,
+        price: index === 0 ? finalTotal / item.quantity : 0,
+      }));
+    });
+    setIsEditingTotal(false);
+    setEditingTotal("");
+  };
+
   const handleUpdateQuantity = (itemId, type, newQuantity) => {
     const itemDefinition = [...products, ...services].find(
       (i) => i.id === itemId && i.type === type
@@ -430,11 +473,15 @@ export const PointOfSale = () => {
 
     const formData = new FormData();
     formData.append("customer_name", customerName.trim() || "Cliente General");
+    formData.append("final_price", totalAmount.toFixed(2));
+    formData.append("total_amount", totalAmount.toFixed(2));
     
     cart.forEach((item, index) => {
       formData.append(`items[${index}][id]`, item.id);
       formData.append(`items[${index}][type]`, item.type);
       formData.append(`items[${index}][quantity]`, item.quantity);
+      formData.append(`items[${index}][price]`, item.price);
+      formData.append(`items[${index}][unit_price]`, item.price);
     });
 
     payments.forEach((p, index) => {
@@ -467,6 +514,59 @@ export const PointOfSale = () => {
       setIsLoading(false);
     }
   };
+
+  const visibleProducts = useMemo(
+    () => products.filter((product) => Number(product.stock) > 0),
+    [products]
+  );
+
+  const renderEditableTotal = () =>
+    isEditingTotal ? (
+      <TextField
+        autoFocus
+        variant="standard"
+        type="number"
+        value={editingTotal}
+        onChange={(e) => setEditingTotal(e.target.value)}
+        onBlur={handleSaveTotal}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleSaveTotal();
+          if (e.key === "Escape") {
+            setIsEditingTotal(false);
+            setEditingTotal("");
+          }
+        }}
+        inputProps={{ min: 0, step: "0.01" }}
+        sx={{
+          maxWidth: 150,
+          "& input": {
+            textAlign: "right",
+            fontSize: theme.typography.h5.fontSize,
+            fontWeight: 900,
+            color: "primary.main",
+          },
+        }}
+      />
+    ) : (
+      <Typography
+        variant="h5"
+        onClick={handleTotalTap}
+        onMouseDown={(e) => {
+          if (e.detail > 1) e.preventDefault();
+        }}
+        title="Doble clic o doble toque para editar el total"
+        sx={{
+          fontWeight: 900,
+          color: "primary.main",
+          cursor: "pointer",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          touchAction: "manipulation",
+        }}
+      >
+        {formatCurrency(totalAmount, currency)}
+      </Typography>
+    );
 
   const renderProductGrid = (items, type) => (
     <Grid container spacing={isMobile ? 1 : 2} sx={{ p: { xs: 1, md: 2 } }}>
@@ -731,12 +831,12 @@ export const PointOfSale = () => {
                 onChange={(e, val) => setTabValue(val)}
                 sx={{ borderBottom: 1, borderColor: "divider" }}
               >
-                <Tab label={`Productos (${products.length})`} />
+                <Tab label={`Productos (${visibleProducts.length})`} />
                 <Tab label={`Servicios (${services.length})`} />
               </Tabs>
               <Box sx={{ flex: 1, overflowY: "auto" }}>
                 <TabPanel value={tabValue} index={0}>
-                  {renderProductGrid(products, "product")}
+                  {renderProductGrid(visibleProducts, "product")}
                 </TabPanel>
                 <TabPanel value={tabValue} index={1}>
                   {renderProductGrid(services, "service")}
@@ -849,12 +949,7 @@ export const PointOfSale = () => {
                     <Typography variant="h5" sx={{ fontWeight: 700 }}>
                       Total:
                     </Typography>
-                    <Typography
-                      variant="h5"
-                      sx={{ fontWeight: 900, color: "primary.main" }}
-                    >
-                      {formatCurrency(totalAmount, currency)}
-                    </Typography>
+                    {renderEditableTotal()}
                   </Box>
                   <Stack direction="row" spacing={1}>
                     <Button
@@ -981,12 +1076,7 @@ export const PointOfSale = () => {
               <Typography variant="h5" sx={{ fontWeight: 700 }}>
                 Total:
               </Typography>
-              <Typography
-                variant="h5"
-                sx={{ fontWeight: 900, color: "primary.main" }}
-              >
-                {formatCurrency(totalAmount, currency)}
-              </Typography>
+              {renderEditableTotal()}
             </Box>
             <Stack direction="row" spacing={1}>
               <Button

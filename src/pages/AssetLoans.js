@@ -40,6 +40,19 @@ import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { assetsAPI, assetLoansAPI, usersAPI } from "../utils/api";
 import { AuditTimeline } from "../components/AuditTimeline";
 
+const getCurrentLimaDate = () => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Lima",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .formatToParts(new Date())
+    .reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+
 export const AssetLoans = () => {
   const { hasPermission } = useAuth();
   const [loans, setLoans] = useState([]);
@@ -70,7 +83,7 @@ export const AssetLoans = () => {
     asset_id: "",
     borrower_name: "",
     quantity: "1",
-    loan_date: new Date().toISOString().split("T")[0],
+    loan_date: getCurrentLimaDate(),
     due_date: "",
     notes: "",
   });
@@ -133,7 +146,7 @@ export const AssetLoans = () => {
       asset_id: "",
       borrower_name: "",
       quantity: "1",
-      loan_date: new Date().toISOString().split("T")[0],
+      loan_date: getCurrentLimaDate(),
       due_date: "",
       notes: "",
     });
@@ -282,28 +295,32 @@ export const AssetLoans = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={6} md={2}>
-              <TextField
-                fullWidth
-                label="Fecha Préstamo"
-                type="date"
-                name="loan_date"
-                value={searchFilters.loan_date}
-                onChange={handleChangeFilter}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
-            <Grid item xs={6} md={2}>
-              <TextField
-                fullWidth
-                label="Fecha Devolución"
-                type="date"
-                name="return_date"
-                value={searchFilters.return_date}
-                onChange={handleChangeFilter}
-                InputLabelProps={{ shrink: true }}
-              />
-            </Grid>
+            {searchFilters.status !== "returned" && (
+              <Grid item xs={6} md={2}>
+                <TextField
+                  fullWidth
+                  label="Fecha Préstamo"
+                  type="date"
+                  name="loan_date"
+                  value={searchFilters.loan_date}
+                  onChange={handleChangeFilter}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            )}
+            {searchFilters.status !== "loaned" && (
+              <Grid item xs={6} md={2}>
+                <TextField
+                  fullWidth
+                  label="Fecha Devolución"
+                  type="date"
+                  name="return_date"
+                  value={searchFilters.return_date}
+                  onChange={handleChangeFilter}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            )}
             {hasPermission("assets.loan.audit") && (
               <Grid item xs={6} md={2}>
                 <Autocomplete

@@ -41,7 +41,6 @@ import {
   Print as PrintIcon,
   Close as CloseIcon,
   Add as AddIcon,
-  FileDownload as FileDownloadIcon,
 } from "@mui/icons-material";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
@@ -631,16 +630,6 @@ export const CashRegisters = () => {
               Reportes de Caja
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<FileDownloadIcon />}
-                onClick={handleExportCashReport}
-                disabled={!reportData || !reportData.sales?.length}
-                size={isMobile ? "small" : "medium"}
-              >
-                {isMobile ? "Excel" : "Exportar reporte Excel"}
-              </Button>
               <IconButton onClick={() => setOpenReportsDialog(false)}>
                 <CloseIcon />
               </IconButton>
@@ -651,6 +640,7 @@ export const CashRegisters = () => {
           <CashRegisterReport 
             reportData={reportData} 
             onPrintReceipt={handlePrintReceipt}
+            onExport={handleExportCashReport}
             isPrinting={isPrinting}
           />
         </DialogContent>

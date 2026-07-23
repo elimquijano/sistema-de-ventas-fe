@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import { notificationSwal } from "./swal-helpers";
 
 const xmlEscape = (value = "") => String(value)
@@ -116,15 +115,33 @@ export const exportProfessionalReport = ({ fileName, sheets }) => {
   notificationSwal("Exportación completa", `El reporte ${fileName} fue descargado.`, "success");
 };
 
-// Exportación simple conservada por compatibilidad con los módulos actuales.
+// Compatibilidad para módulos existentes: convierte cualquier arreglo plano en
+// un reporte con la misma plantilla visual sin exigir cambios en cada pantalla.
 export const exportToExcel = (data, fileName, sheetName = "Sheet1") => {
   if (!data || data.length === 0) {
     notificationSwal("Advertencia", "No hay datos para exportar.", "warning");
     return;
   }
-  const ws = XLSX.utils.json_to_sheet(data);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName);
-  XLSX.writeFile(wb, `${fileName}.xlsx`);
-  notificationSwal("Exportación completa", `El reporte ${fileName} ha sido descargado.`, "success");
+  const keys = Array.from(new Set(data.flatMap((row) => Object.keys(row))));
+  const columns = keys.map((key) => {
+    const values = data.map((row) => row[key]).filter((value) => value !== null && value !== undefined && value !== "");
+    const numeric = values.length > 0 && values.every((value) => typeof value === "number" || (!Number.isNaN(Number(value)) && String(value).trim() !== ""));
+    const currency = numeric && /(total|monto|precio|importe|saldo|costo)/i.test(key);
+    return {
+      key,
+      title: key,
+      type: currency ? "currency" : numeric ? "number" : "text",
+      total: currency,
+      width: Math.min(240, Math.max(80, String(key).length * 8 + 30)),
+    };
+  });
+  exportProfessionalReport({
+    fileName,
+    sheets: [{
+      name: sheetName,
+      title: String(sheetName).toUpperCase(),
+      columns,
+      rows: data,
+    }],
+  });
 };

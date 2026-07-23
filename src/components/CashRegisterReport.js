@@ -17,6 +17,7 @@ import {
   useMediaQuery,
   Divider,
   Avatar,
+  Button,
 } from "@mui/material";
 import {
   Print as PrintIcon,
@@ -26,6 +27,7 @@ import {
   History as HistoryIcon,
   Inventory as InventoryIcon,
   Payments as PaymentsIcon,
+  FileDownload as FileDownloadIcon,
 } from "@mui/icons-material";
 import { formatCurrency } from "../utils/formatters";
 
@@ -62,7 +64,7 @@ const ReportCard = ({ title, value, icon, color, currency = "PEN" }) => (
   </Paper>
 );
 
-export const CashRegisterReport = ({ reportData, onPrintReceipt, isPrinting }) => {
+export const CashRegisterReport = ({ reportData, onPrintReceipt, onExport, isPrinting }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [reportTab, setReportTab] = useState("sales");
@@ -146,6 +148,19 @@ export const CashRegisterReport = ({ reportData, onPrintReceipt, isPrinting }) =
 
   return (
     <Box>
+      {onExport && (
+        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+          <Button
+            variant="contained"
+            color="success"
+            startIcon={<FileDownloadIcon />}
+            onClick={onExport}
+            disabled={!reportData.sales?.length}
+          >
+            Exportar reporte Excel
+          </Button>
+        </Box>
+      )}
       <Grid container spacing={2} sx={{ mb: 4 }}>
         {metrics.map((m, idx) => (
           <Grid item xs={6} sm={4} md={3} key={idx}>

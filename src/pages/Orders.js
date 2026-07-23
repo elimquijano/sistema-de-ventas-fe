@@ -144,8 +144,7 @@ export const Orders = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [quantity, setQuantity] = useState(1);
+  const [orderItems, setOrderItems] = useState([]);
   const [editableTotal, setEditableTotal] = useState("");
 
   const [customerPhone, setCustomerPhone] = useState("");
@@ -166,9 +165,11 @@ export const Orders = () => {
   const locationMapRef = useRef();
 
   const calculatedTotal = useMemo(() => {
-    if (!selectedProduct) return 0;
-    return selectedProduct.price * quantity;
-  }, [selectedProduct, quantity]);
+    return orderItems.reduce(
+      (total, item) => total + Number(item.price || 0) * item.quantity,
+      0,
+    );
+  }, [orderItems]);
 
   const handleScheduledAtTap = () => {
     const now = Date.now();
@@ -182,9 +183,9 @@ export const Orders = () => {
   };
 
   useEffect(() => {
-    if (selectedProduct) setEditableTotal(calculatedTotal.toString());
+    if (orderItems.length) setEditableTotal(calculatedTotal.toString());
     else setEditableTotal("");
-  }, [calculatedTotal, selectedProduct]);
+  }, [calculatedTotal, orderItems.length]);
 
   const filteredItems = useMemo(() => {
     const type = itemTabValue === 0 ? "product" : "service";
@@ -254,8 +255,39 @@ export const Orders = () => {
       );
       return;
     }
-    setSelectedProduct(itemToAdd);
-    setQuantity(1);
+    setOrderItems((current) => {
+      const existing = current.find(
+        (item) => item.id === itemToAdd.id && item.type === itemToAdd.type,
+      );
+      if (!existing) return [...current, { ...itemToAdd, quantity: 1 }];
+      if (itemToAdd.type === "product" && existing.quantity >= Number(itemToAdd.stock)) {
+        notificationSwal("Stock insuficiente", "No hay más unidades disponibles.", "warning");
+        return current;
+      }
+      return current.map((item) =>
+        item.id === itemToAdd.id && item.type === itemToAdd.type
+          ? { ...item, quantity: item.quantity + 1 }
+          : item,
+      );
+    });
+  };
+
+  const changeItemQuantity = (target, change) => {
+    setOrderItems((current) => current.map((item) => {
+      if (item.id !== target.id || item.type !== target.type) return item;
+      const nextQuantity = Math.max(1, item.quantity + change);
+      if (item.type === "product" && nextQuantity > Number(item.stock)) {
+        notificationSwal("Stock insuficiente", "No hay más unidades disponibles.", "warning");
+        return item;
+      }
+      return { ...item, quantity: nextQuantity };
+    }));
+  };
+
+  const removeOrderItem = (target) => {
+    setOrderItems((current) => current.filter(
+      (item) => item.id !== target.id || item.type !== target.type,
+    ));
   };
 
   const loadRiders = async () => {
@@ -351,10 +383,10 @@ export const Orders = () => {
   };
 
   const handleCreateQuickOrder = async () => {
-    if (!customerPhone || !selectedProduct || !selectedRider) {
+    if (!customerPhone || orderItems.length === 0 || !selectedRider) {
       notificationSwal(
         "Faltan Datos",
-        "Teléfono, Producto y Motorizado son obligatorios.",
+        "Teléfono, al menos un producto y motorizado son obligatorios.",
         "warning",
       );
       return;
@@ -365,14 +397,23 @@ export const Orders = () => {
         0,
         calculatedTotal - (parseFloat(editableTotal) || 0),
       );
+      const firstItem = orderItems[0];
       await salesAPI.quickOrder({
         phone: customerPhone,
         customer_name: customerName,
         address: customerAddress,
         latitude: customerLocation?.lat,
         longitude: customerLocation?.lng,
-        product_id: selectedProduct.id,
-        quantity,
+        product_id: firstItem.id,
+        quantity: firstItem.quantity,
+        items: orderItems.map((item) => ({
+          id: item.id,
+          product_id: item.id,
+          type: item.type,
+          quantity: item.quantity,
+          price: Number(item.price),
+          unit_price: Number(item.price),
+        })),
         total_amount: parseFloat(editableTotal) || 0,
         discount: discount,
         rider_id: selectedRider,
@@ -381,7 +422,7 @@ export const Orders = () => {
         scheduled_at: scheduledAt || null,
       });
       notificationSwal("Registrado", "Pedido creado con éxito.", "success");
-      setSelectedProduct(null);
+      setOrderItems([]);
       setCustomerPhone("");
       setCustomerName("");
       setCustomerAddress("");
@@ -524,7 +565,7 @@ export const Orders = () => {
                         setOrderNotes("");
                         setScheduledAt(getNowDateTimeLocal());
                         setIsScheduledAtEditable(false);
-                        setSelectedProduct(null);
+                        setOrderItems([]);
                       }}
                       color="error"
                     >
@@ -763,11 +804,11 @@ export const Orders = () => {
                             borderRadius: 1,
                             border: "1px solid",
                             borderColor:
-                              selectedProduct?.id === item.id
+                              orderItems.some((orderItem) => orderItem.id === item.id && orderItem.type === item.type)
                                 ? "divider"
                                 : theme.palette.warning.main,
                             bgcolor:
-                              selectedProduct?.id === item.id
+                              orderItems.some((orderItem) => orderItem.id === item.id && orderItem.type === item.type)
                                 ? theme.palette.background.paper
                                 : alpha(theme.palette.warning.main, 0.08),
                             transition: "all 0.1s",
@@ -913,77 +954,62 @@ export const Orders = () => {
                     p: 1.5,
                   }}
                 >
-                  {selectedProduct ? (
+                  {orderItems.length > 0 ? (
                     <Box sx={{ flex: 1 }}>
                       <Box
                         sx={{
                           display: "flex",
                           justifyContent: "space-between",
+                          alignItems: "center",
                           mb: 1,
                         }}
                       >
                         <Typography
                           variant="body2"
                           fontWeight="700"
-                          sx={{
-                            color: theme.palette.warning.main,
-                            lineHeight: 1.2,
-                          }}
+                          sx={{ color: theme.palette.warning.main }}
                         >
-                          {selectedProduct.name}
+                          PRODUCTOS ({orderItems.length})
                         </Typography>
                         <IconButton
                           size="small"
-                          onClick={() => setSelectedProduct(null)}
+                          onClick={() => setOrderItems([])}
+                          title="Vaciar orden"
                           sx={{ p: 0.5 }}
                         >
-                          <ClearIcon fontSize="small" />
+                          <DeleteForeverIcon fontSize="small" />
                         </IconButton>
                       </Box>
-
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        sx={{ mb: 2 }}
-                      >
-                        <Box
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            borderRadius: 1,
-                            border: "1px solid",
-                            borderColor: theme.palette.warning.main,
-                          }}
-                        >
-                          <IconButton
-                            size="small"
-                            onClick={() =>
-                              setQuantity(Math.max(1, quantity - 1))
-                            }
-                            sx={{ color: theme.palette.warning.main, p: 0.5 }}
+                      <Stack spacing={1} sx={{ mb: 2, maxHeight: 240, overflowY: "auto", pr: 0.5 }}>
+                        {orderItems.map((item) => (
+                          <Box
+                            key={`${item.type}-${item.id}`}
+                            sx={{ p: 1, border: "1px solid", borderColor: "divider", borderRadius: 1 }}
                           >
-                            <RemoveIcon fontSize="small" />
-                          </IconButton>
-                          <Typography
-                            sx={{ mx: 1.5, fontWeight: 700, fontSize: 14 }}
-                          >
-                            {quantity}
-                          </Typography>
-                          <IconButton
-                            size="small"
-                            onClick={() => setQuantity(quantity + 1)}
-                            sx={{ color: theme.palette.warning.main, p: 0.5 }}
-                          >
-                            <AddIcon fontSize="small" />
-                          </IconButton>
-                        </Box>
-                        <Typography variant="subtitle2" fontWeight="700">
-                          {formatCurrency(
-                            selectedProduct.price * quantity,
-                            currency,
-                          )}
-                        </Typography>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 1, mb: 0.75 }}>
+                              <Typography variant="caption" fontWeight="700" sx={{ lineHeight: 1.2 }}>
+                                {item.name}
+                              </Typography>
+                              <IconButton size="small" color="error" onClick={() => removeOrderItem(item)} sx={{ p: 0.25 }}>
+                                <DeleteIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Box>
+                            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <Box sx={{ display: "flex", alignItems: "center", border: "1px solid", borderColor: theme.palette.warning.main, borderRadius: 1 }}>
+                                <IconButton size="small" onClick={() => changeItemQuantity(item, -1)} sx={{ p: 0.25, color: theme.palette.warning.main }}>
+                                  <RemoveIcon sx={{ fontSize: 17 }} />
+                                </IconButton>
+                                <Typography sx={{ mx: 1, minWidth: 18, textAlign: "center", fontWeight: 700, fontSize: 13 }}>{item.quantity}</Typography>
+                                <IconButton size="small" onClick={() => changeItemQuantity(item, 1)} sx={{ p: 0.25, color: theme.palette.warning.main }}>
+                                  <AddIcon sx={{ fontSize: 17 }} />
+                                </IconButton>
+                              </Box>
+                              <Typography variant="caption" fontWeight="800">
+                                {formatCurrency(Number(item.price) * item.quantity, currency)}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ))}
                       </Stack>
 
                       <FormControl fullWidth size="small" sx={{ mb: 2 }}>
@@ -1093,7 +1119,7 @@ export const Orders = () => {
                     onClick={handleCreateQuickOrder}
                     disabled={
                       isLoading ||
-                      !selectedProduct ||
+                      orderItems.length === 0 ||
                       !customerPhone ||
                       !selectedRider
                     }

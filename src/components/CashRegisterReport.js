@@ -30,6 +30,8 @@ import {
   FileDownload as FileDownloadIcon,
 } from "@mui/icons-material";
 import { formatCurrency } from "../utils/formatters";
+import { useAuth } from "../contexts/AuthContext";
+import { exportCashRegisterReport } from "../utils/excelExport";
 
 const ReportCard = ({ title, value, icon, color, currency = "PEN" }) => (
   <Paper
@@ -64,8 +66,9 @@ const ReportCard = ({ title, value, icon, color, currency = "PEN" }) => (
   </Paper>
 );
 
-export const CashRegisterReport = ({ reportData, onPrintReceipt, onExport, isPrinting }) => {
+export const CashRegisterReport = ({ reportData, onPrintReceipt, isPrinting }) => {
   const theme = useTheme();
+  const { user } = useAuth();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [reportTab, setReportTab] = useState("sales");
 
@@ -148,19 +151,17 @@ export const CashRegisterReport = ({ reportData, onPrintReceipt, onExport, isPri
 
   return (
     <Box>
-      {onExport && (
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<FileDownloadIcon />}
-            onClick={onExport}
-            disabled={!reportData.sales?.length}
-          >
-            Exportar reporte Excel
-          </Button>
-        </Box>
-      )}
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+        <Button
+          variant="contained"
+          color="success"
+          startIcon={<FileDownloadIcon />}
+          onClick={() => exportCashRegisterReport(reportData, user)}
+          disabled={!reportData.sales?.length}
+        >
+          Exportar reporte Excel
+        </Button>
+      </Box>
       <Grid container spacing={2} sx={{ mb: 4 }}>
         {metrics.map((m, idx) => (
           <Grid item xs={6} sm={4} md={3} key={idx}>

@@ -115,6 +115,84 @@ export const exportProfessionalReport = ({ fileName, sheets }) => {
   notificationSwal("Exportación completa", `El reporte ${fileName} fue descargado.`, "success");
 };
 
+export const exportCashRegisterReport = (reportData, currentUser) => {
+  if (!reportData) return;
+  const sales = reportData.sales || [];
+  const number = (value) => Number(value || 0);
+  const dateParts = (value) => {
+    if (!value) return { date: "—", time: "—" };
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return { date: String(value), time: "—" };
+    return {
+      date: date.toLocaleDateString("es-PE"),
+      time: date.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    };
+  };
+  const paymentLabels = { cash: "Efectivo", yape: "Yape", plin: "Plin", card: "Tarjeta", transfer: "Transferencia", credit: "Crédito", discount: "Descuento", vale: "Vale" };
+  const opened = dateParts(reportData.opened_at || reportData.created_at || reportData.start_date);
+  const closed = dateParts(reportData.closed_at || reportData.end_date);
+  const metadata = [
+    { label: "Moneda", value: reportData.currency || "PEN" },
+    { label: "Apertura", value: `${opened.date} · ${opened.time}` },
+    { label: "Cierre", value: reportData.closed_at || reportData.end_date ? `${closed.date} · ${closed.time}` : "Caja aún abierta" },
+    { label: "Estado", value: reportData.status === "closed" ? "Cerrada" : "Abierta" },
+    { label: "Generado por", value: currentUser?.full_name || currentUser?.email || "Usuario del sistema" },
+  ];
+  const saleRows = sales.map((sale) => {
+    const created = dateParts(sale.created_at);
+    return {
+      number: sale.sale_number || sale.id,
+      date: created.date,
+      time: created.time,
+      customer: sale.customer_name || "Cliente general",
+      products: (sale.items || []).map((item) => `${number(item.quantity)}x ${item.item_name || "Producto o servicio"}`).join(" · ") || "Sin detalle",
+      payments: (sale.payments || []).map((payment) => `${paymentLabels[payment.payment_method] || payment.payment_method}: ${number(payment.amount).toFixed(2)}`).join(" · ") || paymentLabels[sale.payment_method] || sale.payment_method || "—",
+      total: number(sale.total_amount),
+    };
+  });
+  const paymentRows = sales.flatMap((sale) => (sale.payments?.length ? sale.payments : [{ payment_method: sale.payment_method, amount: sale.total_amount }]).map((payment) => ({
+    method: paymentLabels[payment.payment_method] || payment.payment_method || "No especificado",
+    amount: number(payment.amount),
+  })));
+  const paymentSummary = paymentRows.reduce((summary, payment) => {
+    summary[payment.method] = (summary[payment.method] || 0) + payment.amount;
+    return summary;
+  }, {});
+  const paymentSummaryRows = Object.entries(paymentSummary).map(([method, amount]) => ({ method, operations: paymentRows.filter((row) => row.method === method).length, amount }));
+  const breakdown = reportData.breakdown || {};
+  const productCount = sales.flatMap((sale) => sale.items || []).reduce((sum, item) => sum + number(item.quantity), 0);
+
+  exportProfessionalReport({
+    fileName: `reporte_caja_${new Date().toISOString().slice(0, 10)}`,
+    sheets: [
+      {
+        name: "Resumen ejecutivo", title: "REPORTE DE CAJA", metadata,
+        kpis: [
+          { label: "Ventas realizadas", value: sales.length, type: "number" },
+          { label: "Monto inicial", value: number(breakdown.initial_amount ?? reportData.initial_amount), type: "currency" },
+          { label: "Total en ventas", value: number(reportData.report_total_sales ?? sales.reduce((sum, sale) => sum + number(sale.total_amount), 0)), type: "currency" },
+          { label: "Efectivo esperado", value: number(breakdown.total_physical_cash ?? reportData.report_cash_to_deliver ?? reportData.expected_amount), type: "currency" },
+          { label: "Ingresos manuales", value: number(breakdown.manual_inflow ?? reportData.manual_inflow), type: "currency" },
+          { label: "Cobros de créditos", value: number(breakdown.credit_debt_collections ?? reportData.credit_collections), type: "currency" },
+          { label: "Diferencia de caja", value: number(reportData.report_difference ?? reportData.difference), type: "currency" },
+          { label: "Productos vendidos", value: productCount, type: "number" },
+        ],
+        columns: [{ key: "method", title: "Medio de pago", width: 160 }, { key: "operations", title: "Operaciones", type: "number", width: 90 }, { key: "amount", title: "Monto", type: "currency", total: true, width: 120 }],
+        rows: paymentSummaryRows,
+        note: "Los totales se calculan automáticamente. Verifique la diferencia de caja antes de entregar el turno.",
+      },
+      {
+        name: "Detalle de ventas", title: "DETALLE DE VENTAS", metadata,
+        columns: [
+          { key: "number", title: "N.º venta", width: 90 }, { key: "date", title: "Fecha", width: 80 }, { key: "time", title: "Hora", width: 70 },
+          { key: "customer", title: "Cliente", width: 150 }, { key: "products", title: "Producto o servicio", width: 220 }, { key: "payments", title: "Medios de pago", width: 230 },
+          { key: "total", title: "Total", type: "currency", total: true, width: 95 },
+        ], rows: saleRows,
+      },
+    ],
+  });
+};
+
 // Compatibilidad para módulos existentes: convierte cualquier arreglo plano en
 // un reporte con la misma plantilla visual sin exigir cambios en cada pantalla.
 export const exportToExcel = (data, fileName, sheetName = "Sheet1") => {

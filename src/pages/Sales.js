@@ -85,6 +85,7 @@ export const Sales = () => {
   const [users, setUsers] = useState([]);
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedSale, setSelectedSale] = useState(null);
@@ -102,7 +103,7 @@ export const Sales = () => {
   useEffect(() => {
     loadSales();
     loadUsers();
-  }, [page, searchFilters]);
+  }, [page, perPage, searchFilters]);
 
   const handleViewHistory = async (saleId) => {
     setOpenHistoryDialog(true);
@@ -121,7 +122,7 @@ export const Sales = () => {
   const loadSales = async () => {
     setIsLoading(true);
     try {
-      const response = await salesAPI.getAll({ page, ...searchFilters });
+      const response = await salesAPI.getAll({ page, per_page: perPage, ...searchFilters });
       setSales(response.data.data);
       setTotalPages(response.data.last_page);
     } catch (error) {
@@ -555,7 +556,17 @@ export const Sales = () => {
             </Table>
           </TableContainer>
 
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mt: 3, flexWrap: "wrap" }}>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Mostrar</InputLabel>
+              <Select
+                value={perPage}
+                label="Mostrar"
+                onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}
+              >
+                {[10, 100, 1000, 10000].map((value) => <MenuItem key={value} value={value}>{value} registros</MenuItem>)}
+              </Select>
+            </FormControl>
             <Pagination
               count={totalPages}
               page={page}

@@ -52,6 +52,7 @@ export const Purchases = () => {
   const { hasPermission } = useAuth();
   const [purchases, setPurchases] = useState([]);
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
@@ -72,12 +73,12 @@ export const Purchases = () => {
 
   useEffect(() => {
     loadPurchases();
-  }, [page, searchFilters]);
+  }, [page, perPage, searchFilters]);
 
   const loadPurchases = async () => {
     setIsLoading(true);
     try {
-      const response = await purchasesAPI.getAll({ page, ...searchFilters });
+      const response = await purchasesAPI.getAll({ page, per_page: perPage, ...searchFilters });
       setPurchases(response.data.data);
       setTotalPages(response.data.last_page);
     } catch (error) {
@@ -385,7 +386,17 @@ export const Purchases = () => {
             </Table>
           </TableContainer>
 
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mt: 3, flexWrap: "wrap" }}>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Mostrar</InputLabel>
+              <Select
+                value={perPage}
+                label="Mostrar"
+                onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}
+              >
+                {[10, 100, 1000, 10000].map((value) => <MenuItem key={value} value={value}>{value} registros</MenuItem>)}
+              </Select>
+            </FormControl>
             <Pagination
               count={totalPages}
               page={page}

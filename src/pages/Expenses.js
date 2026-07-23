@@ -52,6 +52,7 @@ export const Expenses = () => {
   const [categories, setCategories] = useState([]);
   const [searchFilters, setSearchFilters] = useState({});
   const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
@@ -70,12 +71,12 @@ export const Expenses = () => {
   useEffect(() => {
     loadExpenses();
     loadCategories();
-  }, [page, searchFilters]);
+  }, [page, perPage, searchFilters]);
 
   const loadExpenses = async () => {
     setLoading(true);
     try {
-      const response = await expensesAPI.getAll({ page, ...searchFilters });
+      const response = await expensesAPI.getAll({ page, per_page: perPage, ...searchFilters });
       setExpenses(response.data.data);
       setTotalPages(response.data.last_page);
     } catch (error) {
@@ -438,7 +439,17 @@ export const Expenses = () => {
             </Table>
           </TableContainer>
 
-          <Box sx={{ display: "flex", justifyContent: "center", mt: 3 }}>
+          <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mt: 3, flexWrap: "wrap" }}>
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Mostrar</InputLabel>
+              <Select
+                value={perPage}
+                label="Mostrar"
+                onChange={(event) => { setPerPage(Number(event.target.value)); setPage(1); }}
+              >
+                {[10, 100, 1000, 10000].map((value) => <MenuItem key={value} value={value}>{value} registros</MenuItem>)}
+              </Select>
+            </FormControl>
             <Pagination
               count={totalPages}
               page={page}

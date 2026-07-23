@@ -358,7 +358,18 @@ export const AssetLoans = () => {
                   <TableHead>
                     <TableRow>
                       <TableCell>Activo</TableCell>
-                      <TableCell>Beneficiario</TableCell>
+                      <TableCell
+                        sx={{
+                          position: "sticky",
+                          left: 0,
+                          zIndex: 3,
+                          minWidth: 160,
+                          bgcolor: "background.paper",
+                          boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                        }}
+                      >
+                        Beneficiario
+                      </TableCell>
                       <TableCell>Cant. Inicial</TableCell>
                       <TableCell>Cant. Pendiente</TableCell>
                       <TableCell>F. Préstamo</TableCell>
@@ -376,7 +387,16 @@ export const AssetLoans = () => {
                             {loan.asset?.name}
                           </Typography>
                         </TableCell>
-                        <TableCell>
+                        <TableCell
+                          sx={{
+                            position: "sticky",
+                            left: 0,
+                            zIndex: 2,
+                            minWidth: 160,
+                            bgcolor: "background.paper",
+                            boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                          }}
+                        >
                           <Typography variant="body2">
                             {loan.borrower_name}
                           </Typography>

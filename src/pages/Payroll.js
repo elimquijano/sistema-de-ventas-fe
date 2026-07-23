@@ -278,7 +278,18 @@ export const Payroll = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Empleado</TableCell>
+                    <TableCell
+                      sx={{
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 3,
+                        minWidth: 190,
+                        bgcolor: "background.paper",
+                        boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                      }}
+                    >
+                      Empleado
+                    </TableCell>
                     <TableCell>Email</TableCell>
                     <TableCell>Rol</TableCell>
                     <TableCell align="right">Gestión de Pagos y Asistencia</TableCell>
@@ -287,7 +298,16 @@ export const Payroll = () => {
                 <TableBody>
                   {users.map((user) => (
                     <TableRow key={user.id}>
-                      <TableCell>
+                      <TableCell
+                        sx={{
+                          position: "sticky",
+                          left: 0,
+                          zIndex: 2,
+                          minWidth: 190,
+                          bgcolor: "background.paper",
+                          boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                        }}
+                      >
                         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
                           <Avatar sx={{ bgcolor: theme.palette.primary.main }}>{user.first_name?.[0]}{user.last_name?.[0]}</Avatar>
                           <Typography variant="subtitle2">{user.full_name}</Typography>

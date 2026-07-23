@@ -310,7 +310,18 @@ export const Loans = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Descripción</TableCell>
+                    <TableCell
+                      sx={{
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 3,
+                        minWidth: 190,
+                        bgcolor: "background.paper",
+                        boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                      }}
+                    >
+                      Descripción
+                    </TableCell>
                     <TableCell>Monto Total</TableCell>
                     <TableCell>Pagado</TableCell>
                     <TableCell>Pendiente</TableCell>
@@ -323,7 +334,18 @@ export const Loans = () => {
                 <TableBody>
                   {loans.map((loan) => (
                     <TableRow key={loan.id}>
-                      <TableCell><Typography variant="body2" sx={{ fontWeight: 600 }}>{loan.description}</Typography></TableCell>
+                      <TableCell
+                        sx={{
+                          position: "sticky",
+                          left: 0,
+                          zIndex: 2,
+                          minWidth: 190,
+                          bgcolor: "background.paper",
+                          boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{loan.description}</Typography>
+                      </TableCell>
                       <TableCell>{formatCurrency(loan.amount)}</TableCell>
                       <TableCell><Typography color="success.main">{formatCurrency(loan.paid_amount)}</Typography></TableCell>
                       <TableCell><Typography color="error.main" sx={{ fontWeight: 600 }}>{formatCurrency(loan.pending_amount)}</Typography></TableCell>

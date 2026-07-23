@@ -328,7 +328,18 @@ export const Credits = () => {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Cliente</TableCell>
+                  <TableCell
+                    sx={{
+                      position: "sticky",
+                      left: 0,
+                      zIndex: 3,
+                      minWidth: 150,
+                      bgcolor: "background.paper",
+                      boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                    }}
+                  >
+                    Cliente
+                  </TableCell>
                   <TableCell>Venta</TableCell>
                   <TableCell>Emisión</TableCell>
                   <TableCell>Pendiente</TableCell>
@@ -342,7 +353,16 @@ export const Credits = () => {
               <TableBody>
                 {salesCredits.map((credit) => (
                   <TableRow key={credit.id}>
-                    <TableCell>
+                    <TableCell
+                      sx={{
+                        position: "sticky",
+                        left: 0,
+                        zIndex: 2,
+                        minWidth: 150,
+                        bgcolor: "background.paper",
+                        boxShadow: "3px 0 6px -4px rgba(0,0,0,0.35)",
+                      }}
+                    >
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {credit.customer_name}
                       </Typography>

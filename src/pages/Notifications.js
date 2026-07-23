@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   Typography,
@@ -34,12 +34,39 @@ const Notifications = () => {
     markAllAsRead,
     deleteNotification,
     unreadCount,
+    hasMoreNotifications,
   } = useNotifications();
+  const [perPage, setPerPage] = useState(20);
+  const loadMoreRef = useRef(null);
 
   useEffect(() => {
     // Fetch all notifications (not just unread) when entering the page
-    fetchNotifications({ unread: false });
-  }, [fetchNotifications]);
+    fetchNotifications({ unread: false, per_page: perPage });
+  }, [fetchNotifications, perPage]);
+
+  const loadOlderNotifications = useCallback(() => {
+    if (!loading && hasMoreNotifications) {
+      setPerPage((current) => current + 20);
+    }
+  }, [hasMoreNotifications, loading]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!target || !hasMoreNotifications) return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) loadOlderNotifications();
+      },
+      { rootMargin: "180px 0px", threshold: 0.1 }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMoreNotifications, loadOlderNotifications]);
+
+  const handleRefresh = () => {
+    if (perPage !== 20) setPerPage(20);
+    else fetchNotifications({ unread: false, per_page: 20 });
+  };
 
   const formatDateTime = (dateString) => {
     return new Date(dateString).toLocaleString("es-ES", {
@@ -78,7 +105,7 @@ const Notifications = () => {
             variant="outlined"
             size="medium"
             startIcon={<RefreshIcon />}
-            onClick={() => fetchNotifications({ unread: false })}
+            onClick={handleRefresh}
             sx={{ borderRadius: 2, fontWeight: 600 }}
           >
             Actualizar
@@ -223,6 +250,22 @@ const Notifications = () => {
                 </React.Fragment>
               );
             })}
+            <Box component="li" ref={loadMoreRef} sx={{ py: 2.5, px: 3, textAlign: "center", listStyle: "none" }}>
+              {loading ? (
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 1.5 }}>
+                  <CircularProgress size={20} />
+                  <Typography variant="body2" color="text.secondary">Cargando notificaciones anteriores...</Typography>
+                </Box>
+              ) : hasMoreNotifications ? (
+                <Button variant="text" onClick={loadOlderNotifications} sx={{ fontWeight: 700 }}>
+                  Cargar notificaciones anteriores
+                </Button>
+              ) : (
+                <Typography variant="caption" color="text.disabled">
+                  Has llegado al inicio de tu historial
+                </Typography>
+              )}
+            </Box>
           </List>
         ) : (
           <Box sx={{ p: 12, textAlign: "center" }}>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { notificationsAPI } from "../utils/api";
 import { useAuth } from "./AuthContext";
 
@@ -17,14 +17,26 @@ export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [hasMoreNotifications, setHasMoreNotifications] = useState(false);
+  const lastFetchParams = useRef({ unread: true });
 
-  const fetchNotifications = useCallback(async (params = { unread: true }) => {
+  const fetchNotifications = useCallback(async (params) => {
     if (!isAuthenticated) return;
-    
+    const requestParams = params || lastFetchParams.current;
+    if (params) lastFetchParams.current = params;
     setLoading(true);
     try {
-      const response = await notificationsAPI.getAll(params);
-      setNotifications(response.data.data || []);
+      const response = await notificationsAPI.getAll(requestParams);
+      const items = response.data.data || [];
+      setNotifications(items);
+      if (requestParams.per_page) {
+        const total = Number(response.data.total);
+        setHasMoreNotifications(
+          Number.isFinite(total)
+            ? items.length < total
+            : Boolean(response.data.next_page_url) || items.length >= Number(requestParams.per_page)
+        );
+      }
       // Also fetch unread count to be sure
       const countRes = await notificationsAPI.getUnreadCount();
       setUnreadCount(countRes.data.unread_count || 0);
@@ -87,6 +99,7 @@ export const NotificationProvider = ({ children }) => {
     notifications,
     unreadCount,
     loading,
+    hasMoreNotifications,
     fetchNotifications,
     markAsRead,
     markAllAsRead,

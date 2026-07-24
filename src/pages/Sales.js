@@ -48,7 +48,7 @@ import { SaleTimeline } from "../components/SaleTimeline";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
-import { salesAPI, usersAPI, API_STORAGE_URL } from "../utils/api";
+import { salesAPI, usersAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
 
 const PAYMENT_METHOD_LABELS = {
@@ -676,17 +676,17 @@ export const Sales = () => {
                       key={payment.id}
                       label={`${getPaymentMethodLabel(payment.payment_method)}: ${formatCurrency(payment.amount)}`}
                       color={getPaymentMethodColor(payment.payment_method)}
-                      icon={payment.payment_image ? <ImageIcon /> : null}
+                      icon={payment.payment_image_url ? <ImageIcon /> : null}
                       onClick={
-                        payment.payment_image
+                        payment.payment_image_url
                           ? () => {
-                              setSelectedImage(`${API_STORAGE_URL}/${payment.payment_image}`);
+                              setSelectedImage(payment.payment_image_url);
                               setOpenImageDialog(true);
                             }
                           : undefined
                       }
-                      variant={payment.payment_image ? "contained" : "filled"}
-                      sx={{ pl: payment.payment_image ? 0.5 : 0 }}
+                      variant={payment.payment_image_url ? "contained" : "filled"}
+                      sx={{ pl: payment.payment_image_url ? 0.5 : 0 }}
                     />
                   ))}
                 </Stack>

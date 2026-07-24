@@ -42,6 +42,7 @@ export const PaymentMethodSelector = ({
   payments,
   setPayments,
   currency = "PEN",
+  allowedMethods,
 }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
@@ -54,6 +55,12 @@ export const PaymentMethodSelector = ({
   const remainingAmount = useMemo(
     () => totalAmount - totalPaid,
     [totalAmount, totalPaid]
+  );
+  const availableMethods = useMemo(
+    () => allowedMethods?.length
+      ? PAYMENT_METHODS.filter((method) => allowedMethods.includes(method.value))
+      : PAYMENT_METHODS,
+    [allowedMethods]
   );
 
   const handleAddPayment = (method) => {
@@ -133,8 +140,9 @@ export const PaymentMethodSelector = ({
           {["yape", "plin", "transfer", "vale", "card"].includes(
             p.payment_method
           ) && (
-            <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-              <Button
+            <Box sx={{ mt: 1.5 }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Button
                 variant="outlined"
                 size="small"
                 component="label"
@@ -161,8 +169,8 @@ export const PaymentMethodSelector = ({
                   }}
                 />
               </Button>
-              {p.payment_image && (
-                <IconButton
+                {p.payment_image && (
+                  <IconButton
                   size="small"
                   color="error"
                   onClick={() =>
@@ -170,8 +178,9 @@ export const PaymentMethodSelector = ({
                   }
                 >
                   <ClearIcon fontSize="small" />
-                </IconButton>
-              )}
+                  </IconButton>
+                )}
+              </Box>
             </Box>
           )}
         </Paper>
@@ -183,7 +192,7 @@ export const PaymentMethodSelector = ({
             AÑADIR FORMA DE PAGO:
           </Typography>
           <Grid container spacing={1}>
-            {PAYMENT_METHODS.map((method) => (
+            {availableMethods.map((method) => (
               <Grid item xs={4} sm={3} key={method.value}>
                 <Button
                   fullWidth

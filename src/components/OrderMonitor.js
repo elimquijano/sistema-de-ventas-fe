@@ -57,6 +57,8 @@ import { salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { compressImage } from "../utils/imageCompression";
 import { PaymentMethodSelector } from "./PaymentMethodSelector";
+import { buildPaymentsFormData } from "../utils/paymentFormData";
+import { getApiErrorMessage } from "../utils/apiErrors";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -454,15 +456,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       return notificationSwal("Monto", "Pago incompleto.", "error");
     setIsSubmitting(true);
     
-    const formData = new FormData();
-    payments.forEach((p, index) => {
-      formData.append(`payments[${index}][payment_method]`, p.payment_method);
-      formData.append(`payments[${index}][amount]`, p.amount);
-      formData.append(`payments[${index}][reference]`, p.reference || "");
-      if (p.payment_image) {
-        formData.append(`payments[${index}][payment_image]`, p.payment_image);
-      }
-    });
+    const formData = buildPaymentsFormData(payments);
 
     try {
       await salesAPI.confirmDelivery(selectedOrderToConfirm.id, formData);
@@ -470,7 +464,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       setOpenPaymentDialog(false);
       onRefresh();
     } catch (e) {
-      const errorMsg = e.response?.data?.message || e.response?.data?.error || "Error al confirmar.";
+      const errorMsg = getApiErrorMessage(e, "Error al confirmar.");
       notificationSwal("Error", errorMsg, "error");
     } finally {
       setIsSubmitting(false);

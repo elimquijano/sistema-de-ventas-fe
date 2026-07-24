@@ -42,6 +42,8 @@ import {
   Build as BuildIcon,
   History as HistoryIcon,
   Close as CloseIcon,
+  Visibility as VisibilityIcon,
+  Image as ImageIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency, formatDate } from "../utils/formatters";
@@ -49,6 +51,8 @@ import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { creditsAPI } from "../utils/api";
 import { AuditTimeline } from "../components/AuditTimeline";
 import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
+import { buildPaymentsFormData } from "../utils/paymentFormData";
+import { getApiErrorMessage } from "../utils/apiErrors";
 
 export const Credits = () => {
   const { hasPermission } = useAuth();
@@ -66,6 +70,10 @@ export const Credits = () => {
   const [selectedCredit, setSelectedCredit] = useState(null);
   const [payments, setPayments] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detailCredit, setDetailCredit] = useState(null);
+  const [receiptDialogOpen, setReceiptDialogOpen] = useState(false);
+  const [selectedReceiptImage, setSelectedReceiptImage] = useState("");
 
   // Edit Dialog State
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -115,6 +123,22 @@ export const Credits = () => {
     setOpenPaymentDialog(true);
   };
 
+  const handleOpenDetailDialog = (credit) => {
+    setDetailCredit(credit);
+    setDetailDialogOpen(true);
+  };
+
+  const paymentMethodLabel = (method) => ({
+    cash: "Efectivo",
+    credit: "Crédito inicial",
+    yape: "Yape",
+    plin: "Plin",
+    card: "Tarjeta",
+    transfer: "Transferencia",
+    discount: "Descuento",
+    vale: "Vale",
+  })[method] || method;
+
   const handleProcessPayment = async () => {
     try {
       const totalPaid = payments.reduce(
@@ -133,7 +157,7 @@ export const Credits = () => {
         return;
       }
 
-      if (totalPaid > selectedCredit.pending_amount + 0.01) {
+      if (totalPaid > Number(selectedCredit.pending_amount) + 0.01) {
         notificationSwal(
           "Error",
           "El monto total excede el saldo pendiente.",
@@ -142,15 +166,7 @@ export const Credits = () => {
         return;
       }
 
-      const formData = new FormData();
-      payments.forEach((p, index) => {
-        formData.append(`payments[${index}][payment_method]`, p.payment_method);
-        formData.append(`payments[${index}][amount]`, p.amount);
-        formData.append(`payments[${index}][reference]`, p.reference || "");
-        if (p.payment_image) {
-          formData.append(`payments[${index}][payment_image]`, p.payment_image);
-        }
-      });
+      const formData = buildPaymentsFormData(payments);
 
       setIsSubmitting(true);
       await creditsAPI.processPayment(selectedCredit.id, formData);
@@ -167,10 +183,7 @@ export const Credits = () => {
       loadCredits();
     } catch (error) {
       console.error("Error processing payment:", error);
-      const msg =
-        error.response?.data?.message ||
-        error.response?.data?.error ||
-        "Error al procesar el pago.";
+      const msg = getApiErrorMessage(error, "Error al procesar el pago.");
       notificationSwal("Error", msg, "error");
     } finally {
       setIsSubmitting(false);
@@ -409,6 +422,14 @@ export const Credits = () => {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleOpenDetailDialog(credit)}
+                        color="info"
+                        title="Ver detalles y pagos"
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
                       {hasPermission("creditos.pay") &&
                         credit.status === "pending" && (
                           <IconButton
@@ -455,6 +476,114 @@ export const Credits = () => {
       </Card>
 
       <Dialog
+        open={detailDialogOpen}
+        onClose={() => setDetailDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 800 }}>Detalle del crédito</Typography>
+            <Typography variant="caption" color="text.secondary">
+              {detailCredit?.sale?.sale_number || "Venta sin número"}
+            </Typography>
+          </Box>
+          <IconButton onClick={() => setDetailDialogOpen(false)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {detailCredit && (
+            <Box>
+              <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="caption" color="text.secondary">Cliente</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700 }}>{detailCredit.customer_name}</Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">Total</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700 }}>{formatCurrency(detailCredit.total_amount)}</Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">Pagado</Typography>
+                  <Typography variant="body1" color="success.main" sx={{ fontWeight: 700 }}>{formatCurrency(detailCredit.paid_amount)}</Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">Pendiente</Typography>
+                  <Typography variant="body1" color="error.main" sx={{ fontWeight: 700 }}>{formatCurrency(detailCredit.pending_amount)}</Typography>
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <Typography variant="caption" color="text.secondary">Estado</Typography>
+                  <Box sx={{ mt: 0.5 }}><Chip label={getStatusLabel(detailCredit.status)} size="small" color={getStatusColor(detailCredit.status)} /></Box>
+                </Grid>
+              </Grid>
+
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>Historial de pagos</Typography>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {detailCredit.sale?.payments?.length ? detailCredit.sale.payments.map((payment) => {
+                  const isInitialCredit = payment.payment_method === "credit";
+                  return (
+                    <Paper key={payment.id} variant="outlined" sx={{ p: 1.5, bgcolor: isInitialCredit ? alpha("#673ab7", 0.04) : "background.paper" }}>
+                      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+                        <Box>
+                          <Typography variant="body2" sx={{ fontWeight: 800 }}>{paymentMethodLabel(payment.payment_method)}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {new Date(payment.created_at).toLocaleString("es-PE")}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{formatCurrency(payment.amount)}</Typography>
+                          {payment.payment_image_url && (
+                            <Button
+                              onClick={() => {
+                                setSelectedReceiptImage(payment.payment_image_url);
+                                setReceiptDialogOpen(true);
+                              }}
+                              variant="outlined"
+                              size="small"
+                              startIcon={<ImageIcon />}
+                            >
+                              Ver comprobante
+                            </Button>
+                          )}
+                        </Box>
+                      </Box>
+                    </Paper>
+                  );
+                }) : (
+                  <Typography variant="body2" color="text.secondary">No hay pagos registrados.</Typography>
+                )}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setDetailDialogOpen(false)}>Cerrar</Button></DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={receiptDialogOpen}
+        onClose={() => setReceiptDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          Comprobante de pago
+          <IconButton onClick={() => setReceiptDialogOpen(false)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ p: 1, textAlign: "center", bgcolor: "grey.100" }}>
+          {selectedReceiptImage && (
+            <Box
+              component="img"
+              src={selectedReceiptImage}
+              alt="Comprobante de pago"
+              sx={{ display: "block", maxWidth: "100%", maxHeight: "75vh", width: "auto", height: "auto", mx: "auto", objectFit: "contain" }}
+            />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReceiptDialogOpen(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
         open={openPaymentDialog}
         onClose={() => setOpenPaymentDialog(false)}
         maxWidth="sm"
@@ -487,6 +616,30 @@ export const Credits = () => {
                   </Paper>
                 </Grid>
               </Grid>
+              {selectedCredit.sale?.payments?.some((payment) => payment.payment_image_url) && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                    Comprobantes registrados
+                  </Typography>
+                  <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+                    {selectedCredit.sale.payments
+                      .filter((payment) => payment.payment_image_url)
+                      .map((payment) => (
+                        <Button
+                          key={payment.id}
+                          component="a"
+                          href={payment.payment_image_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          size="small"
+                          variant="outlined"
+                        >
+                          {payment.payment_method}: {formatCurrency(payment.amount)}
+                        </Button>
+                      ))}
+                  </Box>
+                </Box>
+              )}
             </Box>
           )}
 
@@ -494,6 +647,7 @@ export const Credits = () => {
             totalAmount={selectedCredit?.pending_amount || 0}
             payments={payments}
             setPayments={setPayments}
+            allowedMethods={["cash", "yape", "plin", "card", "transfer", "discount", "vale"]}
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>

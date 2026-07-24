@@ -325,7 +325,12 @@ export const creditsAPI = {
   getById: (id) => api.get(`/credits/${id}`, { loaderMessage: "Obteniendo detalles del crédito..." }),
   update: (id, creditData) => api.put(`/credits/${id}`, creditData, { loaderMessage: "Actualizando crédito..." }),
   processPayment: (id, paymentData) =>
-    api.post(`/credits/${id}/payment`, paymentData, { loaderMessage: "Procesando pago de crédito..." }),
+    api.post(`/credits/${id}/payment`, paymentData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      loaderMessage: "Procesando pago de crédito..."
+    }),
   getPending: () => api.get("/credits/pending", { loaderMessage: "Cargando créditos pendientes..." }),
   timeline: (id) => api.get(`/credits/${id}/timeline`, { loaderMessage: "Cargando línea de tiempo..." }),
 };

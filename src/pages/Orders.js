@@ -91,6 +91,7 @@ import { MapComponent } from "../components/MapComponent";
 
 import { OrderMonitor } from "../components/OrderMonitor";
 import { StrictAutocomplete } from "../components/StrictAutocomplete";
+import { getApiErrorMessage } from "../utils/apiErrors";
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 
@@ -391,28 +392,30 @@ export const Orders = () => {
       );
       return;
     }
+    if (customerPhone.trim().length !== 9) {
+      notificationSwal(
+        "Teléfono inválido",
+        "El teléfono del cliente debe tener exactamente 9 caracteres.",
+        "warning",
+      );
+      return;
+    }
     setIsLoading(true);
     try {
       const discount = Math.max(
         0,
         calculatedTotal - (parseFloat(editableTotal) || 0),
       );
-      const firstItem = orderItems[0];
       await salesAPI.quickOrder({
-        phone: customerPhone,
+        phone: customerPhone.trim(),
         customer_name: customerName,
         address: customerAddress,
         latitude: customerLocation?.lat,
         longitude: customerLocation?.lng,
-        product_id: firstItem.id,
-        quantity: firstItem.quantity,
         items: orderItems.map((item) => ({
           id: item.id,
-          product_id: item.id,
           type: item.type,
           quantity: item.quantity,
-          price: Number(item.price),
-          unit_price: Number(item.price),
         })),
         total_amount: parseFloat(editableTotal) || 0,
         discount: discount,
@@ -435,7 +438,7 @@ export const Orders = () => {
     } catch (e) {
       notificationSwal(
         "Error",
-        e.response?.data?.message || "No se pudo crear.",
+        getApiErrorMessage(e, "No se pudo crear."),
         "error",
       );
     } finally {

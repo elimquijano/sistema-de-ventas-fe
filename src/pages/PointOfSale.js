@@ -68,6 +68,8 @@ import {
 } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
+import { appendPaymentsToFormData } from "../utils/paymentFormData";
+import { getApiErrorMessage } from "../utils/apiErrors";
 import { CashRegisterReport } from "../components/CashRegisterReport";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
@@ -473,25 +475,14 @@ export const PointOfSale = () => {
 
     const formData = new FormData();
     formData.append("customer_name", customerName.trim() || "Cliente General");
-    formData.append("final_price", totalAmount.toFixed(2));
-    formData.append("total_amount", totalAmount.toFixed(2));
+    formData.append("is_delivery", "0");
     
     cart.forEach((item, index) => {
       formData.append(`items[${index}][id]`, item.id);
       formData.append(`items[${index}][type]`, item.type);
       formData.append(`items[${index}][quantity]`, item.quantity);
-      formData.append(`items[${index}][price]`, item.price);
-      formData.append(`items[${index}][unit_price]`, item.price);
     });
-
-    payments.forEach((p, index) => {
-      formData.append(`payments[${index}][payment_method]`, p.payment_method);
-      formData.append(`payments[${index}][amount]`, p.amount);
-      formData.append(`payments[${index}][reference]`, p.reference || "");
-      if (p.payment_image) {
-        formData.append(`payments[${index}][payment_image]`, p.payment_image);
-      }
-    });
+    appendPaymentsToFormData(formData, payments);
 
     setIsLoading(true);
     try {
@@ -507,8 +498,7 @@ export const PointOfSale = () => {
       checkCashRegisterStatus();
       loadProducts();
     } catch (error) {
-      const msg =
-        error.response?.data?.message || error.response?.data?.error || "Error al completar la venta.";
+      const msg = getApiErrorMessage(error, "Error al completar la venta.");
       notificationSwal("Error", msg, "error");
     } finally {
       setIsLoading(false);
@@ -1146,10 +1136,11 @@ export const PointOfSale = () => {
             />
             <Divider>Métodos de Pago</Divider>
             
-            <PaymentMethodSelector
+          <PaymentMethodSelector
               totalAmount={totalAmount}
               payments={payments}
-              setPayments={setPayments}
+            setPayments={setPayments}
+            allowedMethods={["cash", "credit", "yape", "plin", "card", "transfer", "discount", "vale"]}
               currency={currency}
             />
 

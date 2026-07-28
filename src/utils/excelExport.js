@@ -1,3 +1,4 @@
+import * as XLSX from "xlsx-js-style";
 import { notificationSwal } from "./swal-helpers";
 
 const xmlEscape = (value = "") => String(value)
@@ -10,17 +11,6 @@ const xmlEscape = (value = "") => String(value)
 const safeSheetName = (name) => String(name || "Reporte")
   .replace(/[\\/?*:[\]]/g, " ")
   .slice(0, 31);
-
-const downloadBlob = (blob, fileName) => {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
-};
 
 const dataCell = (value, type = "text", style) => {
   const styleId = style || (type === "currency" ? "Currency" : type === "number" ? "Number" : "Data");
@@ -100,9 +90,183 @@ const buildSheet = ({ name, title, subtitle, metadata = [], kpis = [], columns =
   return `<Worksheet ss:Name="${xmlEscape(safeSheetName(name))}"><Table>${columnXml}${body}</Table><WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel"><FreezePanes/><FrozenNoSplit/><SplitHorizontal>2</SplitHorizontal><TopRowBottomPane>2</TopRowBottomPane><ProtectObjects>False</ProtectObjects><ProtectScenarios>False</ProtectScenarios><PageSetup><Layout x:Orientation="Landscape"/><Header x:Margin="0.3"/><Footer x:Margin="0.3"/><PageMargins x:Bottom="0.5" x:Left="0.25" x:Right="0.25" x:Top="0.5"/></PageSetup><FitToPage/></WorksheetOptions></Worksheet>`;
 };
 
+const excelColors = {
+  navy: "123B5D",
+  blue: "2C7DA0",
+  paleBlue: "DCEAF3",
+  paleGreen: "EAF5F1",
+  green: "087F5B",
+  gray: "52616B",
+  lightGray: "F1F5F7",
+  border: "D8E0E5",
+  white: "FFFFFF",
+};
+
+const thinBorder = (color = excelColors.border) => ({
+  top: { style: "thin", color: { rgb: color } },
+  bottom: { style: "thin", color: { rgb: color } },
+  left: { style: "thin", color: { rgb: color } },
+  right: { style: "thin", color: { rgb: color } },
+});
+
+const setExcelCell = (sheet, row, column, value, style = {}, type) => {
+  const address = XLSX.utils.encode_cell({ r: row, c: column });
+  sheet[address] = {
+    v: value ?? "",
+    t: type || (typeof value === "number" ? "n" : "s"),
+    s: style,
+  };
+};
+
+const buildStyledSheet = ({ title, subtitle, metadata = [], kpis = [], columns = [], rows = [], note }) => {
+  const colCount = Math.max(columns.length, 4);
+  const sheet = {};
+  const merges = [];
+  const rowHeights = [];
+  let row = 0;
+  const mergeAcross = (startRow, startColumn = 0, endColumn = colCount - 1) => {
+    if (endColumn > startColumn) merges.push({ s: { r: startRow, c: startColumn }, e: { r: startRow, c: endColumn } });
+  };
+  const titleStyle = {
+    fill: { fgColor: { rgb: excelColors.navy } },
+    font: { name: "Aptos Display", sz: 18, bold: true, color: { rgb: excelColors.white } },
+    alignment: { horizontal: "center", vertical: "center" },
+  };
+  const subtitleStyle = {
+    fill: { fgColor: { rgb: excelColors.navy } },
+    font: { name: "Aptos", sz: 10, color: { rgb: "D9EAF5" } },
+    alignment: { horizontal: "center", vertical: "center" },
+  };
+  const sectionStyle = {
+    fill: { fgColor: { rgb: excelColors.paleBlue } },
+    font: { bold: true, color: { rgb: excelColors.navy } },
+    border: { bottom: { style: "medium", color: { rgb: excelColors.blue } } },
+    alignment: { vertical: "center" },
+  };
+
+  setExcelCell(sheet, row, 0, title, titleStyle);
+  mergeAcross(row);
+  rowHeights[row] = { hpt: 27 };
+  row += 1;
+  setExcelCell(sheet, row, 0, subtitle, subtitleStyle);
+  mergeAcross(row);
+  rowHeights[row] = { hpt: 19 };
+  row += 2;
+
+  if (metadata.length) {
+    setExcelCell(sheet, row, 0, "INFORMACIÓN DEL REPORTE", sectionStyle);
+    mergeAcross(row);
+    row += 1;
+    for (let index = 0; index < metadata.length; index += 2) {
+      const pair = [metadata[index], metadata[index + 1]].filter(Boolean);
+      pair.forEach((item, pairIndex) => {
+        const startColumn = pairIndex * 2;
+        setExcelCell(sheet, row, startColumn, item.label, {
+          fill: { fgColor: { rgb: excelColors.lightGray } },
+          font: { bold: true, color: { rgb: excelColors.gray } },
+          border: thinBorder(),
+        });
+        setExcelCell(sheet, row, startColumn + 1, item.value, {
+          font: { color: { rgb: "172B3A" } },
+          border: thinBorder(),
+        });
+      });
+      row += 1;
+    }
+    row += 1;
+  }
+
+  if (kpis.length) {
+    setExcelCell(sheet, row, 0, "INDICADORES PRINCIPALES", sectionStyle);
+    mergeAcross(row);
+    row += 1;
+    for (let index = 0; index < kpis.length; index += colCount) {
+      const group = kpis.slice(index, index + colCount);
+      group.forEach((kpi, column) => setExcelCell(sheet, row, column, kpi.label, {
+        fill: { fgColor: { rgb: excelColors.paleGreen } },
+        font: { bold: true, color: { rgb: excelColors.gray } },
+        alignment: { horizontal: "center", vertical: "center", wrapText: true },
+        border: thinBorder("A9D6C5"),
+      }));
+      rowHeights[row] = { hpt: 24 };
+      row += 1;
+      group.forEach((kpi, column) => setExcelCell(sheet, row, column, Number(kpi.value || 0), {
+        fill: { fgColor: { rgb: excelColors.paleGreen } },
+        font: { bold: true, sz: 14, color: { rgb: excelColors.green } },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: thinBorder("A9D6C5"),
+        numFmt: kpi.type === "currency" ? '"S/ "#,##0.00;[Red]-"S/ "#,##0.00' : "#,##0.00",
+      }, "n"));
+      rowHeights[row] = { hpt: 28 };
+      row += 1;
+    }
+    row += 1;
+  }
+
+  if (columns.length) {
+    setExcelCell(sheet, row, 0, "DETALLE", sectionStyle);
+    mergeAcross(row);
+    row += 1;
+    columns.forEach((column, index) => setExcelCell(sheet, row, index, column.title, {
+      fill: { fgColor: { rgb: excelColors.blue } },
+      font: { bold: true, color: { rgb: excelColors.white } },
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: thinBorder("DCEAF3"),
+    }));
+    rowHeights[row] = { hpt: 29 };
+    row += 1;
+    const firstDataRow = row + 1;
+    rows.forEach((item) => {
+      columns.forEach((column, index) => {
+        const numeric = column.type === "currency" || column.type === "number";
+        setExcelCell(sheet, row, index, numeric ? Number(item[column.key] || 0) : item[column.key], {
+          alignment: { horizontal: numeric ? "right" : "left", vertical: "center", wrapText: true },
+          border: { bottom: { style: "thin", color: { rgb: "E3E8EB" } } },
+          numFmt: column.type === "currency" ? '"S/ "#,##0.00;[Red]-"S/ "#,##0.00' : column.type === "number" ? "#,##0.00" : undefined,
+        }, numeric ? "n" : "s");
+      });
+      row += 1;
+    });
+    if (rows.length && columns.some((column) => column.total)) {
+      columns.forEach((column, index) => {
+        const baseStyle = {
+          fill: { fgColor: { rgb: excelColors.paleBlue } },
+          font: { bold: true, color: { rgb: index === 0 ? excelColors.navy : excelColors.green } },
+          alignment: { horizontal: index === 0 ? "right" : "right", vertical: "center" },
+          border: { top: { style: "medium", color: { rgb: excelColors.blue } } },
+          numFmt: column.type === "currency" ? '"S/ "#,##0.00;[Red]-"S/ "#,##0.00' : undefined,
+        };
+        if (index === 0) setExcelCell(sheet, row, index, "TOTALES", baseStyle);
+        else if (column.total) {
+          const address = XLSX.utils.encode_cell({ r: row, c: index });
+          const total = rows.reduce((sum, item) => sum + Number(item[column.key] || 0), 0);
+          sheet[address] = { f: `SUM(${XLSX.utils.encode_col(index)}${firstDataRow}:${XLSX.utils.encode_col(index)}${row})`, t: "n", v: total, s: baseStyle };
+        } else setExcelCell(sheet, row, index, "", baseStyle);
+      });
+      row += 1;
+    }
+  }
+
+  if (note) {
+    row += 1;
+    setExcelCell(sheet, row, 0, note, {
+      fill: { fgColor: { rgb: "FFF7DB" } },
+      font: { italic: true, color: { rgb: "6C7880" } },
+      alignment: { wrapText: true },
+    });
+    mergeAcross(row);
+  }
+
+  sheet["!ref"] = `A1:${XLSX.utils.encode_cell({ r: Math.max(row, 1), c: colCount - 1 })}`;
+  sheet["!cols"] = Array.from({ length: colCount }, (_, index) => ({ wpx: columns[index]?.width || 120 }));
+  sheet["!rows"] = rowHeights;
+  sheet["!merges"] = merges;
+  sheet["!sheetViews"] = [{ state: "frozen", ySplit: 2 }];
+  return sheet;
+};
+
 /**
- * Plantilla reutilizable para reportes corporativos. Cada hoja acepta metadata,
- * indicadores, columnas tipadas, detalle y columnas totalizables con fórmulas.
+ * Plantilla reutilizable para reportes corporativos XLSX con estilos reales.
  */
 export const exportProfessionalReport = ({ fileName, sheets }) => {
   if (!sheets?.some((sheet) => sheet.rows?.length || sheet.kpis?.length)) {
@@ -110,8 +274,15 @@ export const exportProfessionalReport = ({ fileName, sheets }) => {
     return;
   }
   const generatedAt = new Date().toLocaleString("es-PE");
-  const workbook = `<?xml version="1.0" encoding="UTF-8"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:html="http://www.w3.org/TR/REC-html40"><DocumentProperties xmlns="urn:schemas-microsoft-com:office:office"><Author>MIS Gestión Comercial</Author><Created>${new Date().toISOString()}</Created><Company>MIS</Company></DocumentProperties>${STYLES}${sheets.map((sheet) => buildSheet({ ...sheet, subtitle: sheet.subtitle || `Generado el ${generatedAt}` })).join("")}</Workbook>`;
-  downloadBlob(new Blob(["\ufeff", workbook], { type: "application/vnd.ms-excel;charset=utf-8" }), `${fileName}.xls`);
+  const workbook = XLSX.utils.book_new();
+  sheets.forEach((sheet) => {
+    XLSX.utils.book_append_sheet(
+      workbook,
+      buildStyledSheet({ ...sheet, subtitle: sheet.subtitle || `Generado el ${generatedAt}` }),
+      safeSheetName(sheet.name)
+    );
+  });
+  XLSX.writeFile(workbook, `${fileName}.xlsx`, { bookType: "xlsx", compression: true });
   notificationSwal("Exportación completa", `El reporte ${fileName} fue descargado.`, "success");
 };
 

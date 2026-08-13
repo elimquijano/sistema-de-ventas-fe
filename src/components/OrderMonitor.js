@@ -386,7 +386,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       } finally {
         refreshInProgress = false;
       }
-    }, 5000);
+    }, 30000);
 
     return () => window.clearInterval(intervalId);
   }, [autoRefresh]);

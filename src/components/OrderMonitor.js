@@ -61,6 +61,7 @@ import { compressImage } from "../utils/imageCompression";
 import { PaymentMethodSelector } from "./PaymentMethodSelector";
 import { buildPaymentsFormData } from "../utils/paymentFormData";
 import { getApiErrorMessage } from "../utils/apiErrors";
+import { openGoogleMaps } from "../utils/navigationUtils";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -117,7 +118,7 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
       url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     }
     
-    if (url) window.open(url, "_blank");
+    if (url) openGoogleMaps(url);
     else notificationSwal("Error", "No hay ubicación ni dirección disponible.", "error");
   };
 
@@ -576,7 +577,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
     }
     url += `&destination=${destination}`;
 
-    window.open(url, "_blank");
+    openGoogleMaps(url);
   };
 
   const orderMarkerIcon = (color = theme.palette.primary.main) =>

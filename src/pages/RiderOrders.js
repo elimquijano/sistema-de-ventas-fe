@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Box, Typography, Container, CircularProgress, AppBar, Toolbar, IconButton, Badge } from "@mui/material";
-import { Refresh as RefreshIcon, LocalShipping as LocalShippingIcon } from "@mui/icons-material";
+import { Box, Typography, CircularProgress, AppBar, Toolbar, Badge } from "@mui/material";
+import { LocalShipping as LocalShippingIcon } from "@mui/icons-material";
 import { OrderMonitor } from "../components/OrderMonitor";
 import { salesAPI, usersAPI } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -24,8 +24,8 @@ export const RiderOrders = () => {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async ({ silent = false } = {}) => {
+    if (!silent) setIsLoading(true);
     try {
       const [ordersRes, ridersRes] = await Promise.all([
         salesAPI.getAll({
@@ -40,9 +40,11 @@ export const RiderOrders = () => {
       setRiders((ridersRes.data.data || []).filter(u => u.status === 'active'));
     } catch (e) {
       console.error("Error loading rider data", e);
-      notificationSwal("Error", "No se pudieron cargar los pedidos.", "error");
+      if (!silent) {
+        notificationSwal("Error", "No se pudieron cargar los pedidos.", "error");
+      }
     } finally {
-      setIsLoading(false);
+      if (!silent) setIsLoading(false);
     }
   };
 
@@ -66,9 +68,6 @@ export const RiderOrders = () => {
           <Badge badgeContent={orders.length} color="error" sx={{ mr: 2 }}>
             <LocalShippingIcon color="inherit" />
           </Badge>
-          <IconButton color="inherit" onClick={loadData} disabled={isLoading}>
-            {isLoading ? <CircularProgress size={24} color="inherit" /> : <RefreshIcon />}
-          </IconButton>
         </Toolbar>
       </AppBar>
 

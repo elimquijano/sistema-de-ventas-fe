@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Box,
   Grid,
@@ -27,6 +27,8 @@ import {
   Paper,
   Slide,
   CircularProgress,
+  FormControlLabel,
+  Switch,
 } from "@mui/material";
 import {
   Payment as PaymentIcon,
@@ -362,6 +364,31 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
 export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderView = false, currency = "PEN" }) => {
   const theme = useTheme();
   const [monitorView, setMonitorView] = useState("cards");
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const refreshRef = useRef(onRefresh);
+
+  refreshRef.current = onRefresh;
+
+  useEffect(() => {
+    if (!autoRefresh) return undefined;
+
+    let refreshInProgress = false;
+    const intervalId = window.setInterval(async () => {
+      // Avoid background traffic and overlapping requests on slow connections.
+      if (document.visibilityState !== "visible" || refreshInProgress) return;
+
+      refreshInProgress = true;
+      try {
+        await refreshRef.current?.({ silent: true });
+      } catch (error) {
+        console.error("Error refreshing orders", error);
+      } finally {
+        refreshInProgress = false;
+      }
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [autoRefresh]);
 
   const getRiderColor = (riderId) => {
     if (!riderId) return theme.palette.text.disabled;
@@ -578,6 +605,25 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <Box sx={{ mb: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
+        <FormControlLabel
+          control={
+            <Switch
+              size="small"
+              checked={autoRefresh}
+              onChange={(event) => setAutoRefresh(event.target.checked)}
+              color="primary"
+            />
+          }
+          label="Actualización automática"
+          title="Actualizar los pedidos cada 5 segundos"
+          sx={{
+            mr: 0,
+            "& .MuiFormControlLabel-label": {
+              fontSize: 12,
+              fontWeight: 600,
+            },
+          }}
+        />
         <IconButton 
           size="small" 
           color="primary" 

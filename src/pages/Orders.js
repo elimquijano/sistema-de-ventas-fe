@@ -67,7 +67,6 @@ import {
   Send as SendIcon,
   WhatsApp as WhatsAppIcon,
   ReceiptLong as ReceiptIcon,
-  Refresh as RefreshIcon,
   Category as CategoryIcon,
   GridView as GridViewIcon,
   LocationOn as LocationOnIcon,
@@ -510,19 +509,6 @@ export const Orders = () => {
             />
           </Tabs>
 
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <IconButton
-              size="small"
-              onClick={() => {
-                loadData();
-                loadPendingOrders();
-              }}
-              color="primary"
-              sx={{ ml: 1 }}
-            >
-              <RefreshIcon fontSize="small" />
-            </IconButton>
-          </Stack>
         </Toolbar>
       </AppBar>
 

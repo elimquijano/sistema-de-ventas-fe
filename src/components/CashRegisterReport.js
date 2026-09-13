@@ -29,7 +29,7 @@ import {
   Payments as PaymentsIcon,
   FileDownload as FileDownloadIcon,
 } from "@mui/icons-material";
-import { formatCurrency } from "../utils/formatters";
+import { formatCurrency, formatDate, PERU_TIME_ZONE } from "../utils/formatters";
 import { useAuth } from "../contexts/AuthContext";
 import { exportCashRegisterReport } from "../utils/excelExport";
 
@@ -266,7 +266,7 @@ export const CashRegisterReport = ({ reportData, onPrintReceipt, isPrinting }) =
                             {sale.sale_number}
                           </Typography>
                           <Chip 
-                            label={new Date(sale.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            label={formatDate(sale.created_at, 'HH:mm', PERU_TIME_ZONE)}
                             size="small"
                             sx={{ fontWeight: 700, height: 20, fontSize: '0.65rem', bgcolor: alpha(theme.palette.primary.main, 0.1), color: 'primary.main' }}
                           />

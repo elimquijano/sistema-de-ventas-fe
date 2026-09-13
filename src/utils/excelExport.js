@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx-js-style";
 import { notificationSwal } from "./swal-helpers";
+import { formatDate, getCurrentPeruDate, PERU_TIME_ZONE } from "./formatters";
 
 const xmlEscape = (value = "") => String(value)
   .replace(/&/g, "&amp;")
@@ -273,7 +274,7 @@ export const exportProfessionalReport = ({ fileName, sheets }) => {
     notificationSwal("Advertencia", "No hay datos para exportar.", "warning");
     return;
   }
-  const generatedAt = new Date().toLocaleString("es-PE");
+  const generatedAt = formatDate(new Date(), "DD/MM/YYYY HH:mm", PERU_TIME_ZONE);
   const workbook = XLSX.utils.book_new();
   sheets.forEach((sheet) => {
     XLSX.utils.book_append_sheet(
@@ -295,8 +296,8 @@ export const exportCashRegisterReport = (reportData, currentUser) => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return { date: String(value), time: "—" };
     return {
-      date: date.toLocaleDateString("es-PE"),
-      time: date.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+      date: formatDate(date, "DD/MM/YYYY", PERU_TIME_ZONE),
+      time: formatDate(date, "HH:mm:ss", PERU_TIME_ZONE),
     };
   };
   const paymentLabels = { cash: "Efectivo", yape: "Yape", plin: "Plin", card: "Tarjeta", transfer: "Transferencia", credit: "Crédito", discount: "Descuento", vale: "Vale" };
@@ -334,7 +335,7 @@ export const exportCashRegisterReport = (reportData, currentUser) => {
   const productCount = sales.flatMap((sale) => sale.items || []).reduce((sum, item) => sum + number(item.quantity), 0);
 
   exportProfessionalReport({
-    fileName: `reporte_caja_${new Date().toISOString().slice(0, 10)}`,
+    fileName: `reporte_caja_${getCurrentPeruDate()}`,
     sheets: [
       {
         name: "Resumen ejecutivo", title: "REPORTE DE CAJA", metadata,

@@ -57,7 +57,12 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  getCurrentPeruDate,
+  PERU_TIME_ZONE,
+} from "../utils/formatters";
 import { businessAPI, cashRegisterAPI, salesAPI, default as api } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
@@ -232,9 +237,9 @@ export const BusinessDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("day");
-  const [customDates, setCustomDates] = useState({
-    from: new Date().toISOString().split('T')[0],
-    to: new Date().toISOString().split('T')[0]
+  const [customDates, setCustomDates] = useState(() => {
+    const todayInPeru = getCurrentPeruDate();
+    return { from: todayInPeru, to: todayInPeru };
   });
   const isInitialMount = useRef(true);
 
@@ -758,7 +763,7 @@ export const BusinessDashboard = () => {
                         <Grid item xs={6}>
                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, display: 'block', mb: 1, textTransform: 'uppercase' }}>Inicio</Typography>
                           <Typography variant="h6" sx={{ fontWeight: 900, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Schedule fontSize="inherit" /> {formatDate(reg.opened_at, "HH:mm")}
+                            <Schedule fontSize="inherit" /> {formatDate(reg.opened_at, "HH:mm", PERU_TIME_ZONE)}
                           </Typography>
                         </Grid>
                         <Grid item xs={6}>

@@ -45,7 +45,7 @@ import {
   Visibility as ViewIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import { formatCurrency, formatDate, getCurrentPeruDate } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { usersAPI, payrollAPI } from "../utils/api";
 
@@ -68,19 +68,6 @@ export const Payroll = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   
   // Form States
-  const getCurrentPeruDate = () => {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: "America/Lima",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    })
-      .formatToParts(new Date())
-      .reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
-
-    return `${parts.year}-${parts.month}-${parts.day}`;
-  };
-
   const [configData, setConfigData] = useState({
     base_salary: "",
     payment_frequency: "monthly",

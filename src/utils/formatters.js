@@ -1,8 +1,32 @@
+export const PERU_TIME_ZONE = 'America/Lima';
+
+const getDateTimeParts = (date, timeZone) => new Intl.DateTimeFormat('en-CA', {
+  timeZone,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+  .formatToParts(date)
+  .reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+
+export const getCurrentPeruDate = (date = new Date()) => {
+  const parsedDate = date instanceof Date ? date : new Date(date);
+  if (isNaN(parsedDate.getTime())) return '';
+
+  const parts = getDateTimeParts(parsedDate, PERU_TIME_ZONE);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
+
 // Formateadores de fecha
-export const formatDate = (date, format = 'DD/MM/YYYY') => {
+export const formatDate = (date, format = 'DD/MM/YYYY', timeZone) => {
   if (!date) return '';
   
   let d;
+  let dateTimeParts;
   // Si la fecha es solo YYYY-MM-DD, la parseamos manualmente para evitar desfase UTC
   if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
     const [year, month, day] = date.split('-').map(Number);
@@ -13,13 +37,17 @@ export const formatDate = (date, format = 'DD/MM/YYYY') => {
 
   if (isNaN(d.getTime())) return '';
 
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const yearShort = String(d.getFullYear()).slice(-2);
-  const seconds = String(d.getSeconds()).padStart(2, '0');
+  if (timeZone && !(typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date))) {
+    dateTimeParts = getDateTimeParts(d, timeZone);
+  }
+
+  const day = dateTimeParts?.day || String(d.getDate()).padStart(2, '0');
+  const month = dateTimeParts?.month || String(d.getMonth() + 1).padStart(2, '0');
+  const year = dateTimeParts?.year || String(d.getFullYear());
+  const hours = dateTimeParts?.hour || String(d.getHours()).padStart(2, '0');
+  const minutes = dateTimeParts?.minute || String(d.getMinutes()).padStart(2, '0');
+  const yearShort = year.slice(-2);
+  const seconds = dateTimeParts?.second || String(d.getSeconds()).padStart(2, '0');
   
   switch (format) {
     case 'DD/MM/YYYY':
@@ -34,10 +62,12 @@ export const formatDate = (date, format = 'DD/MM/YYYY') => {
       return `${day}-${month}-${yearShort} ${hours}:${minutes}:${seconds}`;
     case 'HH:mm':
       return `${hours}:${minutes}`;
+    case 'HH:mm:ss':
+      return `${hours}:${minutes}:${seconds}`;
     case 'relative':
       return getRelativeTime(d);
     default:
-      return d.toLocaleDateString();
+      return d.toLocaleDateString('es-PE', timeZone ? { timeZone } : undefined);
   }
 };
 

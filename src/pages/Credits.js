@@ -64,6 +64,7 @@ export const Credits = () => {
     status: "pending", 
     date: "" 
   });
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [openPaymentDialog, setOpenPaymentDialog] = useState(false);
@@ -93,6 +94,19 @@ export const Credits = () => {
     loadCredits();
   }, [page, searchFilters]);
 
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setPage(1);
+      setSearchFilters((prev) =>
+        prev.search === searchInput
+          ? prev
+          : { ...prev, search: searchInput },
+      );
+    }, 600);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchInput]);
+
   const loadCredits = async () => {
     try {
       setLoading(true);
@@ -115,6 +129,10 @@ export const Credits = () => {
     const { name, value } = event.target;
     setPage(1);
     setSearchFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSearchChange = (event) => {
+    setSearchInput(event.target.value);
   };
 
   const handleOpenPaymentDialog = (credit) => {
@@ -297,8 +315,8 @@ export const Credits = () => {
                 fullWidth
                 placeholder="Buscar por cliente o venta..."
                 name="search"
-                value={searchFilters.search || ""}
-                onChange={handleChangeFilter}
+                value={searchInput}
+                onChange={handleSearchChange}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">

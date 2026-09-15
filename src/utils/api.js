@@ -126,7 +126,11 @@ export const authAPI = {
   forgotPassword: (email) => api.post("/auth/forgot-password", { email }, { loaderMessage: "Enviando correo de recuperación..." }),
   resetPassword: (data) => api.post("/auth/reset-password", data, { loaderMessage: "Restableciendo contraseña..." }),
   refreshToken: () => api.post("/auth/refresh", {}, { silent: true }),
-  me: () => api.get("/auth/me", { loaderMessage: "Verificando identidad..." }),
+  me: ({ silent = false } = {}) =>
+    api.get(
+      "/auth/me",
+      silent ? { silent: true } : { loaderMessage: "Verificando identidad..." },
+    ),
   profile: (userData) => api.patch("/auth/profile", userData, { loaderMessage: "Actualizando perfil..." }),
   changePassword: (data) => api.post("/auth/change-password", data, { loaderMessage: "Cambiando contraseña..." }),
 };
@@ -190,6 +194,13 @@ export const notificationsAPI = {
   markAllAsRead: () => api.patch("/notifications/mark-all-read", {}, { silent: true }),
   delete: (id) => api.delete(`/notifications/${id}`, { silent: true }),
   getUnreadCount: () => api.get("/notifications/unread-count", { silent: true }),
+};
+
+export const notificationSettingsAPI = {
+  savePushToken: (token) =>
+    api.post("/notification-settings/token", { token }, { silent: true }),
+  deletePushToken: () =>
+    api.delete("/notification-settings/token", { silent: true }),
 };
 
 // NUEVAS APIs para el sistema de ventas

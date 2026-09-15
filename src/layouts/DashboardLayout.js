@@ -44,7 +44,10 @@ import {
 import { useNavigate, useLocation, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme as useCustomTheme } from "../contexts/ThemeContext";
+import { usePushNotifications } from "../contexts/PushNotificationsContext";
 import { modulesAPI } from "../utils/api";
+import { getPushErrorMessage } from "../services/firebaseMessaging";
+import { notificationSwal } from "../utils/swal-helpers";
 import { getIcon } from "../config/moduleConfig";
 import { DynamicRoutes } from "../routes/DynamicRouteGenerator";
 import { findFirstValidRoute } from "../utils/navigationUtils";
@@ -55,18 +58,44 @@ import Swal from "sweetalert2";
 const drawerWidth = 260;
 const collapsedDrawerWidth = 64;
 
-const enterFullscreen = (element = document.documentElement) => {
-  if (element.requestFullscreen) element.requestFullscreen();
-  else if (element.mozRequestFullScreen) element.mozRequestFullScreen();
-  else if (element.webkitRequestFullscreen) element.webkitRequestFullscreen();
-  else if (element.msRequestFullscreen) element.msRequestFullscreen();
+const getFullscreenElement = () =>
+  document.fullscreenElement ||
+  document.webkitFullscreenElement ||
+  document.mozFullScreenElement ||
+  document.msFullscreenElement;
+
+const enterFullscreen = async (element = document.documentElement) => {
+  const requestFullscreen =
+    element.requestFullscreen ||
+    element.webkitRequestFullscreen ||
+    element.mozRequestFullScreen ||
+    element.msRequestFullscreen;
+
+  if (!requestFullscreen) return false;
+
+  try {
+    await requestFullscreen.call(element);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
-const exitFullscreen = () => {
-  if (document.exitFullscreen) document.exitFullscreen();
-  else if (document.mozCancelFullScreen) document.mozCancelFullScreen();
-  else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-  else if (document.msExitFullscreen) document.msExitFullscreen();
+const exitFullscreen = async () => {
+  const cancelFullscreen =
+    document.exitFullscreen ||
+    document.webkitExitFullscreen ||
+    document.mozCancelFullScreen ||
+    document.msExitFullscreen;
+
+  if (!cancelFullscreen) return false;
+
+  try {
+    await cancelFullscreen.call(document);
+    return true;
+  } catch {
+    return false;
+  }
 };
 
 export const DashboardLayout = () => {
@@ -76,6 +105,12 @@ export const DashboardLayout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const {
+    available: pushAvailable,
+    pushEnabled,
+    saving: savingPush,
+    togglePushNotifications,
+  } = usePushNotifications();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -93,13 +128,19 @@ export const DashboardLayout = () => {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      setIsFullscreen(!!getFullscreenElement());
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    document.addEventListener("MSFullscreenChange", handleFullscreenChange);
 
     return () => {
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("MSFullscreenChange", handleFullscreenChange);
     };
   }, []);
 
@@ -146,6 +187,22 @@ export const DashboardLayout = () => {
 
   const handleClose = () => {
     setAnchorEl(null);
+  };
+
+  const handlePushToggle = async (event) => {
+    const enabled = event.target.checked;
+    try {
+      await togglePushNotifications(enabled);
+      notificationSwal(
+        enabled ? "Push activado" : "Push desactivado",
+        enabled
+          ? "Este navegador recibirá notificaciones push."
+          : "Las notificaciones volverán a enviarse por WhatsApp.",
+        "success",
+      );
+    } catch (error) {
+      notificationSwal("Error", getPushErrorMessage(error), "error");
+    }
   };
 
   const handleLogout = () => {
@@ -411,6 +468,7 @@ export const DashboardLayout = () => {
                 backgroundColor: alpha(theme.palette.common.black, 0.06),
               },
               marginLeft: 0,
+              display: { xs: "none", sm: "block" },
               width: "100%",
               maxWidth: 300,
             }}
@@ -451,8 +509,19 @@ export const DashboardLayout = () => {
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Fullscreen">
-              <IconButton color="inherit" onClick={handleToggleFullscreen}>
+            <Tooltip
+              title={isFullscreen ? "Salir de pantalla completa" : "Pantalla completa"}
+            >
+              <IconButton
+                color="inherit"
+                onClick={handleToggleFullscreen}
+                aria-label={
+                  isFullscreen
+                    ? "Salir de pantalla completa"
+                    : "Activar pantalla completa"
+                }
+                sx={{ flexShrink: 0 }}
+              >
                 {isFullscreen ? <FullscreenExit /> : <FullscreenIcon />}
               </IconButton>
             </Tooltip>
@@ -531,10 +600,19 @@ export const DashboardLayout = () => {
                   label="Modo Oscuro"
                   sx={{ mb: 1 }}
                 />
-                <FormControlLabel
-                  control={<Switch color="primary" />}
-                  label="Permitir Notificaciones"
-                />
+                {pushAvailable && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={pushEnabled}
+                        disabled={savingPush}
+                        onChange={handlePushToggle}
+                        color="primary"
+                      />
+                    }
+                    label="Notificaciones push"
+                  />
+                )}
               </Box>
 
               <Divider />

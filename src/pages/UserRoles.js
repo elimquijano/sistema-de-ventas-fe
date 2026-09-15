@@ -94,7 +94,7 @@ export const UserRoles = () => {
   useEffect(() => {
     const delayedSearch = setTimeout(() => {
       loadRoles();
-    }, 300);
+    }, 600);
 
     return () => clearTimeout(delayedSearch);
   }, [searchTerm]);

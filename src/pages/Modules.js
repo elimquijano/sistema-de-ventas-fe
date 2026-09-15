@@ -133,7 +133,7 @@ export const Modules = () => {
   useEffect(() => {
     const delayedSearch = setTimeout(() => {
       loadModules();
-    }, 300);
+    }, 600);
 
     return () => clearTimeout(delayedSearch);
   }, [searchFilters]);

@@ -124,7 +124,7 @@ export const UserPermissions = () => {
   useEffect(() => {
     const delayedSearch = setTimeout(() => {
       loadPermissions();
-    }, 300);
+    }, 600);
 
     return () => clearTimeout(delayedSearch);
   }, [searchFilters]);

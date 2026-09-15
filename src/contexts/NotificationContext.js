@@ -95,6 +95,17 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [isAuthenticated, fetchNotifications]);
 
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+
+    const handlePushNotification = () => fetchNotifications();
+    window.addEventListener("push-notification-received", handlePushNotification);
+
+    return () => {
+      window.removeEventListener("push-notification-received", handlePushNotification);
+    };
+  }, [isAuthenticated, fetchNotifications]);
+
   const value = {
     notifications,
     unreadCount,

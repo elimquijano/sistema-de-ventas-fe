@@ -5,6 +5,33 @@ import { loaderEvents } from "../utils/loaderEvents";
 
 const AuthContext = createContext(undefined);
 
+const getSafeUserForStorage = (user) => {
+  const safeUser = { ...user };
+  [
+    "fcm_token",
+    "firebase_token",
+    "push_token",
+    "notification_token",
+    "device_token",
+  ].forEach((field) => delete safeUser[field]);
+
+  if (safeUser.notification_settings) {
+    safeUser.notification_settings = { ...safeUser.notification_settings };
+    delete safeUser.notification_settings.token;
+  }
+
+  if (safeUser.notification_setting) {
+    safeUser.notification_setting = { ...safeUser.notification_setting };
+    delete safeUser.notification_setting.token;
+  }
+
+  return safeUser;
+};
+
+const storeUser = (user) => {
+  localStorage.setItem("user", JSON.stringify(getSafeUserForStorage(user)));
+};
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -45,7 +72,7 @@ export const AuthProvider = ({ children }) => {
       };
 
       setUser(userForState);
-      localStorage.setItem("user", JSON.stringify(userForState));
+      storeUser(userForState);
     } catch (error) {
       console.error("Token validation failed:", error);
 
@@ -54,6 +81,7 @@ export const AuthProvider = ({ children }) => {
         const parsedUser = JSON.parse(savedUser);
         if (parsedUser && parsedUser.permissions) {
           setUser(parsedUser);
+          storeUser(parsedUser);
         } else {
           // Limpiar datos inválidos
           localStorage.removeItem("auth_token");
@@ -94,7 +122,7 @@ export const AuthProvider = ({ children }) => {
 
       setUser(userForState);
       localStorage.setItem("auth_token", responseData.token);
-      localStorage.setItem("user", JSON.stringify(userForState));
+      storeUser(userForState);
 
       return true;
     } catch (error) {
@@ -129,7 +157,7 @@ export const AuthProvider = ({ children }) => {
 
       setUser(userForState);
       localStorage.setItem("auth_token", responseData.token);
-      localStorage.setItem("user", JSON.stringify(userForState));
+      storeUser(userForState);
 
       notificationSwal(
         "Éxito",
@@ -200,11 +228,24 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshUser = async ({ silent = true } = {}) => {
+    const response = await authAPI.me({ silent });
+    const responseData = response.data;
+    const refreshedUser = {
+      ...responseData.user,
+      permissions: responseData.permissions,
+    };
+
+    setUser(refreshedUser);
+    storeUser(refreshedUser);
+    return refreshedUser;
+  };
+
   // Función para actualizar el usuario (útil para actualizaciones de perfil)
   const updateUser = (updatedUserData) => {
     const updatedUser = { ...user, ...updatedUserData };
     setUser(updatedUser);
-    localStorage.setItem("user", JSON.stringify(updatedUser));
+    storeUser(updatedUser);
   };
 
   const value = {
@@ -217,6 +258,7 @@ export const AuthProvider = ({ children }) => {
     isAuthenticated: !!user,
     hasPermission,
     refreshToken,
+    refreshUser,
     updateUser,
     checkAuthStatus,
   };

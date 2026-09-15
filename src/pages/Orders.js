@@ -163,6 +163,7 @@ export const Orders = () => {
   const [locationMode, setLocationMode] = useState("manual");
   const [tempLocation, setTempLocation] = useState(null);
   const locationMapRef = useRef();
+  const addressSearchTimeoutRef = useRef(null);
 
   const calculatedTotal = useMemo(() => {
     return orderItems.reduce(
@@ -170,6 +171,13 @@ export const Orders = () => {
       0,
     );
   }, [orderItems]);
+
+  const businessLocation = useMemo(() => {
+    const lat = Number.parseFloat(user?.business?.latitude);
+    const lng = Number.parseFloat(user?.business?.longitude);
+
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }, [user?.business?.latitude, user?.business?.longitude]);
 
   const handleScheduledAtTap = () => {
     const now = Date.now();
@@ -313,14 +321,38 @@ export const Orders = () => {
   };
 
 
-  const handleAddressSearch = async (query) => {
-    if (!query || query.length < 3 || !MAPBOX_TOKEN) return;
-    const res = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&language=es&limit=5&country=pe`,
-    );
-    const data = await res.json();
-    setAddressSuggestions(data.features || []);
+  const handleAddressSearch = (query) => {
+    if (addressSearchTimeoutRef.current) {
+      clearTimeout(addressSearchTimeoutRef.current);
+    }
+
+    if (!query || query.length < 3 || !MAPBOX_TOKEN) {
+      setAddressSuggestions([]);
+      return;
+    }
+
+    addressSearchTimeoutRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&language=es&limit=5&country=pe`,
+        );
+        const data = await res.json();
+        setAddressSuggestions(data.features || []);
+      } catch (error) {
+        console.error("Error searching Mapbox addresses:", error);
+        setAddressSuggestions([]);
+      }
+    }, 600);
   };
+
+  useEffect(
+    () => () => {
+      if (addressSearchTimeoutRef.current) {
+        clearTimeout(addressSearchTimeoutRef.current);
+      }
+    },
+    [],
+  );
 
   const handleSelectSuggestion = (s) => {
     if (!s) return;
@@ -338,14 +370,8 @@ export const Orders = () => {
     setCustomerAddress(data.features?.[0]?.place_name || "");
 
     // Calcular distancia y tiempo desde el negocio
-    if (user?.business?.latitude && user?.business?.longitude) {
-      calculateDistanceAndTime(
-        {
-          lat: parseFloat(user.business.latitude),
-          lng: parseFloat(user.business.longitude),
-        },
-        { lat, lng },
-      );
+    if (businessLocation) {
+      calculateDistanceAndTime(businessLocation, { lat, lng });
     }
   };
 
@@ -647,11 +673,8 @@ export const Orders = () => {
                                       size="small"
                                       color="primary"
                                       onClick={() => {
-                                        // Prioridad: Ubicación ya puesta > Ubicación GPS > Ubicación Negocio (esto lo maneja MapComponent si mandamos null)
                                         setTempLocation(
-                                          customerLocation ||
-                                            userLocation ||
-                                            null,
+                                          customerLocation || businessLocation,
                                         );
                                         setOpenLocationDialog(true);
                                       }}

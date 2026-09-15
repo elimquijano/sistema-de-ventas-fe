@@ -51,6 +51,7 @@ export const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [searchFilters, setSearchFilters] = useState({});
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -67,6 +68,19 @@ export const Expenses = () => {
     receipt_path: "",
     notes: "",
   });
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setPage(1);
+      setSearchFilters((previous) =>
+        previous.search === searchInput
+          ? previous
+          : { ...previous, search: searchInput },
+      );
+    }, 600);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchInput]);
 
   useEffect(() => {
     loadExpenses();
@@ -282,8 +296,8 @@ export const Expenses = () => {
                 fullWidth
                 placeholder="Buscar por descripción..."
                 name="search"
-                value={searchFilters.search || ""}
-                onChange={handleChangeFilter}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">

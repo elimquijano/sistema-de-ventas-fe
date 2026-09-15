@@ -26,8 +26,10 @@ import {
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
-import { authAPI, usersAPI } from "../utils/api";
+import { usePushNotifications } from "../contexts/PushNotificationsContext";
+import { authAPI } from "../utils/api";
 import { notificationSwal } from "../utils/swal-helpers";
+import { getPushErrorMessage } from "../services/firebaseMessaging";
 
 function TabPanel(props) {
   const { children, value, index, ...other } = props;
@@ -48,6 +50,12 @@ function TabPanel(props) {
 export const Settings = () => {
   const { user, updateUser } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
+  const {
+    available: pushAvailable,
+    pushEnabled,
+    saving: savingPush,
+    togglePushNotifications,
+  } = usePushNotifications();
   const [tabValue, setTabValue] = useState(0);
 
   // Form states
@@ -131,23 +139,21 @@ export const Settings = () => {
     }
   };
 
-  const handleNotificationToggle = async (checked) => {
+  const handlePushToggle = async (checked) => {
     try {
-      /* const response = await usersAPI.update(user.id, {
-        ...user,
-        receive_notifications: checked
-      });
-      updateUser(response.data.user || response.data); */
+      await togglePushNotifications(checked);
       notificationSwal(
-        "Éxito",
-        "Preferencia de notificaciones actualizada",
+        checked ? "Push activado" : "Push desactivado",
+        checked
+          ? "Este navegador recibirá notificaciones push."
+          : "Las notificaciones volverán a enviarse por WhatsApp.",
         "success",
       );
     } catch (error) {
       console.error(error);
       notificationSwal(
         "Error",
-        "No se pudo actualizar la preferencia",
+        getPushErrorMessage(error),
         "error",
       );
     }
@@ -372,22 +378,28 @@ export const Settings = () => {
                   Preferencias de Notificación
                 </Typography>
 
-                <List>
-                  <ListItem>
-                    <ListItemText
-                      primary="Recibir Notificaciones"
-                      secondary="Alertas automáticas sobre actividad crítica en el negocio (Préstamos, Créditos, etc.)"
-                    />
-                    <ListItemSecondaryAction>
-                      <Switch
-                        checked={user.receive_notifications || false}
-                        onChange={(e) =>
-                          handleNotificationToggle(e.target.checked)
-                        }
+                {pushAvailable && (
+                  <List>
+                    <ListItem>
+                      <ListItemText
+                        primary="Notificaciones push"
+                        secondary="Recibe alertas incluso con esta pestaña cerrada. Al desactivarlas, se usará WhatsApp."
                       />
-                    </ListItemSecondaryAction>
-                  </ListItem>
-                </List>
+                      <ListItemSecondaryAction>
+                        <Switch
+                          checked={pushEnabled}
+                          disabled={savingPush}
+                          onChange={(e) =>
+                            handlePushToggle(e.target.checked)
+                          }
+                          inputProps={{
+                            "aria-label": "Activar notificaciones push",
+                          }}
+                        />
+                      </ListItemSecondaryAction>
+                    </ListItem>
+                  </List>
+                )}
               </TabPanel>
 
               {/* Preferencias Tab */}

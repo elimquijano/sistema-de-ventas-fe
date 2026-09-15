@@ -62,6 +62,7 @@ import { PaymentMethodSelector } from "./PaymentMethodSelector";
 import { buildPaymentsFormData } from "../utils/paymentFormData";
 import { getApiErrorMessage } from "../utils/apiErrors";
 import { openGoogleMaps } from "../utils/navigationUtils";
+import currentLocationMarker from "../assets/images/current-location-marker.png";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
@@ -77,28 +78,40 @@ const PAYMENT_METHODS = [
   { value: "vale", label: "Vale", icon: <AddCardIcon /> },
 ];
 
-const MapFitBounds = ({ orders }) => {
+const userLocationMarkerIcon = L.icon({
+  iconUrl: currentLocationMarker,
+  iconSize: [24, 24],
+  iconAnchor: [12, 24],
+  popupAnchor: [0, -24],
+});
+
+const MapFitBounds = ({ orders, userLocation }) => {
   const map = useMap();
+
   useEffect(() => {
-    if (orders && orders.length > 0) {
-      const validOrders = orders.filter(
-        (o) =>
-          (o.latitude || o.client?.latitude) &&
-          (o.longitude || o.client?.longitude),
-      );
-      if (validOrders.length > 0) {
-        const bounds = L.latLngBounds(
-          validOrders.map((o) => [
-            parseFloat(o.latitude || o.client.latitude),
-            parseFloat(o.longitude || o.client.longitude),
-          ]),
-        );
-        if (bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [30, 30] });
-        }
-      }
+    const points = (orders || [])
+      .filter(
+        (order) =>
+          (order.latitude || order.client?.latitude) &&
+          (order.longitude || order.client?.longitude),
+      )
+      .map((order) => [
+        Number.parseFloat(order.latitude || order.client.latitude),
+        Number.parseFloat(order.longitude || order.client.longitude),
+      ]);
+
+    const userLat = Number.parseFloat(userLocation?.lat);
+    const userLng = Number.parseFloat(userLocation?.lng);
+    if (Number.isFinite(userLat) && Number.isFinite(userLng)) {
+      points.push([userLat, userLng]);
     }
-  }, [orders, map]);
+
+    const bounds = L.latLngBounds(points);
+    if (points.length > 0 && bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+    }
+  }, [orders, userLocation, map]);
+
   return null;
 };
 
@@ -386,7 +399,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       } finally {
         refreshInProgress = false;
       }
-    }, 30000);
+    }, 15000);
 
     return () => window.clearInterval(intervalId);
   }, [autoRefresh]);
@@ -593,16 +606,6 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       className: "order-marker",
     });
 
-  const userMarkerIcon = new L.divIcon({
-    html: `
-      <svg viewBox="0 0 24 24" width="28" height="28" style="filter: drop-shadow(0 2px 3px rgba(0,0,0,0.3));">
-        <path fill="${theme.palette.secondary.main}" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-      </svg>
-    `,
-    iconSize: [28, 28],
-    iconAnchor: [14, 28],
-  });
-
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <Box sx={{ mb: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
@@ -737,11 +740,14 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                   </Marker>
                 ))}
               {userLocation && (
-                <Marker position={[userLocation.lat, userLocation.lng]} icon={userMarkerIcon}>
+                <Marker
+                  position={[userLocation.lat, userLocation.lng]}
+                  icon={userLocationMarkerIcon}
+                >
                   <Popup>Tu ubicación</Popup>
                 </Marker>
               )}
-              <MapFitBounds orders={orders} />
+              <MapFitBounds orders={orders} userLocation={userLocation} />
             </MapContainer>
           </Card>
         )}

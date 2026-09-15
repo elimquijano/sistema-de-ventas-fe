@@ -52,6 +52,7 @@ import {
 import { notificationSwal } from "../utils/swal-helpers";
 import { clientsAPI } from "../utils/api";
 import { compressImage } from "../utils/imageCompression";
+import currentLocationMarker from "../assets/images/current-location-marker.png";
 
 // --- CONFIGURACIÓN DE ÍCONOS ---
 
@@ -63,7 +64,7 @@ L.Icon.Default.mergeOptions({
 });
 
 const motorcycleIcon = new L.Icon({
-  iconUrl: "https://cdn-icons-png.flaticon.com/128/9561/9561839.png",
+  iconUrl: currentLocationMarker,
   iconSize: [40, 40],
   iconAnchor: [20, 40],
   popupAnchor: [0, -40],
@@ -169,7 +170,7 @@ export default function LocationTracker() {
       } finally {
         setLoadingClients(false);
       }
-    }, 500); // Debounce de 500ms
+    }, 600);
   }, []);
 
   useEffect(() => {

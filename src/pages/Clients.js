@@ -23,7 +23,6 @@ import {
   Paper,
   Stack,
   TextField,
-  Autocomplete,
   useTheme,
   IconButton,
   Typography,
@@ -59,6 +58,7 @@ import { clientsAPI, businessAPI } from "../utils/api";
 import { compressImage } from "../utils/imageCompression";
 import { useAuth } from "../contexts/AuthContext";
 import { MapComponent } from "../components/MapComponent";
+import { StrictAutocomplete } from "../components/StrictAutocomplete";
 
 // --- CONFIGURACIÓN DE ÍCONOS LEAFLET ---
 delete L.Icon.Default.prototype._getIconUrl;
@@ -107,6 +107,7 @@ export const Clients = () => {
   const [openImageDialog, setOpenImageDialog] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingMapbox, setIsFetchingMapbox] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
 
   // Estados de Formulario
   const [editingClient, setEditingClient] = useState(null);
@@ -117,6 +118,7 @@ export const Clients = () => {
     address_detail: "",
     phone: "",
     image: null,
+    route: null,
     estimated_time: "",
     approximate_distance: "",
   });
@@ -127,6 +129,13 @@ export const Clients = () => {
 
   const mapRef = useRef();
   const locationMapRef = useRef();
+
+  const businessLocation = useMemo(() => {
+    const lat = Number.parseFloat(business?.latitude || user?.business?.latitude);
+    const lng = Number.parseFloat(business?.longitude || user?.business?.longitude);
+
+    return Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
+  }, [business?.latitude, business?.longitude, user?.business?.latitude, user?.business?.longitude]);
 
   // --- CARGA DE DATOS ---
   const loadClients = useCallback(async () => {
@@ -140,7 +149,7 @@ export const Clients = () => {
 
       if (user?.business_id) {
         const bizRes = await businessAPI.getById(user.business_id);
-        setBusiness(bizRes.data);
+        setBusiness(bizRes.data?.data || bizRes.data);
       }
     } catch (error) {
       console.error("Error loading clients:", error);
@@ -187,23 +196,26 @@ export const Clients = () => {
 
       let time = "";
       let dist = "";
+      let routeGeometry = null;
 
-      // 2. Obtener Tiempo/Distancia si tenemos la ubicación del usuario
-      if (userLocation) {
+      // 2. Calcular la ruta desde el negocio hasta el cliente
+      if (businessLocation) {
         const dirRes = await fetch(
-          `https://api.mapbox.com/directions/v5/mapbox/driving/${userLocation.lng},${userLocation.lat};${lng},${lat}?access_token=${MAPBOX_TOKEN}`
+          `https://api.mapbox.com/directions/v5/mapbox/driving/${businessLocation.lng},${businessLocation.lat};${lng},${lat}?access_token=${MAPBOX_TOKEN}&geometries=geojson&overview=full`
         );
         const dirData = await dirRes.json();
         if (dirData.routes?.[0]) {
           const route = dirData.routes[0];
           time = `${Math.round(route.duration / 60)} min`;
           dist = `${(route.distance / 1000).toFixed(1)} km`;
+          routeGeometry = route.geometry || null;
         }
       }
 
       setFormData(prev => ({
         ...prev,
         address: address.split(",")[0] + (address.split(",")[1] || ""),
+        route: routeGeometry,
         estimated_time: time,
         approximate_distance: dist
       }));
@@ -224,6 +236,7 @@ export const Clients = () => {
         address_detail: client.address_detail || "",
         phone: client.phone || "",
         image: null,
+        route: client.route || null,
         estimated_time: client.estimated_time || "",
         approximate_distance: client.approximate_distance || "",
       });
@@ -240,6 +253,7 @@ export const Clients = () => {
         address_detail: "", 
         phone: "", 
         image: null,
+        route: null,
         estimated_time: "",
         approximate_distance: "",
       });
@@ -272,6 +286,14 @@ export const Clients = () => {
     data.append("phone", formData.phone);
     data.append("estimated_time", formData.estimated_time);
     data.append("approximate_distance", formData.approximate_distance);
+    data.append(
+      "route",
+      formData.route
+        ? typeof formData.route === "string"
+          ? formData.route
+          : JSON.stringify(formData.route)
+        : "",
+    );
     
     if (formData.image) data.append("image", formData.image);
 
@@ -304,14 +326,21 @@ export const Clients = () => {
       "Esta acción no se puede deshacer",
       { icon: "warning" },
     );
-    if (confirm) {
-      try {
-        await clientsAPI.delete(id);
-        notificationSwal("Éxito", "Cliente eliminado", "success");
-        loadClients();
-      } catch (error) {
-        notificationSwal("Error", "No se pudo eliminar", "error");
-      }
+    if (!confirm) return;
+
+    setIsSubmitting(true);
+    try {
+      await clientsAPI.delete(id);
+      setOpenLocationDialog(false);
+      setOpenCRUDDialog(false);
+      setEditingClient(null);
+      setSelectedClient((current) => (current?.id === id ? null : current));
+      setClients((current) => current.filter((client) => client.id !== id));
+      notificationSwal("Éxito", "Cliente eliminado", "success");
+    } catch (error) {
+      notificationSwal("Error", "No se pudo eliminar", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -559,30 +588,39 @@ export const Clients = () => {
 
       <Box sx={{ position: "absolute", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 1000, width: "90%", maxWidth: 500 }}>
         <Paper elevation={4} sx={{ p: 0.5, borderRadius: 3, display: "flex", alignItems: "center" }}>
-          <Autocomplete
-            fullWidth
+          <StrictAutocomplete
             options={clients}
-            getOptionLabel={(option) => `${option.name} ${option.phone || ""}`}
-            renderOption={(props, option) => (
-              <Box component="li" {...props} sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", py: 0.5 }}>
-                <Typography variant="body2" sx={{ fontWeight: "bold" }}>{option.name}</Typography>
-                <Typography variant="caption" color="text.secondary">{option.phone || "Sin teléfono"}</Typography>
-              </Box>
-            )}
-            onChange={(e, val) => val && flyToClient(val)}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                placeholder="Buscar cliente..."
-                variant="standard"
-                InputProps={{
-                  ...params.InputProps,
-                  disableUnderline: true,
-                  startAdornment: <SearchIcon sx={{ ml: 2, mr: 1, color: "text.secondary" }} />,
-                }}
-                sx={{ ml: 1 }}
-              />
-            )}
+            filterKey="name"
+            matchMode="any"
+            getFilterText={(client) =>
+              `${client.name || ""} ${client.phone || ""} ${client.address || ""}`
+            }
+            getOptionLabel={(client) => client.name || ""}
+            getOptionSublabel={(client) =>
+              [client.phone, client.address].filter(Boolean).join(" · ") ||
+              "Sin datos adicionales"
+            }
+            value={clientSearch}
+            onInputChange={setClientSearch}
+            onChange={(client) => {
+              setClientSearch(client.name || "");
+              flyToClient(client);
+            }}
+            TextFieldProps={{
+              fullWidth: true,
+              placeholder: "Buscar por nombre, teléfono o dirección...",
+              variant: "standard",
+              InputProps: {
+                disableUnderline: true,
+                startAdornment: (
+                  <SearchIcon sx={{ ml: 2, mr: 1, color: "text.secondary" }} />
+                ),
+              },
+              sx: {
+                px: 1,
+                py: 0.5,
+              },
+            }}
           />
         </Paper>
       </Box>
@@ -603,12 +641,44 @@ export const Clients = () => {
         </Fab>
       </Box>
 
-      <Dialog open={openCRUDDialog} onClose={() => setOpenCRUDDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          {editingClient ? "Editar Cliente" : "Nuevo Cliente"}
-          {isFetchingMapbox && <CircularProgress size={20} />}
+      <Dialog
+        open={openCRUDDialog}
+        onClose={() => !isSubmitting && setOpenCRUDDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+      >
+        <DialogTitle
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
+            py: 1.5,
+          }}
+        >
+          <Box>
+            <Typography variant="h6" fontWeight={800}>
+              {editingClient ? "Editar cliente" : "Nuevo cliente"}
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.85 }}>
+              Datos de contacto, ubicación y ruta de entrega
+            </Typography>
+          </Box>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            {isFetchingMapbox && <CircularProgress size={20} color="inherit" />}
+            <IconButton
+              onClick={() => setOpenCRUDDialog(false)}
+              disabled={isSubmitting}
+              sx={{ color: "inherit" }}
+              aria-label="Cerrar"
+            >
+              <Close />
+            </IconButton>
+          </Box>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent dividers sx={{ bgcolor: "action.hover" }}>
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid item xs={12}>
               <TextField fullWidth label="Nombre / Negocio" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
@@ -627,8 +697,48 @@ export const Clients = () => {
             <Grid item xs={12}>
               <TextField fullWidth label="Referencia / Detalle" value={formData.address_detail} onChange={(e) => setFormData({ ...formData, address_detail: e.target.value })} placeholder="Ejem: Frente al parque, local azul..." />
             </Grid>
+            {(formData.estimated_time || formData.approximate_distance) && (
+              <Grid item xs={12}>
+                <Paper
+                  variant="outlined"
+                  sx={{ p: 1.5, borderRadius: 2, bgcolor: "background.paper" }}
+                >
+                  <Typography variant="subtitle2" fontWeight={800} sx={{ mb: 1 }}>
+                    Ruta desde el negocio
+                  </Typography>
+                  <Grid container spacing={1}>
+                    <Grid item xs={6}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <TimeIcon color="primary" fontSize="small" />
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            Tiempo estimado
+                          </Typography>
+                          <Typography variant="body2" fontWeight={700}>
+                            {formData.estimated_time || "No disponible"}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <RouteIcon color="secondary" fontSize="small" />
+                        <Box>
+                          <Typography variant="caption" color="text.secondary">
+                            Distancia aproximada
+                          </Typography>
+                          <Typography variant="body2" fontWeight={700}>
+                            {formData.approximate_distance || "No disponible"}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+            )}
             <Grid item xs={12}>
-              <Box sx={{ border: "1px dashed grey", borderRadius: 2, p: 2, textAlign: "center", position: "relative" }}>
+              <Box sx={{ border: "1px dashed", borderColor: "divider", bgcolor: "background.paper", borderRadius: 2, p: 2, textAlign: "center", position: "relative" }}>
                 <Button component="label" startIcon={<CloudUploadIcon />}>
                   {imagePreview ? "Cambiar Imagen" : "Subir Foto del Local"}
                   <input type="file" hidden onChange={handleFileChange} />
@@ -642,20 +752,32 @@ export const Clients = () => {
             </Grid>
           </Grid>
         </DialogContent>
-        <DialogActions sx={{ p: 3 }}>
+        <DialogActions sx={{ px: 3, py: 2, borderTop: "1px solid", borderColor: "divider" }}>
           <Button onClick={() => setOpenCRUDDialog(false)}>Cancelar</Button>
           {editingClient && hasPermission("clientes.delete") && (
-            <Button color="error" onClick={() => handleDeleteClient(editingClient.id)}>Eliminar</Button>
+            <Button color="error" onClick={() => handleDeleteClient(editingClient.id)} disabled={isSubmitting}>Eliminar</Button>
           )}
-          <Button variant="contained" onClick={handleSaveClient} disabled={isSubmitting || !formData.name || !tempLocation || isFetchingMapbox} startIcon={isSubmitting && <CircularProgress size={20} />}>
+          <Button variant="contained" onClick={handleSaveClient} disabled={isSubmitting || !formData.name || !tempLocation || isFetchingMapbox} startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : <Save />}>
             Guardar Cliente
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openLocationDialog} onClose={() => setOpenLocationDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="h6" fontWeight="700">Ajustar Ubicación</Typography>
+      <Dialog
+        open={openLocationDialog}
+        onClose={() => setOpenLocationDialog(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}
+      >
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", bgcolor: "primary.main", color: "primary.contrastText", py: 1.5 }}>
+          <Box>
+            <Typography variant="h6" fontWeight="800">Ajustar ubicación</Typography>
+            <Typography variant="caption" sx={{ opacity: 0.85 }}>Mueve el mapa hasta el punto exacto del cliente</Typography>
+          </Box>
+          <IconButton onClick={() => setOpenLocationDialog(false)} sx={{ color: "inherit" }} aria-label="Cerrar">
+            <Close />
+          </IconButton>
         </DialogTitle>
         <DialogContent sx={{ p: 0, height: 400, position: "relative" }}>
           <MapComponent
@@ -669,13 +791,13 @@ export const Clients = () => {
             onMapInstance={(instance) => { locationMapRef.current = instance; }}
           />
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ px: 2.5, py: 1.5, borderTop: "1px solid", borderColor: "divider" }}>
           <Button onClick={() => setOpenLocationDialog(false)}>Cancelar</Button>
-          <Button variant="contained" onClick={handleConfirmLocation}>Confirmar Ubicación</Button>
+          <Button variant="contained" onClick={handleConfirmLocation} startIcon={<GpsFixed />}>Confirmar ubicación</Button>
         </DialogActions>
       </Dialog>
 
-      <Dialog open={openImageDialog} onClose={() => setOpenImageDialog(false)} maxWidth="md">
+      <Dialog open={openImageDialog} onClose={() => setOpenImageDialog(false)} maxWidth="md" PaperProps={{ sx: { borderRadius: 3, overflow: "hidden" } }}>
         <Box sx={{ position: "relative" }}>
           <IconButton onClick={() => setOpenImageDialog(false)} sx={{ position: "absolute", right: 8, top: 8, bgcolor: "rgba(0,0,0,0.5)", color: "white", "&:hover": { bgcolor: "rgba(0,0,0,0.7)" } }}><Close /></IconButton>
           <img src={selectedClient?.image_path} alt={selectedClient?.name} style={{ width: "100%", maxHeight: "80vh", objectFit: "contain" }} />

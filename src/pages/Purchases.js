@@ -56,6 +56,7 @@ export const Purchases = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
+  const [searchInput, setSearchInput] = useState("");
   const [datePreset, setDatePreset] = useState("all");
   const [openViewDialog, setOpenViewDialog] = useState(false);
   const [selectedPurchase, setSelectedPurchase] = useState(null);
@@ -70,6 +71,19 @@ export const Purchases = () => {
     purchase_date: "",
     notes: "",
   });
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setPage(1);
+      setSearchFilters((previous) =>
+        previous.search === searchInput
+          ? previous
+          : { ...previous, search: searchInput },
+      );
+    }, 600);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchInput]);
 
   useEffect(() => {
     loadPurchases();
@@ -261,8 +275,8 @@ export const Purchases = () => {
                 fullWidth
                 placeholder="Buscar por número o proveedor..."
                 name="search"
-                value={searchFilters.search || ""}
-                onChange={handleChangeFilter}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">

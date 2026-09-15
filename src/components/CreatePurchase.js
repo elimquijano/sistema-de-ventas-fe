@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Grid,
@@ -123,21 +123,36 @@ export const CreatePurchase = ({ onSuccess, onCancel }) => {
     setTotal(newTotal);
   }, [items]);
 
-  const handleSearch = useCallback(async (term) => {
+  const searchTimeoutRef = useRef(null);
+
+  const handleSearch = useCallback((term) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+
     if (term.length < 2) {
       setOptions([]);
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const response = await businessAPI.searchProducts(term); // Asumo que existe este método
-      setOptions(response.data);
-    } catch (error) {
-      console.error("Error searching products:", error);
-    } finally {
-      setLoading(false);
-    }
+
+    searchTimeoutRef.current = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const response = await businessAPI.searchProducts(term);
+        setOptions(response.data);
+      } catch (error) {
+        console.error("Error searching products:", error);
+      } finally {
+        setLoading(false);
+      }
+    }, 600);
   }, []);
+
+  useEffect(
+    () => () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    },
+    [],
+  );
 
   const handleAddItem = () => {
     if (!selectedProduct || quantity <= 0 || cost < 0) {

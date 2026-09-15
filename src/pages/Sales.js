@@ -84,6 +84,7 @@ export const Sales = () => {
   const [sales, setSales] = useState([]);
   const [users, setUsers] = useState([]);
   const [searchFilters, setSearchFilters] = useState({});
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -99,6 +100,19 @@ export const Sales = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [openImageDialog, setOpenImageDialog] = useState(false);
   const [selectedImage, setSelectedImage] = useState("");
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setPage(1);
+      setSearchFilters((previous) =>
+        previous.search === searchInput
+          ? previous
+          : { ...previous, search: searchInput },
+      );
+    }, 600);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchInput]);
 
   useEffect(() => {
     loadSales();
@@ -351,8 +365,8 @@ export const Sales = () => {
                 fullWidth
                 placeholder="Buscar por número o cliente..."
                 name="search"
-                value={searchFilters.search || ""}
-                onChange={handleChangeFilter}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">

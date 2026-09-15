@@ -53,6 +53,7 @@ export const Users = () => {
   const [businesses, setBusinesses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({});
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [openDialog, setOpenDialog] = useState(false);
@@ -69,6 +70,19 @@ export const Users = () => {
     business_id: "",
     receive_notifications: true,
   });
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setPage(1);
+      setSearchFilters((previous) =>
+        previous.search === searchInput
+          ? previous
+          : { ...previous, search: searchInput },
+      );
+    }, 600);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchInput]);
 
   useEffect(() => {
     loadUsers();
@@ -315,8 +329,8 @@ export const Users = () => {
                 fullWidth
                 placeholder="Buscar usuarios..."
                 name="search"
-                value={searchFilters?.search || ""}
-                onChange={handleChangeFilter}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">

@@ -47,6 +47,7 @@ export const Loans = () => {
   const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchFilters, setSearchFilters] = useState({ status: "pending" });
+  const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,6 +63,19 @@ export const Loans = () => {
     due_date: "",
     status: "pending",
   });
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setPage(1);
+      setSearchFilters((previous) =>
+        previous.search === searchInput
+          ? previous
+          : { ...previous, search: searchInput },
+      );
+    }, 600);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchInput]);
 
   // Dialog for Add Payment
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
@@ -285,8 +299,8 @@ export const Loans = () => {
                 fullWidth
                 placeholder="Buscar por descripción..."
                 name="search"
-                value={searchFilters.search || ""}
-                onChange={handleChangeFilter}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
                 InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
               />
             </Grid>

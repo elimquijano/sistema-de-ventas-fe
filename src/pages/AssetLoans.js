@@ -68,6 +68,7 @@ export const AssetLoans = () => {
     return_date: "",
     created_by: "",
   });
+  const [searchInput, setSearchInput] = useState("");
 
   const [openDialog, setOpenDialog] = useState(false);
   const [openReturnDialog, setOpenReturnDialog] = useState(false);
@@ -87,6 +88,19 @@ export const AssetLoans = () => {
     due_date: "",
     notes: "",
   });
+
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      setPage(1);
+      setSearchFilters((previous) =>
+        previous.search === searchInput
+          ? previous
+          : { ...previous, search: searchInput },
+      );
+    }, 600);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchInput]);
 
   const [returnData, setReturnData] = useState({
     status: "returned",
@@ -274,8 +288,8 @@ export const AssetLoans = () => {
                 fullWidth
                 placeholder="Buscar activo/beneficiario..."
                 name="search"
-                value={searchFilters.search}
-                onChange={handleChangeFilter}
+                value={searchInput}
+                onChange={(event) => setSearchInput(event.target.value)}
               />
             </Grid>
             <Grid item xs={6} md={2}>

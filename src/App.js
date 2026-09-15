@@ -9,6 +9,7 @@ import { CssBaseline } from "@mui/material";
 import { CustomThemeProvider } from "./contexts/ThemeContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { NotificationProvider } from "./contexts/NotificationContext";
+import { PushNotificationsProvider } from "./contexts/PushNotificationsContext";
 import { LoaderProvider } from "./contexts/LoaderContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -27,9 +28,10 @@ function App() {
         <CssBaseline />
         <Loader />
         <AuthProvider>
-          <NotificationProvider>
-            <Router>
-              <Routes>
+          <PushNotificationsProvider>
+            <NotificationProvider>
+              <Router>
+                <Routes>
                 {/* Rutas Públicas */}
                 <Route
                   path="/"
@@ -79,9 +81,10 @@ function App() {
 
                 {/* Fallback - Redirigir a landing si no está autenticado, o dashboard si lo está */}
                 <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
-            </Router>
-          </NotificationProvider>
+                </Routes>
+              </Router>
+            </NotificationProvider>
+          </PushNotificationsProvider>
         </AuthProvider>
       </LoaderProvider>
     </CustomThemeProvider>

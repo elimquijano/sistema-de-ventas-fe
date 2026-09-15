@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   Box,
   TextField,
@@ -15,6 +15,7 @@ export const StrictAutocomplete = ({
   matchMode = "any",
   getOptionLabel,
   getOptionSublabel,
+  getFilterText,
   value = "",
   onInputChange,
   onChange,
@@ -28,12 +29,23 @@ export const StrictAutocomplete = ({
     if (!query) return [];
     const q = query.toLowerCase();
     return options.filter((option) => {
-      const text = (
-        typeof option === "string" ? option : option[filterKey] || ""
+      const text = String(
+        getFilterText
+          ? getFilterText(option)
+          : typeof option === "string"
+            ? option
+            : option[filterKey] || ""
       ).toLowerCase();
       return matchMode === "start" ? text.startsWith(q) : text.includes(q);
     });
-  }, [query, options, filterKey, matchMode]);
+  }, [query, options, filterKey, matchMode, getFilterText]);
+
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    [],
+  );
 
   const handleInputChange = useCallback(
     (newValue) => {

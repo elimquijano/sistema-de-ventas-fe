@@ -8,7 +8,6 @@ import React, {
 import { useAuth } from "./AuthContext";
 import { notificationSettingsAPI } from "../utils/api";
 import {
-  getExistingFirebaseToken,
   getFirebaseToken,
   getPushAvailability,
   playForegroundNotificationSound,
@@ -18,24 +17,6 @@ import {
 } from "../services/firebaseMessaging";
 
 const PushNotificationsContext = createContext(undefined);
-const PUSH_DEVICE_USER_KEY = "push_notifications_registered_user_id";
-
-const getUserPushToken = (user) =>
-  user?.fcm_token ||
-  user?.firebase_token ||
-  user?.push_token ||
-  user?.notification_token ||
-  user?.device_token ||
-  user?.notification_settings?.token ||
-  user?.notification_setting?.token ||
-  null;
-
-const getUserNotificationChannel = (user) =>
-  user?.notification_channel ||
-  user?.notification_settings?.notification_channel ||
-  user?.notification_settings?.channel ||
-  user?.notification_setting?.notification_channel ||
-  user?.notification_setting?.channel;
 
 const getResponseUser = (response) =>
   response?.data?.user || response?.data?.data?.user || null;
@@ -52,9 +33,9 @@ export const usePushNotifications = () => {
 
 export const PushNotificationsProvider = ({ children }) => {
   const { user, updateUser, refreshUser } = useAuth();
-  const [pushEnabled, setPushEnabled] = useState(false);
+  const pushEnabled =
+    user?.notification_channel === "push" && Boolean(user?.has_fcm_token);
   const [saving, setSaving] = useState(false);
-  const [checkingPushState, setCheckingPushState] = useState(true);
   const [availability, setAvailability] = useState({
     checked: false,
     available: false,
@@ -72,66 +53,6 @@ export const PushNotificationsProvider = ({ children }) => {
       active = false;
     };
   }, []);
-
-  const backendPushToken = getUserPushToken(user);
-  const backendUsesPush =
-    getUserNotificationChannel(user) === "push" &&
-    user?.receive_notifications !== false;
-
-  useEffect(() => {
-    if (!availability.checked) return undefined;
-
-    if (!user || !availability.available || !backendUsesPush) {
-      if (
-        user &&
-        localStorage.getItem(PUSH_DEVICE_USER_KEY) === String(user.id)
-      ) {
-        localStorage.removeItem(PUSH_DEVICE_USER_KEY);
-      }
-      setPushEnabled(false);
-      setCheckingPushState(false);
-      return undefined;
-    }
-
-    let active = true;
-    setCheckingPushState(true);
-
-    getExistingFirebaseToken()
-      .then((localToken) => {
-        if (!active) return;
-
-        const deviceWasRegisteredHere =
-          localStorage.getItem(PUSH_DEVICE_USER_KEY) === String(user.id);
-        const tokenMatchesBackend =
-          Boolean(backendPushToken) && backendPushToken === localToken;
-        const enabledOnThisDevice =
-          Boolean(localToken) &&
-          (tokenMatchesBackend || (!backendPushToken && deviceWasRegisteredHere));
-
-        if (tokenMatchesBackend && !deviceWasRegisteredHere) {
-          localStorage.setItem(PUSH_DEVICE_USER_KEY, String(user.id));
-        }
-
-        if (backendPushToken && !tokenMatchesBackend && deviceWasRegisteredHere) {
-          localStorage.removeItem(PUSH_DEVICE_USER_KEY);
-        }
-
-        setPushEnabled(enabledOnThisDevice);
-      })
-      .finally(() => {
-        if (active) setCheckingPushState(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [
-    availability.available,
-    availability.checked,
-    backendPushToken,
-    backendUsesPush,
-    user,
-  ]);
 
   const enablePushNotifications = useCallback(async () => {
     const currentAvailability = await getPushAvailability();
@@ -153,15 +74,12 @@ export const PushNotificationsProvider = ({ children }) => {
       const response = await notificationSettingsAPI.savePushToken(firebaseToken);
       const responseUser = getResponseUser(response);
 
-      localStorage.setItem(PUSH_DEVICE_USER_KEY, String(user.id));
-
       updateUser({
         ...(responseUser || {}),
         notification_channel: "push",
         receive_notifications: true,
-        has_push_token: true,
+        has_fcm_token: true,
       });
-      setPushEnabled(true);
 
       try {
         await refreshUser({ silent: true });
@@ -172,10 +90,9 @@ export const PushNotificationsProvider = ({ children }) => {
       if (firebaseToken) {
         await removeFirebaseToken().catch(() => {});
       }
-      localStorage.removeItem(PUSH_DEVICE_USER_KEY);
       throw error;
     }
-  }, [refreshUser, updateUser, user]);
+  }, [refreshUser, updateUser]);
 
   const disablePushNotifications = useCallback(async () => {
     await notificationSettingsAPI.deletePushToken();
@@ -189,8 +106,6 @@ export const PushNotificationsProvider = ({ children }) => {
       );
     }
 
-    localStorage.removeItem(PUSH_DEVICE_USER_KEY);
-
     updateUser({
       notification_channel: "whatsapp",
       fcm_token: null,
@@ -198,9 +113,8 @@ export const PushNotificationsProvider = ({ children }) => {
       push_token: null,
       notification_token: null,
       device_token: null,
-      has_push_token: false,
+      has_fcm_token: false,
     });
-    setPushEnabled(false);
 
     try {
       await refreshUser({ silent: true });
@@ -260,7 +174,7 @@ export const PushNotificationsProvider = ({ children }) => {
     available: availability.available,
     unavailableReason: availability.reason,
     pushEnabled,
-    saving: saving || checkingPushState,
+    saving: saving || !availability.checked,
     togglePushNotifications,
   };
 

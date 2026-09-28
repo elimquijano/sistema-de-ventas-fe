@@ -59,7 +59,11 @@ import { salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { compressImage } from "../utils/imageCompression";
 import { PaymentMethodSelector } from "./PaymentMethodSelector";
-import { buildPaymentsFormData } from "../utils/paymentFormData";
+import {
+  buildPaymentsFormData,
+  hasPaymentImageErrors,
+  hasPaymentImagesInProgress,
+} from "../utils/paymentFormData";
 import { getApiErrorMessage } from "../utils/apiErrors";
 import { openGoogleMaps } from "../utils/navigationUtils";
 import currentLocationMarker from "../assets/images/current-location-marker.png";
@@ -495,6 +499,10 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   const handleConfirmDelivery = async () => {
     if (Math.abs(remainingAmount) > 0.01)
       return notificationSwal("Monto", "Pago incompleto.", "error");
+    if (hasPaymentImagesInProgress(payments))
+      return notificationSwal("Espera", "El comprobante aún se está preparando.", "info");
+    if (hasPaymentImageErrors(payments))
+      return notificationSwal("Comprobante", "Corrige o elimina la imagen con error.", "error");
     setIsSubmitting(true);
     
     const formData = buildPaymentsFormData(payments);
@@ -911,7 +919,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
             variant="contained"
             color="success"
             onClick={handleConfirmDelivery}
-            disabled={isSubmitting || Math.abs(remainingAmount) > 0.01}
+            disabled={
+              isSubmitting ||
+              Math.abs(remainingAmount) > 0.01 ||
+              hasPaymentImagesInProgress(payments) ||
+              hasPaymentImageErrors(payments)
+            }
             sx={{ borderRadius: 1, py: 1.2, fontWeight: 700 }}
           >
             {isSubmitting ? <CircularProgress size={24} color="inherit" /> : "CONFIRMAR ENTREGA"}

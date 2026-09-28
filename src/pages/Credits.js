@@ -51,7 +51,11 @@ import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { creditsAPI } from "../utils/api";
 import { AuditTimeline } from "../components/AuditTimeline";
 import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
-import { buildPaymentsFormData } from "../utils/paymentFormData";
+import {
+  buildPaymentsFormData,
+  hasPaymentImageErrors,
+  hasPaymentImagesInProgress,
+} from "../utils/paymentFormData";
 import { getApiErrorMessage } from "../utils/apiErrors";
 
 export const Credits = () => {
@@ -159,6 +163,15 @@ export const Credits = () => {
 
   const handleProcessPayment = async () => {
     try {
+      if (hasPaymentImagesInProgress(payments)) {
+        notificationSwal("Espera", "El comprobante aún se está preparando.", "info");
+        return;
+      }
+      if (hasPaymentImageErrors(payments)) {
+        notificationSwal("Comprobante", "Corrige o elimina la imagen con error.", "error");
+        return;
+      }
+
       const totalPaid = payments.reduce(
         (sum, p) => sum + parseFloat(p.amount || 0),
         0,
@@ -681,7 +694,9 @@ export const Credits = () => {
             variant="contained"
             fullWidth
             disabled={
-              isSubmitting || 
+              isSubmitting ||
+              hasPaymentImagesInProgress(payments) ||
+              hasPaymentImageErrors(payments) ||
               payments.length === 0 || 
               payments.reduce((sum, p) => sum + parseFloat(p.amount || 0), 0) <= 0
             }

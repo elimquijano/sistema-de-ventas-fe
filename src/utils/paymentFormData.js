@@ -17,3 +17,9 @@ export const appendPaymentsToFormData = (formData, payments) => {
 
 export const buildPaymentsFormData = (payments) =>
   appendPaymentsToFormData(new FormData(), payments);
+
+export const hasPaymentImagesInProgress = (payments) =>
+  payments.some((payment) => payment.payment_image_status === "processing");
+
+export const hasPaymentImageErrors = (payments) =>
+  payments.some((payment) => payment.payment_image_status === "error");

@@ -68,7 +68,11 @@ import {
 } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import { PaymentMethodSelector } from "../components/PaymentMethodSelector";
-import { appendPaymentsToFormData } from "../utils/paymentFormData";
+import {
+  appendPaymentsToFormData,
+  hasPaymentImageErrors,
+  hasPaymentImagesInProgress,
+} from "../utils/paymentFormData";
 import { getApiErrorMessage } from "../utils/apiErrors";
 import { CashRegisterReport } from "../components/CashRegisterReport";
 
@@ -459,6 +463,14 @@ export const PointOfSale = () => {
         `El monto pagado no coincide con el total de la venta.`,
         "error"
       );
+      return;
+    }
+    if (hasPaymentImagesInProgress(payments)) {
+      notificationSwal("Espera", "El comprobante aún se está preparando.", "info");
+      return;
+    }
+    if (hasPaymentImageErrors(payments)) {
+      notificationSwal("Comprobante", "Corrige o elimina la imagen con error.", "error");
       return;
     }
     if (
@@ -1174,7 +1186,12 @@ export const PointOfSale = () => {
             size="large"
             variant="contained"
             onClick={handleCompleteSale}
-            disabled={isLoading || Math.abs(remainingAmount) > 0.001}
+            disabled={
+              isLoading ||
+              Math.abs(remainingAmount) > 0.001 ||
+              hasPaymentImagesInProgress(payments) ||
+              hasPaymentImageErrors(payments)
+            }
           >
             {isLoading ? "Procesando..." : "Completar Venta"}
           </Button>

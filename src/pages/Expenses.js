@@ -40,7 +40,11 @@ import {
   Clear as ClearIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  getCurrentPeruDate,
+} from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import api, { API_STORAGE_URL, categoriesAPI, expensesAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
@@ -64,7 +68,7 @@ export const Expenses = () => {
     description: "",
     amount: "",
     category_id: "",
-    expense_date: new Date().toISOString().split("T")[0],
+    expense_date: getCurrentPeruDate(),
     receipt_path: "",
     notes: "",
   });
@@ -142,7 +146,7 @@ export const Expenses = () => {
         description: "",
         amount: "",
         category_id: "",
-        expense_date: new Date().toISOString().split("T")[0],
+        expense_date: getCurrentPeruDate(),
         receipt_path: "",
         notes: "",
       });

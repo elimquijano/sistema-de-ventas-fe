@@ -46,7 +46,11 @@ import {
 } from "@mui/icons-material";
 import { SaleTimeline } from "../components/SaleTimeline";
 import { useAuth } from "../contexts/AuthContext";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  PERU_TIME_ZONE,
+} from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { salesAPI, usersAPI } from "../utils/api";
 import { exportToExcel } from "../utils/excelExport";
@@ -329,7 +333,7 @@ export const Sales = () => {
           ?.map((p) => getPaymentMethodLabel(p.payment_method))
           .join(", ") || "",
       "Estado de Pago": getPaymentStatusLabel(sale.status),
-      Fecha: formatDate(sale.created_at),
+      Fecha: formatDate(sale.created_at, "DD/MM/YYYY", PERU_TIME_ZONE),
       Vendedor: sale.creator.full_name,
     }));
     exportToExcel(dataToExport, "ventas_reporte", "Ventas");
@@ -511,7 +515,9 @@ export const Sales = () => {
                           />
                         )}
                       </TableCell>
-                      <TableCell>{formatDate(sale.created_at)}</TableCell>
+                      <TableCell>
+                        {formatDate(sale.created_at, "DD/MM/YYYY", PERU_TIME_ZONE)}
+                      </TableCell>
                       <TableCell>{sale.creator?.full_name || "-"}</TableCell>
                       <TableCell>{sale.rider?.full_name || "-"}</TableCell>
                       <TableCell align="right">
@@ -655,7 +661,11 @@ export const Sales = () => {
                         Fecha
                       </Typography>
                       <Typography variant="body1">
-                        {formatDate(selectedSale.created_at)}
+                        {formatDate(
+                          selectedSale.created_at,
+                          "DD/MM/YYYY",
+                          PERU_TIME_ZONE,
+                        )}
                       </Typography>
                     </Grid>
                     <Grid item xs={6}>

@@ -37,7 +37,11 @@ import {
   History as HistoryIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  getCurrentPeruDate,
+} from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { loansAPI } from "../utils/api";
 import { AuditTimeline } from "../components/AuditTimeline";
@@ -138,7 +142,7 @@ export const Loans = () => {
         description: "",
         amount: "",
         paid_amount: "",
-        loan_date: new Date().toISOString().split("T")[0],
+        loan_date: getCurrentPeruDate(),
         due_date: "",
         status: "pending",
       });

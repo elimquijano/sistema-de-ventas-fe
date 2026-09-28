@@ -54,7 +54,11 @@ import {
 import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  PERU_TIME_ZONE,
+} from "../utils/formatters";
 import { salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { compressImage } from "../utils/imageCompression";
@@ -200,7 +204,7 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
           fontWeight="600"
           sx={{ fontSize: 10, color: "text.secondary" }}
         >
-          {formatDate(order.created_at)} - {new Date(order.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false })}
+          {formatDate(order.created_at, "DD/MM/YYYY HH:mm", PERU_TIME_ZONE)}
         </Typography>
       </Box>
       <CardContent sx={{ flex: 1, p: 1.5 }}>

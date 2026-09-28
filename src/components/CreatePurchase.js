@@ -34,7 +34,7 @@ import {
 import { productsAPI, businessAPI, purchasesAPI } from '../utils/api'; 
 import { useAuth } from '../contexts/AuthContext';
 import { notificationSwal } from '../utils/swal-helpers';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, getCurrentPeruDate } from '../utils/formatters';
 import { compressImage } from '../utils/imageCompression';
 
 // Componente para el modal de creación rápida de productos
@@ -103,7 +103,7 @@ export const CreatePurchase = ({ onSuccess, onCancel }) => {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [supplier, setSupplier] = useState('');
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [purchaseDate, setPurchaseDate] = useState(getCurrentPeruDate());
   const [notes, setNotes] = useState('');
   const [receiptFile, setReceiptFile] = useState(null);
   const [total, setTotal] = useState(0);

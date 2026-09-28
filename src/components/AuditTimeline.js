@@ -10,7 +10,11 @@ import {
 import {
   AccessTime as TimeIcon,
 } from "@mui/icons-material";
-import { formatDate, formatCurrency } from "../utils/formatters";
+import {
+  formatDate,
+  formatCurrency,
+  PERU_TIME_ZONE,
+} from "../utils/formatters";
 
 const getEventStory = (log, currency) => {
   const user = log.user?.full_name || "Sistema";
@@ -166,7 +170,7 @@ const TimelineItem = ({ log, isLast, currency }) => {
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
           <TimeIcon sx={{ fontSize: 14, color: "text.disabled" }} />
           <Typography variant="caption" fontWeight="700" color="text.secondary">
-            {formatDate(log.created_at, 'DD-MM-YY HH:mm:ss')}
+            {formatDate(log.created_at, 'DD-MM-YY HH:mm:ss', PERU_TIME_ZONE)}
           </Typography>
         </Stack>
         <Typography variant="body2" sx={{ color: "text.primary", lineHeight: 1.5 }}>

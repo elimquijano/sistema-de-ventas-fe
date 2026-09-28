@@ -42,7 +42,11 @@ import {
   Close as CloseIcon,
   Add as AddIcon,
 } from "@mui/icons-material";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  PERU_TIME_ZONE,
+} from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { cashRegisterAPI, usersAPI, salesAPI } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
@@ -403,9 +407,13 @@ export const CashRegisters = () => {
                           size="small"
                         />
                       </TableCell>
-                      <TableCell>{formatDate(cr.opened_at)}</TableCell>
                       <TableCell>
-                        {cr.closed_at ? formatDate(cr.closed_at) : "-"}
+                        {formatDate(cr.opened_at, "DD/MM/YYYY", PERU_TIME_ZONE)}
+                      </TableCell>
+                      <TableCell>
+                        {cr.closed_at
+                          ? formatDate(cr.closed_at, "DD/MM/YYYY", PERU_TIME_ZONE)
+                          : "-"}
                       </TableCell>
                       <TableCell>
                         {formatCurrency(cr.initial_amount, cr.currency)}

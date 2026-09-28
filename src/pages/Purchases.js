@@ -42,7 +42,11 @@ import {
   GetApp as ExportIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
-import { formatCurrency, formatDate } from "../utils/formatters";
+import {
+  formatCurrency,
+  formatDate,
+  getCurrentPeruDate,
+} from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { purchasesAPI } from "../utils/api";
 import { CreatePurchase } from "../components/CreatePurchase";
@@ -111,27 +115,32 @@ export const Purchases = () => {
     const preset = event.target.value;
     setDatePreset(preset);
 
-    const today = new Date();
+    const today = getCurrentPeruDate();
     let date_from = "";
     let date_to = "";
 
-    const formatDateInput = (date) => {
-      return date.toISOString().split("T")[0];
+    const moveCalendarDate = (dateValue, days) => {
+      const [year, month, day] = dateValue.split("-").map(Number);
+      const shiftedDate = new Date(Date.UTC(year, month - 1, day + days));
+      return [
+        shiftedDate.getUTCFullYear(),
+        String(shiftedDate.getUTCMonth() + 1).padStart(2, "0"),
+        String(shiftedDate.getUTCDate()).padStart(2, "0"),
+      ].join("-");
     };
 
     if (preset === "today") {
-      date_from = formatDateInput(today);
-      date_to = formatDateInput(today);
+      date_from = today;
+      date_to = today;
     } else if (preset === "yesterday") {
-      const yesterday = new Date();
-      yesterday.setDate(today.getDate() - 1);
-      date_from = formatDateInput(yesterday);
-      date_to = formatDateInput(yesterday);
+      const yesterday = moveCalendarDate(today, -1);
+      date_from = yesterday;
+      date_to = yesterday;
     } else if (preset === "this_month") {
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-      date_from = formatDateInput(firstDay);
-      date_to = formatDateInput(lastDay);
+      const [year, month] = today.split("-").map(Number);
+      const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      date_from = `${year}-${String(month).padStart(2, "0")}-01`;
+      date_to = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
     }
 
     setSearchFilters((prev) => {

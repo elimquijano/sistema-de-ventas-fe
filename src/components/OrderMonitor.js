@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   Box,
   Grid,
@@ -89,20 +89,30 @@ const userLocationMarkerIcon = L.icon({
   popupAnchor: [0, -24],
 });
 
-const MapFitBounds = ({ orders, userLocation }) => {
+const getOrderClientCoordinates = (order) => {
+  const latitude = Number.parseFloat(order?.client?.latitude);
+  const longitude = Number.parseFloat(order?.client?.longitude);
+
+  return Number.isFinite(latitude) && Number.isFinite(longitude)
+    ? [latitude, longitude]
+    : null;
+};
+
+const getOrderClientAddress = (order) =>
+  [order?.client?.address, order?.client?.address_detail]
+    .filter(Boolean)
+    .join(" · ");
+
+const MapFitBounds = ({ orders, userLocation, autoFitPausedRef }) => {
   const map = useMap();
 
   useEffect(() => {
+    // Mientras un popup está abierto respetamos la vista elegida por el usuario.
+    if (autoFitPausedRef.current) return;
+
     const points = (orders || [])
-      .filter(
-        (order) =>
-          (order.latitude || order.client?.latitude) &&
-          (order.longitude || order.client?.longitude),
-      )
-      .map((order) => [
-        Number.parseFloat(order.latitude || order.client.latitude),
-        Number.parseFloat(order.longitude || order.client.longitude),
-      ]);
+      .map(getOrderClientCoordinates)
+      .filter(Boolean);
 
     const userLat = Number.parseFloat(userLocation?.lat);
     const userLng = Number.parseFloat(userLocation?.lng);
@@ -114,7 +124,7 @@ const MapFitBounds = ({ orders, userLocation }) => {
     if (points.length > 0 && bounds.isValid()) {
       map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
     }
-  }, [orders, userLocation, map]);
+  }, [orders, userLocation, map, autoFitPausedRef]);
 
   return null;
 };
@@ -124,13 +134,12 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
   const cardColor = markerColor || (order.scheduled_at ? theme.palette.error.main : theme.palette.primary.main);
 
   const handleOpenGoogleMaps = () => {
-    const lat = order.latitude || order.client?.latitude;
-    const lng = order.longitude || order.client?.longitude;
-    const address = order.delivery_address || order.address;
+    const coordinates = getOrderClientCoordinates(order);
+    const address = getOrderClientAddress(order);
     
     let url = "";
-    if (lat && lng) {
-      url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+    if (coordinates) {
+      url = `https://www.google.com/maps/search/?api=1&query=${coordinates[0]},${coordinates[1]}`;
     } else if (address) {
       url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     }
@@ -139,7 +148,9 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
     else notificationSwal("Error", "No hay ubicación ni dirección disponible.", "error");
   };
 
-  const phoneNumber = order.delivery_phone || order.phone || order.client?.phone;
+  const clientName = order.client?.name || "Cliente no disponible";
+  const phoneNumber = order.client?.phone;
+  const clientAddress = getOrderClientAddress(order);
 
   return (
     <Card
@@ -198,7 +209,7 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
           fontWeight="700"
           sx={{ mb: 0.5, color: "text.primary", lineHeight: 1.2 }}
         >
-          {order.customer_name}
+          {clientName}
         </Typography>
         {order.items?.length > 0 && (
           <Box sx={{ mb: 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
@@ -306,7 +317,7 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
                 overflow: "hidden",
               }}
             >
-              {order.delivery_address || order.address}
+              {clientAddress || "Sin dirección registrada"}
             </Typography>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -384,29 +395,61 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   const [monitorView, setMonitorView] = useState("cards");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const refreshRef = useRef(onRefresh);
+  const refreshInProgressRef = useRef(false);
+  const mapAutoFitPausedRef = useRef(false);
 
   refreshRef.current = onRefresh;
+
+  const refreshOrders = useCallback(async () => {
+    // Evita tráfico en segundo plano y solicitudes superpuestas en conexiones lentas.
+    if (
+      document.visibilityState !== "visible" ||
+      refreshInProgressRef.current
+    ) {
+      return;
+    }
+
+    refreshInProgressRef.current = true;
+    try {
+      await refreshRef.current?.({ silent: true });
+    } catch (error) {
+      console.error("Error refreshing orders", error);
+    } finally {
+      refreshInProgressRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
     if (!autoRefresh) return undefined;
 
-    let refreshInProgress = false;
-    const intervalId = window.setInterval(async () => {
-      // Avoid background traffic and overlapping requests on slow connections.
-      if (document.visibilityState !== "visible" || refreshInProgress) return;
-
-      refreshInProgress = true;
-      try {
-        await refreshRef.current?.({ silent: true });
-      } catch (error) {
-        console.error("Error refreshing orders", error);
-      } finally {
-        refreshInProgress = false;
-      }
-    }, 15000);
+    const intervalId = window.setInterval(refreshOrders, 15000);
 
     return () => window.clearInterval(intervalId);
-  }, [autoRefresh]);
+  }, [autoRefresh, refreshOrders]);
+
+  const handleAutoRefreshChange = (event) => {
+    const enabled = event.target.checked;
+    setAutoRefresh(enabled);
+
+    if (enabled) {
+      // La activación hecha por el usuario actualiza ahora; el intervalo continúa después.
+      refreshOrders();
+    }
+  };
+
+  const pauseMapAutoFit = () => {
+    mapAutoFitPausedRef.current = true;
+  };
+
+  const resumeMapAutoFit = () => {
+    mapAutoFitPausedRef.current = false;
+  };
+
+  const handleMonitorViewChange = (event, view) => {
+    if (!view) return;
+    if (view !== "map") resumeMapAutoFit();
+    setMonitorView(view);
+  };
 
   const getRiderColor = (riderId) => {
     if (!riderId) return theme.palette.text.disabled;
@@ -570,9 +613,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   };
 
   const handleOpenRouteInGoogleMaps = () => {
-    const validOrders = orders.filter(
-      (o) => (o.latitude || o.client?.latitude) && (o.longitude || o.client?.longitude)
-    );
+    const validOrders = orders.filter((order) => getOrderClientCoordinates(order));
 
     if (validOrders.length === 0) {
       return notificationSwal("Aviso", "No hay pedidos con ubicación para generar la ruta.", "warning");
@@ -586,10 +627,9 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       url += "&origin=My+Location";
     }
 
-    const waypoints = validOrders.map(o => {
-      const lat = o.latitude || o.client.latitude;
-      const lng = o.longitude || o.client.longitude;
-      return `${lat},${lng}`;
+    const waypoints = validOrders.map((order) => {
+      const [latitude, longitude] = getOrderClientCoordinates(order);
+      return `${latitude},${longitude}`;
     });
 
     const destination = waypoints.pop();
@@ -622,12 +662,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
             <Switch
               size="small"
               checked={autoRefresh}
-              onChange={(event) => setAutoRefresh(event.target.checked)}
+              onChange={handleAutoRefreshChange}
               color="primary"
             />
           }
           label="Actualización automática"
-          title="Actualizar los pedidos cada 5 segundos"
+          title="Actualizar los pedidos cada 15 segundos"
           sx={{
             mr: 0,
             "& .MuiFormControlLabel-label": {
@@ -652,7 +692,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
           size="small"
           value={monitorView}
           exclusive
-          onChange={(e, v) => v && setMonitorView(v)}
+          onChange={handleMonitorViewChange}
           sx={{ height: 32 }}
         >
           <ToggleButton value="cards" sx={{ px: 1 }}>
@@ -719,15 +759,17 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                 </LayersControl.BaseLayer>
               </LayersControl>
               {orders
-                .filter((o) => (o.latitude || o.client?.latitude) && (o.longitude || o.client?.longitude))
+                .filter((order) => getOrderClientCoordinates(order))
                 .map((order) => (
                   <Marker
                     key={order.id}
-                    position={[
-                      parseFloat(order.latitude || order.client.latitude),
-                      parseFloat(order.longitude || order.client.longitude),
-                    ]}
+                    position={getOrderClientCoordinates(order)}
                     icon={orderMarkerIcon(isMultiRider ? getRiderColor(order.rider_id) : theme.palette.primary.main)}
+                    eventHandlers={{
+                      click: pauseMapAutoFit,
+                      popupopen: pauseMapAutoFit,
+                      popupclose: resumeMapAutoFit,
+                    }}
                   >
                     <Popup minWidth={280}>
                       <Box sx={{ p: 0.2 }}>
@@ -751,11 +793,20 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                 <Marker
                   position={[userLocation.lat, userLocation.lng]}
                   icon={userLocationMarkerIcon}
+                  eventHandlers={{
+                    click: pauseMapAutoFit,
+                    popupopen: pauseMapAutoFit,
+                    popupclose: resumeMapAutoFit,
+                  }}
                 >
                   <Popup>Tu ubicación</Popup>
                 </Marker>
               )}
-              <MapFitBounds orders={orders} userLocation={userLocation} />
+              <MapFitBounds
+                orders={orders}
+                userLocation={userLocation}
+                autoFitPausedRef={mapAutoFitPausedRef}
+              />
             </MapContainer>
           </Card>
         )}

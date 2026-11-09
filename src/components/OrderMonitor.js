@@ -1,4 +1,10 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useCallback,
+} from "react";
 import {
   Box,
   Grid,
@@ -50,8 +56,15 @@ import {
   Clear as ClearIcon,
   Directions as DirectionsIcon,
   Notes as NotesIcon,
-  } from "@mui/icons-material";
-import { MapContainer, TileLayer, Marker, Popup, LayersControl, useMap } from "react-leaflet";
+} from "@mui/icons-material";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  LayersControl,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import {
@@ -102,10 +115,7 @@ const getOrderClientCoordinates = (order) => {
     : null;
 };
 
-const getOrderClientAddress = (order) =>
-  [order?.client?.address, order?.client?.address_detail]
-    .filter(Boolean)
-    .join(" · ");
+const getOrderClientAddress = (order) => order?.client?.address;
 
 const MapFitBounds = ({ orders, userLocation, autoFitPausedRef }) => {
   const map = useMap();
@@ -133,23 +143,44 @@ const MapFitBounds = ({ orders, userLocation, autoFitPausedRef }) => {
   return null;
 };
 
-const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onChangeRider, onEdit, isRiderView, currency, markerColor }) => {
+const OrderCard = ({
+  order,
+  riders,
+  onPay,
+  onCancel,
+  onWhatsapp,
+  onOpenMap,
+  onChangeRider,
+  onEdit,
+  isRiderView,
+  currency,
+  markerColor,
+}) => {
   const theme = useTheme();
-  const cardColor = markerColor || (order.scheduled_at ? theme.palette.error.main : theme.palette.primary.main);
+  const cardColor =
+    markerColor ||
+    (order.scheduled_at
+      ? theme.palette.error.main
+      : theme.palette.primary.main);
 
   const handleOpenGoogleMaps = () => {
     const coordinates = getOrderClientCoordinates(order);
     const address = getOrderClientAddress(order);
-    
+
     let url = "";
     if (coordinates) {
       url = `https://www.google.com/maps/search/?api=1&query=${coordinates[0]},${coordinates[1]}`;
     } else if (address) {
       url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
     }
-    
+
     if (url) openGoogleMaps(url);
-    else notificationSwal("Error", "No hay ubicación ni dirección disponible.", "error");
+    else
+      notificationSwal(
+        "Error",
+        "No hay ubicación ni dirección disponible.",
+        "error",
+      );
   };
 
   const clientName = order.client?.name || "Cliente no disponible";
@@ -165,7 +196,11 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
         display: "flex",
         flexDirection: "column",
         border: "1px solid",
-        borderColor: markerColor ? alpha(markerColor, 0.5) : (order.scheduled_at ? "error.light" : "divider"),
+        borderColor: markerColor
+          ? alpha(markerColor, 0.5)
+          : order.scheduled_at
+            ? "error.light"
+            : "divider",
         transition: "all 0.2s",
         "&:hover": { boxShadow: theme.shadows[3] },
       }}
@@ -184,17 +219,22 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
           <Chip
             label={`#${order.sale_number}`}
             size="small"
-            sx={{ 
-              fontWeight: 800, 
-              height: 20, 
-              fontSize: 10, 
+            sx={{
+              fontWeight: 800,
+              height: 20,
+              fontSize: 10,
               borderRadius: 1,
               bgcolor: cardColor,
-              color: "white"
+              color: "white",
             }}
           />
           {!isRiderView && (
-            <IconButton size="small" onClick={() => onEdit(order)} sx={{ p: 0.2 }} title="Editar Pedido">
+            <IconButton
+              size="small"
+              onClick={() => onEdit(order)}
+              sx={{ p: 0.2 }}
+              title="Editar Pedido"
+            >
               <EditIcon sx={{ fontSize: 16, color: "text.secondary" }} />
             </IconButton>
           )}
@@ -216,7 +256,9 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
           {clientName}
         </Typography>
         {order.items?.length > 0 && (
-          <Box sx={{ mb: 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
+          <Box
+            sx={{ mb: 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}
+          >
             {order.items.map((it, idx) => (
               <Box
                 key={idx}
@@ -283,7 +325,11 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
             <Typography
               variant="caption"
               fontWeight="600"
-              sx={{ color: "text.primary", fontStyle: "italic", display: "block" }}
+              sx={{
+                color: "text.primary",
+                fontStyle: "italic",
+                display: "block",
+              }}
             >
               {order.delivery_notes || order.notes}
             </Typography>
@@ -330,15 +376,25 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
               {(() => {
                 const rider = riders.find((r) => r.id === order.rider_id);
                 return rider
-                  ? rider.full_name || `${rider.first_name} ${rider.last_name || ""}`
+                  ? rider.full_name ||
+                      `${rider.first_name} ${rider.last_name || ""}`
                   : "NO ASIGNADO";
               })()}
             </Typography>
           </Box>
         </Stack>
-        <Box sx={{ mt: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-           <Typography variant="caption" fontWeight="700" color="text.secondary">TOTAL:</Typography>
-           <Typography variant="subtitle1" fontWeight="800" color="primary">
+        <Box
+          sx={{
+            mt: 1.5,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <Typography variant="caption" fontWeight="700" color="text.secondary">
+            TOTAL:
+          </Typography>
+          <Typography variant="subtitle1" fontWeight="800" color="primary">
             {formatCurrency(order.total_amount, currency)}
           </Typography>
         </Box>
@@ -394,7 +450,14 @@ const OrderCard = ({ order, riders, onPay, onCancel, onWhatsapp, onOpenMap, onCh
     </Card>
   );
 };
-export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderView = false, currency = "PEN" }) => {
+export const OrderMonitor = ({
+  orders,
+  riders,
+  userLocation,
+  onRefresh,
+  isRiderView = false,
+  currency = "PEN",
+}) => {
   const theme = useTheme();
   const [monitorView, setMonitorView] = useState("cards");
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -458,8 +521,16 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   const getRiderColor = (riderId) => {
     if (!riderId) return theme.palette.text.disabled;
     const colors = [
-      "#673ab7", "#2196f3", "#00c853", "#ff9100", "#f50057", 
-      "#00b0ff", "#d500f9", "#00bfa5", "#3d5afe", "#4caf50"
+      "#673ab7",
+      "#2196f3",
+      "#00c853",
+      "#ff9100",
+      "#f50057",
+      "#00b0ff",
+      "#d500f9",
+      "#00bfa5",
+      "#3d5afe",
+      "#4caf50",
     ];
     const idStr = riderId.toString();
     let hash = 0;
@@ -470,7 +541,9 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   };
 
   const isMultiRider = useMemo(() => {
-    const activeRiderIds = new Set(orders.map(o => o.rider_id).filter(id => id));
+    const activeRiderIds = new Set(
+      orders.map((o) => o.rider_id).filter((id) => id),
+    );
     return activeRiderIds.size > 1;
   }, [orders]);
 
@@ -515,7 +588,7 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
 
   const handleEditChange = (e) => {
     const { name, value } = e.target;
-    setEditingOrder(prev => ({ ...prev, [name]: value }));
+    setEditingOrder((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleUpdateOrder = async () => {
@@ -531,7 +604,11 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       setOpenEditDialog(false);
       onRefresh();
     } catch (e) {
-      notificationSwal("Error", e.response?.data?.message || "No se pudo actualizar.", "error");
+      notificationSwal(
+        "Error",
+        e.response?.data?.message || "No se pudo actualizar.",
+        "error",
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -547,11 +624,19 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
     if (Math.abs(remainingAmount) > 0.01)
       return notificationSwal("Monto", "Pago incompleto.", "error");
     if (hasPaymentImagesInProgress(payments))
-      return notificationSwal("Espera", "El comprobante aún se está preparando.", "info");
+      return notificationSwal(
+        "Espera",
+        "El comprobante aún se está preparando.",
+        "info",
+      );
     if (hasPaymentImageErrors(payments))
-      return notificationSwal("Comprobante", "Corrige o elimina la imagen con error.", "error");
+      return notificationSwal(
+        "Comprobante",
+        "Corrige o elimina la imagen con error.",
+        "error",
+      );
     setIsSubmitting(true);
-    
+
     const formData = buildPaymentsFormData(payments);
 
     try {
@@ -585,14 +670,15 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       notificationSwal(
         "WhatsApp Enviado",
         `Mensaje enviado correctamente al número: ${response.data.target_phone || response.data.phone}`,
-        "success"
+        "success",
       );
     } catch (error) {
       console.error("Error resending WhatsApp:", error);
       notificationSwal(
         "Error",
-        error.response?.data?.message || "No se pudo reenviar el mensaje de WhatsApp.",
-        "error"
+        error.response?.data?.message ||
+          "No se pudo reenviar el mensaje de WhatsApp.",
+        "error",
       );
     }
   };
@@ -606,25 +692,35 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
   const handleChangeRider = async () => {
     try {
       await salesAPI.updateQuickOrder(selectedOrderForRider.id, {
-        rider_id: newRiderId
+        rider_id: newRiderId,
       });
       notificationSwal("Éxito", "Motorizado actualizado.", "success");
       setOpenRiderDialog(false);
       onRefresh();
     } catch (e) {
-      notificationSwal("Error", "No se pudo actualizar el motorizado.", "error");
+      notificationSwal(
+        "Error",
+        "No se pudo actualizar el motorizado.",
+        "error",
+      );
     }
   };
 
   const handleOpenRouteInGoogleMaps = () => {
-    const validOrders = orders.filter((order) => getOrderClientCoordinates(order));
+    const validOrders = orders.filter((order) =>
+      getOrderClientCoordinates(order),
+    );
 
     if (validOrders.length === 0) {
-      return notificationSwal("Aviso", "No hay pedidos con ubicación para generar la ruta.", "warning");
+      return notificationSwal(
+        "Aviso",
+        "No hay pedidos con ubicación para generar la ruta.",
+        "warning",
+      );
     }
 
     let url = "https://www.google.com/maps/dir/?api=1";
-    
+
     if (userLocation) {
       url += `&origin=${userLocation.lat},${userLocation.lng}`;
     } else {
@@ -660,7 +756,15 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ mb: 1, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 1 }}>
+      <Box
+        sx={{
+          mb: 1,
+          display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
+          gap: 1,
+        }}
+      >
         <FormControlLabel
           control={
             <Switch
@@ -680,14 +784,14 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
             },
           }}
         />
-        <IconButton 
-          size="small" 
-          color="primary" 
+        <IconButton
+          size="small"
+          color="primary"
           onClick={handleOpenRouteInGoogleMaps}
           title="Ver Ruta en Google Maps"
-          sx={{ 
+          sx={{
             bgcolor: alpha(theme.palette.primary.main, 0.1),
-            "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.2) }
+            "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.2) },
           }}
         >
           <DirectionsIcon fontSize="small" />
@@ -711,8 +815,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       <Box sx={{ flex: 1, overflow: "hidden" }}>
         {orders.length === 0 ? (
           <Box sx={{ textAlign: "center", py: 10, opacity: 0.2 }}>
-            <LocalShippingIcon sx={{ fontSize: 80, mb: 1, color: "primary.main" }} />
-            <Typography variant="h6" fontWeight="700">No hay pedidos pendientes</Typography>
+            <LocalShippingIcon
+              sx={{ fontSize: 80, mb: 1, color: "primary.main" }}
+            />
+            <Typography variant="h6" fontWeight="700">
+              No hay pedidos pendientes
+            </Typography>
           </Box>
         ) : monitorView === "cards" ? (
           <Box sx={{ height: "100%", overflowY: "auto", px: 0.5, pb: 2 }}>
@@ -729,16 +837,25 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                     isRiderView={isRiderView}
                     currency={currency}
                     onChangeRider={handleOpenChangeRider}
-                    markerColor={isMultiRider ? getRiderColor(order.rider_id) : null}
+                    markerColor={
+                      isMultiRider ? getRiderColor(order.rider_id) : null
+                    }
                   />
                 </Grid>
               ))}
             </Grid>
           </Box>
         ) : (
-          <Card variant="outlined" sx={{ height: "100%", borderRadius: 1, overflow: "hidden" }}>
+          <Card
+            variant="outlined"
+            sx={{ height: "100%", borderRadius: 1, overflow: "hidden" }}
+          >
             <MapContainer
-              center={userLocation ? [userLocation.lat, userLocation.lng] : [-9.93, -76.24]}
+              center={
+                userLocation
+                  ? [userLocation.lat, userLocation.lng]
+                  : [-9.93, -76.24]
+              }
               zoom={14}
               style={{ height: "100%", width: "100%" }}
             >
@@ -768,7 +885,11 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                   <Marker
                     key={order.id}
                     position={getOrderClientCoordinates(order)}
-                    icon={orderMarkerIcon(isMultiRider ? getRiderColor(order.rider_id) : theme.palette.primary.main)}
+                    icon={orderMarkerIcon(
+                      isMultiRider
+                        ? getRiderColor(order.rider_id)
+                        : theme.palette.primary.main,
+                    )}
                     eventHandlers={{
                       click: pauseMapAutoFit,
                       popupopen: pauseMapAutoFit,
@@ -787,7 +908,9 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                           isRiderView={isRiderView}
                           currency={currency}
                           onChangeRider={handleOpenChangeRider}
-                          markerColor={isMultiRider ? getRiderColor(order.rider_id) : null}
+                          markerColor={
+                            isMultiRider ? getRiderColor(order.rider_id) : null
+                          }
                         />
                       </Box>
                     </Popup>
@@ -816,7 +939,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
         )}
       </Box>
 
-      <Dialog open={openEditDialog} onClose={() => setOpenEditDialog(false)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={openEditDialog}
+        onClose={() => setOpenEditDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle sx={{ fontWeight: 700 }}>Editar Pedido</DialogTitle>
         <DialogContent dividers>
           {editingOrder && (
@@ -869,7 +997,14 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
                     size="small"
                     InputProps={{
                       startAdornment: (
-                        <Typography variant="body2" sx={{ mr: 1, fontWeight: 700, color: "text.secondary" }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            mr: 1,
+                            fontWeight: 700,
+                            color: "text.secondary",
+                          }}
+                        >
                           {currency === "PEN" ? "S/" : "$"}
                         </Typography>
                       ),
@@ -892,9 +1027,9 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenEditDialog(false)}>Cancelar</Button>
-          <Button 
-            onClick={handleUpdateOrder} 
-            variant="contained" 
+          <Button
+            onClick={handleUpdateOrder}
+            variant="contained"
             disabled={isSubmitting}
           >
             {isSubmitting ? "Guardando..." : "Guardar Cambios"}
@@ -903,7 +1038,12 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
       </Dialog>
 
       {/* Dialogo Cambiar Motorizado (Quick) */}
-      <Dialog open={openRiderDialog} onClose={() => setOpenRiderDialog(false)} maxWidth="xs" fullWidth>
+      <Dialog
+        open={openRiderDialog}
+        onClose={() => setOpenRiderDialog(false)}
+        maxWidth="xs"
+        fullWidth
+      >
         <DialogTitle>Cambiar Motorizado</DialogTitle>
         <DialogContent sx={{ pt: 1 }}>
           <FormControl fullWidth size="small">
@@ -923,7 +1063,13 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenRiderDialog(false)}>Cancelar</Button>
-          <Button onClick={handleChangeRider} variant="contained" color="primary">Guardar</Button>
+          <Button
+            onClick={handleChangeRider}
+            variant="contained"
+            color="primary"
+          >
+            Guardar
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -936,8 +1082,17 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
         TransitionComponent={Transition}
         sx={{ "& .MuiDialog-paper": { borderRadius: 2 } }}
       >
-        <DialogTitle sx={{ textAlign: "center", bgcolor: "success.main", color: "white", py: 1.5 }}>
-          <Typography variant="subtitle1" fontWeight="700">COBRAR PEDIDO</Typography>
+        <DialogTitle
+          sx={{
+            textAlign: "center",
+            bgcolor: "success.main",
+            color: "white",
+            py: 1.5,
+          }}
+        >
+          <Typography variant="subtitle1" fontWeight="700">
+            COBRAR PEDIDO
+          </Typography>
           <Typography variant="caption" sx={{ opacity: 0.9 }}>
             #{selectedOrderToConfirm?.sale_number}
           </Typography>
@@ -956,11 +1111,20 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
             }}
           >
             <Typography variant="h4" fontWeight="800" color="success.main">
-              {formatCurrency(selectedOrderToConfirm?.total_amount || 0, currency)}
+              {formatCurrency(
+                selectedOrderToConfirm?.total_amount || 0,
+                currency,
+              )}
             </Typography>
-            <Typography variant="caption" fontWeight="600" color="text.secondary">TOTAL A RECIBIR</Typography>
+            <Typography
+              variant="caption"
+              fontWeight="600"
+              color="text.secondary"
+            >
+              TOTAL A RECIBIR
+            </Typography>
           </Paper>
-          
+
           <PaymentMethodSelector
             totalAmount={selectedOrderToConfirm?.total_amount || 0}
             payments={payments}
@@ -982,7 +1146,11 @@ export const OrderMonitor = ({ orders, riders, userLocation, onRefresh, isRiderV
             }
             sx={{ borderRadius: 1, py: 1.2, fontWeight: 700 }}
           >
-            {isSubmitting ? <CircularProgress size={24} color="inherit" /> : "CONFIRMAR ENTREGA"}
+            {isSubmitting ? (
+              <CircularProgress size={24} color="inherit" />
+            ) : (
+              "CONFIRMAR ENTREGA"
+            )}
           </Button>
         </DialogActions>
       </Dialog>

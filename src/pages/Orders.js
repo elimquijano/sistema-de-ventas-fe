@@ -93,6 +93,7 @@ import { StrictAutocomplete } from "../components/StrictAutocomplete";
 import { getApiErrorMessage } from "../utils/apiErrors";
 
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
+const GEOAPIFY_API_KEY = process.env.REACT_APP_GEOAPIFY_API_KEY;
 
 
 function TabPanel(props) {
@@ -159,11 +160,13 @@ export const Orders = () => {
   const [userLocation, setUserLocation] = useState(null);
 
   const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [isSearchingAddress, setIsSearchingAddress] = useState(false);
   const [openLocationDialog, setOpenLocationDialog] = useState(false);
   const [locationMode, setLocationMode] = useState("manual");
   const [tempLocation, setTempLocation] = useState(null);
   const locationMapRef = useRef();
   const addressSearchTimeoutRef = useRef(null);
+  const addressSearchRequestRef = useRef(null);
 
   const calculatedTotal = useMemo(() => {
     return orderItems.reduce(
@@ -325,24 +328,51 @@ export const Orders = () => {
     if (addressSearchTimeoutRef.current) {
       clearTimeout(addressSearchTimeoutRef.current);
     }
+    addressSearchRequestRef.current?.abort();
 
-    if (!query || query.length < 3 || !MAPBOX_TOKEN) {
+    if (!query || query.trim().length < 3 || !GEOAPIFY_API_KEY) {
       setAddressSuggestions([]);
+      setIsSearchingAddress(false);
       return;
     }
 
+    setIsSearchingAddress(true);
     addressSearchTimeoutRef.current = setTimeout(async () => {
+      const controller = new AbortController();
+      addressSearchRequestRef.current = controller;
       try {
+        const params = new URLSearchParams({
+          text: query.trim(),
+          lang: "es",
+          limit: "5",
+          format: "geojson",
+          apiKey: GEOAPIFY_API_KEY,
+        });
+        if (businessLocation) {
+          params.set(
+            "bias",
+            `proximity:${businessLocation.lng},${businessLocation.lat}`,
+          );
+        }
         const res = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&language=es&limit=5&country=pe`,
+          `https://api.geoapify.com/v1/geocode/search?${params}`,
+          { signal: controller.signal },
         );
+        if (!res.ok) throw new Error(`Geoapify error: ${res.status}`);
         const data = await res.json();
         setAddressSuggestions(data.features || []);
       } catch (error) {
-        console.error("Error searching Mapbox addresses:", error);
-        setAddressSuggestions([]);
+        if (error.name !== "AbortError") {
+          console.error("Error searching Geoapify addresses:", error);
+          setAddressSuggestions([]);
+        }
+      } finally {
+        if (addressSearchRequestRef.current === controller) {
+          addressSearchRequestRef.current = null;
+          setIsSearchingAddress(false);
+        }
       }
-    }, 600);
+    }, 500);
   };
 
   useEffect(
@@ -350,28 +380,48 @@ export const Orders = () => {
       if (addressSearchTimeoutRef.current) {
         clearTimeout(addressSearchTimeoutRef.current);
       }
+      addressSearchRequestRef.current?.abort();
     },
     [],
   );
 
-  const handleSelectSuggestion = (s) => {
-    if (!s) return;
-    setCustomerAddress(s.place_name);
-    setCustomerLocation({ lat: s.center[1], lng: s.center[0] });
+  const handleSelectSuggestion = async (suggestion) => {
+    if (!suggestion?.properties) return;
+    if (addressSearchTimeoutRef.current) {
+      clearTimeout(addressSearchTimeoutRef.current);
+    }
+    addressSearchRequestRef.current?.abort();
+    const lat = Number(suggestion.properties.lat);
+    const lng = Number(suggestion.properties.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+
+    const formattedAddress = suggestion.properties.formatted || "";
+    const addressName = formattedAddress.split(",")[0];
+    if (!customerName.trim() && addressName) setCustomerName(addressName.trim());
+
+    setCustomerLocation({ lat, lng });
+    setTempLocation({ lat, lng });
+    setCustomerAddress(formattedAddress);
     setAddressSuggestions([]);
+    await fetchMapboxAddress(lat, lng);
   };
 
   const fetchMapboxAddress = async (lat, lng) => {
     if (!MAPBOX_TOKEN) return;
-    const res = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=es`,
-    );
-    const data = await res.json();
-    setCustomerAddress(data.features?.[0]?.place_name || "");
+    try {
+      const res = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=es`,
+      );
+      if (!res.ok) throw new Error(`Mapbox geocoding error: ${res.status}`);
+      const data = await res.json();
+      setCustomerAddress(data.features?.[0]?.place_name || "");
 
-    // Calcular distancia y tiempo desde el negocio
-    if (businessLocation) {
-      calculateDistanceAndTime(businessLocation, { lat, lng });
+      // Calcular distancia y tiempo desde el negocio
+      if (businessLocation) {
+        calculateDistanceAndTime(businessLocation, { lat, lng });
+      }
+    } catch (error) {
+      console.error("Error fetching Mapbox address:", error);
     }
   };
 
@@ -651,11 +701,16 @@ export const Orders = () => {
                       freeSolo
                       size="small"
                       options={addressSuggestions}
-                      getOptionLabel={(o) =>
-                        typeof o === "string" ? o : o.place_name || ""
+                      getOptionLabel={(option) =>
+                        typeof option === "string"
+                          ? option
+                          : option.properties?.formatted || ""
                       }
-                      onInputChange={(e, v) => handleAddressSearch(v)}
-                      onChange={(e, v) => handleSelectSuggestion(v)}
+                      loading={isSearchingAddress}
+                      onInputChange={(event, value, reason) => {
+                        if (reason === "input") handleAddressSearch(value);
+                      }}
+                      onChange={(event, value) => handleSelectSuggestion(value)}
                       inputValue={customerAddress}
                       renderInput={(p) => (
                         <TextField
@@ -666,6 +721,13 @@ export const Orders = () => {
                             ...p.InputProps,
                             endAdornment: (
                               <React.Fragment>
+                                {isSearchingAddress && (
+                                  <CircularProgress
+                                    color="inherit"
+                                    size={16}
+                                    sx={{ mr: 1 }}
+                                  />
+                                )}
                                 {p.InputProps.endAdornment}
                                 <InputAdornment position="end">
                                   <MuiTooltip title="Seleccionar en mapa">

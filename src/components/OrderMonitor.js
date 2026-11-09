@@ -89,15 +89,16 @@ const Transition = React.forwardRef(function Transition(props, ref) {
   return <Slide direction="up" ref={ref} {...props} />;
 });
 
-const PAYMENT_METHODS = [
-  { value: "cash", label: "Efectivo", icon: <MoneyIcon /> },
-  { value: "yape", label: "Yape", icon: <PriceCheckIcon /> },
-  { value: "plin", label: "Plin", icon: <PriceCheckIcon /> },
-  { value: "card", label: "Tarjeta", icon: <CreditCardIcon /> },
-  { value: "transfer", label: "Transferencia", icon: <CreditCardIcon /> },
-  { value: "credit", label: "Crédito", icon: <ScheduleIcon /> },
-  { value: "vale", label: "Vale", icon: <AddCardIcon /> },
-];
+const AUTO_REFRESH_STORAGE_KEY = "orderMonitorAutoRefresh";
+
+const getSavedAutoRefreshPreference = () => {
+  try {
+    const savedPreference = localStorage.getItem(AUTO_REFRESH_STORAGE_KEY);
+    return savedPreference === null || savedPreference === "true";
+  } catch {
+    return true;
+  }
+};
 
 const userLocationMarkerIcon = L.icon({
   iconUrl: currentLocationMarker,
@@ -460,7 +461,7 @@ export const OrderMonitor = ({
 }) => {
   const theme = useTheme();
   const [monitorView, setMonitorView] = useState("cards");
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(getSavedAutoRefreshPreference);
   const refreshRef = useRef(onRefresh);
   const refreshInProgressRef = useRef(false);
   const mapAutoFitPausedRef = useRef(false);
@@ -485,6 +486,14 @@ export const OrderMonitor = ({
       refreshInProgressRef.current = false;
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(AUTO_REFRESH_STORAGE_KEY, String(autoRefresh));
+    } catch {
+      // The preference still works for this session when storage is unavailable.
+    }
+  }, [autoRefresh]);
 
   useEffect(() => {
     if (!autoRefresh) return undefined;
@@ -581,7 +590,10 @@ export const OrderMonitor = ({
       delivery_notes: order.delivery_notes || order.notes || "",
       scheduled_at: order.scheduled_at ? order.scheduled_at.slice(0, 16) : "",
       total_amount: order.total_amount || 0,
-      quantity: order.items?.[0]?.quantity || 1,
+      items: (order.items || []).map((item) => ({
+        ...item,
+        quantity: String(item.quantity ?? 1),
+      })),
     });
     setOpenEditDialog(true);
   };
@@ -591,12 +603,33 @@ export const OrderMonitor = ({
     setEditingOrder((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleEditItemQuantity = (itemIndex, value) => {
+    setEditingOrder((prev) => ({
+      ...prev,
+      items: prev.items.map((item, index) =>
+        index === itemIndex ? { ...item, quantity: value } : item,
+      ),
+    }));
+  };
+
   const handleUpdateOrder = async () => {
+    const hasInvalidQuantity = editingOrder.items.some(
+      (item) => !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1,
+    );
+    if (hasInvalidQuantity) {
+      notificationSwal("Cantidad no valida", "Cada producto debe tener una cantidad de al menos 1.", "warning");
+      return;
+    }
     setIsSubmitting(true);
     try {
       // Enviar tanto delivery_notes como notes para asegurar compatibilidad
       const updateData = {
         ...editingOrder,
+        items: editingOrder.items.map((item) => ({
+          id: item.item_id ?? item.id,
+          type: item.item_type ?? item.type,
+          quantity: Number(item.quantity),
+        })),
         notes: editingOrder.delivery_notes, // Copiar para compatibilidad
       };
       await salesAPI.updateQuickOrder(editingOrder.id, updateData);
@@ -974,19 +1007,42 @@ export const OrderMonitor = ({
                 size="small"
                 InputLabelProps={{ shrink: true }}
               />
+              {editingOrder.items.length > 0 && (
+                <Stack spacing={1.25}>
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Productos del pedido
+                  </Typography>
+                  {editingOrder.items.map((item, index) => (
+                    <Grid
+                      container
+                      spacing={1}
+                      alignItems="center"
+                      key={`${item.item_type ?? item.type}-${item.item_id ?? item.id}-${index}`}
+                    >
+                      <Grid item xs={8}>
+                        <Typography variant="body2" fontWeight={600}>
+                          {item.item_name || item.name || `Producto ${index + 1}`}
+                        </Typography>
+                      </Grid>
+                      <Grid item xs={4}>
+                        <TextField
+                          label="Cantidad"
+                          type="number"
+                          inputProps={{ min: 1, step: 1 }}
+                          value={item.quantity}
+                          onChange={(event) =>
+                            handleEditItemQuantity(index, event.target.value)
+                          }
+                          fullWidth
+                          size="small"
+                        />
+                      </Grid>
+                    </Grid>
+                  ))}
+                </Stack>
+              )}
               <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <TextField
-                    label="Cantidad"
-                    name="quantity"
-                    type="number"
-                    value={editingOrder.quantity}
-                    onChange={handleEditChange}
-                    fullWidth
-                    size="small"
-                  />
-                </Grid>
-                <Grid item xs={6}>
+                <Grid item xs={12}>
                   <TextField
                     label="Total"
                     name="total_amount"

@@ -135,6 +135,15 @@ export const authAPI = {
   changePassword: (data) => api.post("/auth/change-password", data, { loaderMessage: "Cambiando contraseña..." }),
 };
 
+export const voiceAssistantAPI = {
+  completeChat: (payload, { signal } = {}) =>
+    api.post("/deepseek/chat/completions", payload, {
+      signal,
+      timeout: 90000,
+      silent: true,
+    }),
+};
+
 // Funciones de API para usuarios
 export const usersAPI = {
   getAll: (params = {}) => api.get("/users", { params, loaderMessage: "Cargando usuarios..." }),
@@ -227,7 +236,7 @@ export const businessAPI = {
   delete: (id) => api.delete(`/businesses/${id}`, { loaderMessage: "Eliminando negocio..." }),
   getStats: (id, period) =>
     api.get(`/businesses/${id}/dashboard`, { params: { period }, loaderMessage: "Cargando estadísticas..." }),
-  searchProducts: (term) => api.get(`/products/search?term=${term}`, { silent: true }),
+  searchProducts: (term) => api.get(`/products/search?term=${encodeURIComponent(term)}`, { silent: true }),
 };
 
 export const purchasesAPI = {

@@ -53,6 +53,7 @@ import { DynamicRoutes } from "../routes/DynamicRouteGenerator";
 import { findFirstValidRoute } from "../utils/navigationUtils";
 import Logo from "../components/Logo";
 import NotificationMenu from "../components/NotificationMenu";
+import { VoiceAssistant } from "../components/VoiceAssistant";
 import Swal from "sweetalert2";
 
 const drawerWidth = 260;
@@ -525,6 +526,13 @@ export const DashboardLayout = () => {
                 {isFullscreen ? <FullscreenExit /> : <FullscreenIcon />}
               </IconButton>
             </Tooltip>
+
+            <VoiceAssistant
+              menuModules={menuModules}
+              navigate={navigate}
+              currentPath={location.pathname}
+              currency={user?.business?.currency || "PEN"}
+            />
 
             {/* Notification Menu Component */}
             <NotificationMenu />

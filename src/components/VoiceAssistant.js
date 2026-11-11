@@ -36,6 +36,8 @@ import { sanitizeChatMessages } from "../utils/voiceAssistantMessages";
 import { BUSINESS_SEARCH_FIELDS, buildSearchKeywords, rowMatchesKeywords } from "../utils/voiceAssistantSearch";
 
 const DEEPSEEK_MODEL = "deepseek-v4-flash";
+const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
+const GEOAPIFY_API_KEY = process.env.REACT_APP_GEOAPIFY_API_KEY;
 const SCREEN_FIELD_GUIDE = {
   Orders: ["cliente (nombre/telefono)", "direccion y referencia", "productos o servicios con cantidad", "motorizado", "fecha/hora opcional", "descuento opcional", "notas"],
   Products: ["nombre", "descripcion", "categoria", "precio", "costo", "stock", "stock minimo", "codigo de barras", "imagen"],
@@ -167,6 +169,32 @@ const VOICE_TOOLS = [
   {
     type: "function",
     function: {
+      name: "search_delivery_address",
+      description: "Busca por Geoapify una direccion dictada para un cliente nuevo o para cambiar la direccion. Devuelve hasta cinco opciones numeradas; el usuario elige una hablando.",
+      parameters: {
+        type: "object",
+        properties: { query: { type: "string", description: "Texto de direccion reconocido por voz, por ejemplo calle, distrito y ciudad." } },
+        required: ["query"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "select_delivery_address",
+      description: "Selecciona una de las opciones numeradas devueltas por la busqueda de direccion. Ejecuta geocodificacion inversa y calculo de ruta con Mapbox, y guarda las coordenadas para el borrador del pedido.",
+      parameters: {
+        type: "object",
+        properties: { choice: { type: "integer", minimum: 1, maximum: 5 } },
+        required: ["choice"],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "search_catalog",
       description: "Busca productos o servicios por palabras clave. El codigo consulta la API, filtra coincidencias y devuelve maximo 12 resultados breves.",
       parameters: {
@@ -238,7 +266,7 @@ const VOICE_TOOLS = [
 ];
 
 export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", currency = "PEN" }) => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const canUseVoiceAssistant = hasPermission(VOICE_ASSISTANT_PERMISSION);
   const [open, setOpen] = useState(false);
   const [sessionActive, setSessionActive] = useState(false);
@@ -275,6 +303,7 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
   const pagesRef = useRef([]);
   const catalogRef = useRef({ products: null, services: null, riders: null, clients: null });
   const searchedCatalogIdsRef = useRef(new Set());
+  const addressSuggestionsRef = useRef([]);
 
   pagesRef.current = getPages(menuModules);
 
@@ -510,7 +539,7 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
     }
     if (signal?.aborted) return { ok: false, error: "La solicitud fue interrumpida." };
     const canManageOrders = pagesRef.current.some((page) => page.component === "Orders");
-    if (["search_catalog", "search_customer", "search_riders", "prepare_order"].includes(name) && !canManageOrders) {
+    if (["search_delivery_address", "select_delivery_address", "search_catalog", "search_customer", "search_riders", "prepare_order"].includes(name) && !canManageOrders) {
       return { ok: false, error: "El usuario no tiene acceso al modulo de pedidos." };
     }
     if (name === "inspect_screen") {
@@ -689,6 +718,72 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
       return { ok: true, draft: pendingExpenseRef.current, instruction: "Resume descripcion, importe, categoria y fecha y pide confirmacion oral. No lo guardes aun." };
     }
 
+    if (name === "search_delivery_address") {
+      const query = String(args.query || "").trim().slice(0, 240);
+      if (query.length < 3) return { ok: false, error: "Dime una direccion un poco mas completa para buscarla." };
+      if (!GEOAPIFY_API_KEY) return { ok: false, error: "La busqueda de direcciones no esta configurada en este frontend." };
+      const params = new URLSearchParams({ text: query, lang: "es", limit: "5", format: "geojson", apiKey: GEOAPIFY_API_KEY });
+      const businessLat = Number.parseFloat(user?.business?.latitude);
+      const businessLng = Number.parseFloat(user?.business?.longitude);
+      if (Number.isFinite(businessLat) && Number.isFinite(businessLng)) params.set("bias", `proximity:${businessLng},${businessLat}`);
+      const response = await fetch(`https://api.geoapify.com/v1/geocode/search?${params}`, { signal });
+      if (!response.ok) throw new Error(`Geoapify respondio ${response.status}.`);
+      const data = await response.json();
+      addressSuggestionsRef.current = (data.features || []).filter((feature) =>
+        Number.isFinite(Number(feature?.properties?.lat)) && Number.isFinite(Number(feature?.properties?.lon)),
+      ).slice(0, 5);
+      const results = addressSuggestionsRef.current.map((feature, index) => ({
+        choice: index + 1,
+        address: feature.properties.formatted || feature.properties.address_line1 || "Direccion sin descripcion",
+        city: feature.properties.city || feature.properties.county || feature.properties.state || "",
+      }));
+      return results.length
+        ? { ok: true, results, instruction: "Lee las opciones numeradas y pregunta cual elige. No selecciones una por tu cuenta." }
+        : { ok: true, results: [], instruction: "Informa que no hubo coincidencias y pide otra referencia o distrito." };
+    }
+
+    if (name === "select_delivery_address") {
+      const index = Number(args.choice) - 1;
+      const feature = addressSuggestionsRef.current[index];
+      if (!feature) return { ok: false, error: "Esa opcion ya no esta disponible. Vuelve a buscar la direccion." };
+      const lat = Number(feature.properties.lat);
+      const lng = Number(feature.properties.lon);
+      let resolvedAddress = feature.properties.formatted || feature.properties.address_line1 || "";
+      if (MAPBOX_TOKEN) {
+        const reverseUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&language=es`;
+        const reverseResponse = await fetch(reverseUrl, { signal });
+        if (reverseResponse.ok) {
+          const reverseData = await reverseResponse.json();
+          resolvedAddress = reverseData.features?.[0]?.place_name || resolvedAddress;
+        }
+      }
+      let routeInfo = "";
+      const originLat = Number.parseFloat(user?.business?.latitude);
+      const originLng = Number.parseFloat(user?.business?.longitude);
+      if (MAPBOX_TOKEN && Number.isFinite(originLat) && Number.isFinite(originLng)) {
+        const routeUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${originLng},${originLat};${lng},${lat}?access_token=${MAPBOX_TOKEN}&geometries=geojson`;
+        const routeResponse = await fetch(routeUrl, { signal });
+        if (routeResponse.ok) {
+          const routeData = await routeResponse.json();
+          const route = routeData.routes?.[0];
+          if (route) routeInfo = `Distancia: ${(route.distance / 1000).toFixed(2)} km | Tiempo aprox: ${Math.round(route.duration / 60)} min`;
+        }
+      }
+      if (signal?.aborted) return { ok: false, error: "La solicitud fue interrumpida." };
+      const addressNameHint = String(feature.properties.formatted || "").split(",")[0].trim();
+      const existingCustomerName = String(orderInputDraftRef.current?.customer_name || "").trim();
+      orderInputDraftRef.current = mergeVoiceData(orderInputDraftRef.current, {
+        ...(!existingCustomerName && addressNameHint ? { customer_name: addressNameHint } : {}),
+        address: resolvedAddress,
+        geo_address: resolvedAddress,
+        latitude: lat,
+        longitude: lng,
+        route_info: routeInfo,
+      });
+      addressSuggestionsRef.current = [];
+      return { ok: true, selected: { address: resolvedAddress, latitude: lat, longitude: lng, route: routeInfo || undefined, customer_name_prefilled: !existingCustomerName ? addressNameHint || undefined : undefined }, instruction: "Confirma la direccion seleccionada por voz y continua completando los datos del pedido." };
+    }
+
     if (name === "search_catalog") {
       const catalog = await getCatalog(args.query, args.type);
       const queryTerms = buildSearchKeywords(args.query).split(/\s+/).filter(Boolean);
@@ -821,18 +916,23 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
       }
 
       if (signal?.aborted) return { ok: false, error: "La solicitud fue interrumpida." };
+      const usesVoiceGeocode = normalizeText(address) === normalizeText(mergedOrder.geo_address);
+      const routeInfo = usesVoiceGeocode ? String(mergedOrder.route_info || "").trim() : "";
+      const userNotes = String(args.notes || "").trim();
+      const orderNotes = [userNotes, routeInfo].filter(Boolean).join("\n");
+      const hasMatchedClientAddress = normalizeText(address) === normalizeText(matchedClient?.address || "");
       pendingOrderRef.current = {
         phone,
         customer_name: customerName,
         address,
-        latitude: matchedClient?.latitude && normalizeText(address) === normalizeText(matchedClient.address) ? Number(matchedClient.latitude) : undefined,
-        longitude: matchedClient?.longitude && normalizeText(address) === normalizeText(matchedClient.address) ? Number(matchedClient.longitude) : undefined,
+        latitude: usesVoiceGeocode ? Number(mergedOrder.latitude) : hasMatchedClientAddress && matchedClient?.latitude != null ? Number(matchedClient.latitude) : undefined,
+        longitude: usesVoiceGeocode ? Number(mergedOrder.longitude) : hasMatchedClientAddress && matchedClient?.longitude != null ? Number(matchedClient.longitude) : undefined,
         items: normalizedItems.map(({ id, type, quantity }) => ({ id, type, quantity })),
         total_amount: Math.max(0, subtotal - discount),
         discount,
         rider_id: rider.id,
-        notes: String(args.notes || "").trim(),
-        delivery_notes: String(args.notes || "").trim(),
+        notes: orderNotes,
+        delivery_notes: orderNotes,
         scheduled_at: scheduledAt,
         summary: {
           customerName,
@@ -1203,7 +1303,7 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
 
 Conserva el objetivo y todos los datos que el usuario ya proporciono en turnos anteriores. Para buscar, genera pocas palabras clave utiles (nombre, numero o producto); la API y el codigo aplican los filtros por campos y solo te devuelven coincidencias acotadas. Mientras completas un pedido, guarda cada aporte parcial llamando prepare_order para que los datos queden persistidos en codigo. Acepta respuestas que incluyan varios campos y combinalas con lo ya conocido. Si falta algo, pregunta solo lo que falta, en una sola pregunta clara. No inventes datos, resultados, nombres, precios, productos ni estados. Usa las herramientas y resultados reales; cuando la persona pide una accion o una consulta que tenga herramienta, ejecutala en vez de decir que no puedes o que falta una herramienta. Para saber que campos tiene una vista, usa inspect_screen. Para abrirla, usa open_page con la pantalla autorizada correspondiente.
 
-PEDIDOS: Si dan nombre o telefono, busca primero el cliente registrado con search_customer y reutiliza su nombre, direccion y datos encontrados. No vuelvas a pedir datos que ya esten en el registro. Si el telefono se dio en otro turno, usalo. Busca productos/servicios con search_catalog y motorizados activos con search_riders. Acepta la direccion o referencia tal como la dice el usuario; no exijas calle y numero si la referencia es util. Antes de preparar verifica nombre y telefono peruano de 9 digitos, direccion, al menos un producto/servicio con cantidad valida y motorizado activo. La fecha programada y descuento son opcionales. Si prepare_order indica faltantes, conserva el borrador y pregunta solo esos datos; luego vuelve a prepararlo con todos los datos recopilados. La preparacion es solo un borrador: resume cliente, direccion, articulos/cantidades, motorizado y total; espera un si explicito antes de registrar. Si corrigen algo, actualiza el borrador y solicita confirmacion nueva. Solo afirma que se registro despues de una respuesta exitosa del sistema.
+PEDIDOS: Si dan nombre o telefono, busca primero el cliente registrado con search_customer y reutiliza su nombre, direccion y datos encontrados. No vuelvas a pedir datos que ya esten en el registro. Si el telefono se dio en otro turno, usalo. Busca productos/servicios con search_catalog y motorizados activos con search_riders. Si es cliente nuevo o indica una direccion nueva, busca el texto dictado con search_delivery_address; ofrece las opciones numeradas y espera que la persona elija por voz, luego llama select_delivery_address con ese numero. Esa herramienta usa las coordenadas de Geoapify para completar direccion, distancia y tiempo con Mapbox y guarda las coordenadas en el borrador. Si el nombre del cliente aun falta, completa el campo con el texto de Geoapify anterior a la primera coma y no vuelvas a pedirlo. No intentes mover ni seleccionar el mapa por voz. Si no hay coincidencias, pide otra referencia o distrito. Acepta referencias utiles sin exigir calle y numero. Para un cliente registrado conserva su direccion guardada salvo que indique cambiarla. Antes de preparar verifica nombre y telefono peruano de 9 digitos, direccion, al menos un producto/servicio con cantidad valida y motorizado activo. La fecha programada y descuento son opcionales. Si prepare_order indica faltantes, conserva el borrador y pregunta solo esos datos; luego vuelve a prepararlo con todos los datos recopilados. La preparacion es solo un borrador: resume cliente, direccion, articulos/cantidades, motorizado y total; espera un si explicito antes de registrar. Si corrigen algo, actualiza el borrador y solicita confirmacion nueva. Solo afirma que se registro despues de una respuesta exitosa del sistema.
 
 CONSULTAS: Usa query_business_data para resumen, ventas, pedidos, productos/stock, servicios, clientes, gastos, compras, creditos, prestamos, caja, bienes o personal, segun las secciones autorizadas. Busca con el filtro indicado y resume resultados reales con claridad. Para caja, reporta efectivo esperado/contado, diferencia, ingresos manuales, ventas en efectivo y cantidad de ventas cuando existan. Un reporte es de solo lectura y no requiere confirmacion.
 
@@ -1263,6 +1363,7 @@ OPERACIONES: Puedes abrir/cerrar caja, cancelar o cobrar pedidos, prestar/devolv
     pendingOperationRef.current = null;
     searchedCatalogIdsRef.current = new Set();
     catalogRef.current = { products: null, services: null, riders: null, clients: null };
+    addressSuggestionsRef.current = [];
     sessionActiveRef.current = true;
     processingRef.current = false;
     setSessionActive(true);

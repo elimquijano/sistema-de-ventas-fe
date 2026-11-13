@@ -23,6 +23,45 @@ export const findFirstValidRoute = (items) => {
 
 const GOOGLE_MAPS_ANDROID_PACKAGE = "com.google.android.apps.maps";
 
+export const isAppleDevice = (deviceNavigator = navigator) => {
+  const userAgent = deviceNavigator?.userAgent || "";
+  const platform =
+    deviceNavigator?.userAgentData?.platform ||
+    deviceNavigator?.platform ||
+    "";
+
+  return (
+    /iPad|iPhone|iPod|Mac/i.test(`${userAgent} ${platform}`) ||
+    (platform === "MacIntel" && Number(deviceNavigator?.maxTouchPoints) > 1)
+  );
+};
+
+export const buildPreferredMapsLocationUrl = (
+  { latitude, longitude, address },
+  deviceNavigator = navigator,
+) => {
+  const hasCoordinates =
+    Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude));
+  const query = hasCoordinates
+    ? `${Number(latitude)},${Number(longitude)}`
+    : String(address || "").trim();
+
+  if (!query) return "";
+
+  if (isAppleDevice(deviceNavigator)) {
+    const params = new URLSearchParams();
+    if (hasCoordinates) {
+      params.set("ll", query);
+      params.set("q", String(address || "Ubicación"));
+    } else {
+      params.set("q", query);
+    }
+    return `https://maps.apple.com/?${params.toString()}`;
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+};
+
 /**
  * Builds an Android intent that targets the Google Maps application directly.
  * The browser fallback keeps the link useful when Maps is not installed.
@@ -55,4 +94,21 @@ export const openGoogleMaps = (googleMapsUrl) => {
   }
 
   window.open(googleMapsUrl, "_blank", "noopener,noreferrer");
+};
+
+
+export const openPreferredMapsLocation = (location) => {
+  const mapsUrl = buildPreferredMapsLocationUrl(location);
+  if (!mapsUrl) return false;
+
+  const androidBridge = window.Android?.openExternalUrl;
+  if (typeof androidBridge === "function") {
+    androidBridge.call(window.Android, mapsUrl);
+  } else if (/Android/i.test(navigator.userAgent)) {
+    window.location.assign(buildGoogleMapsIntentUrl(mapsUrl));
+  } else {
+    window.open(mapsUrl, "_blank", "noopener,noreferrer");
+  }
+
+  return true;
 };

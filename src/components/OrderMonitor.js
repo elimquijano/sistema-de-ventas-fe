@@ -82,7 +82,10 @@ import {
   hasPaymentImagesInProgress,
 } from "../utils/paymentFormData";
 import { getApiErrorMessage } from "../utils/apiErrors";
-import { openGoogleMaps } from "../utils/navigationUtils";
+import {
+  openGoogleMaps,
+  openPreferredMapsLocation,
+} from "../utils/navigationUtils";
 import currentLocationMarker from "../assets/images/current-location-marker.png";
 
 const Transition = React.forwardRef(function Transition(props, ref) {
@@ -175,20 +178,19 @@ const OrderCard = ({
     const coordinates = getOrderClientCoordinates(order);
     const address = getOrderClientAddress(order);
 
-    let url = "";
-    if (coordinates) {
-      url = `https://www.google.com/maps/search/?api=1&query=${coordinates[0]},${coordinates[1]}`;
-    } else if (address) {
-      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    }
+    const opened = openPreferredMapsLocation({
+      latitude: coordinates?.[0],
+      longitude: coordinates?.[1],
+      address,
+    });
 
-    if (url) openGoogleMaps(url);
-    else
+    if (!opened) {
       notificationSwal(
         "Error",
         "No hay ubicación ni dirección disponible.",
         "error",
       );
+    }
   };
 
   const clientName = order.client?.name || "Cliente no disponible";
@@ -434,7 +436,7 @@ const OrderCard = ({
             size="small"
             sx={{ color: "info.main" }}
             onClick={handleOpenGoogleMaps}
-            title="Ver en Google Maps"
+            title="Abrir ubicación en Mapas"
           >
             <LocationOnIcon fontSize="small" />
           </IconButton>

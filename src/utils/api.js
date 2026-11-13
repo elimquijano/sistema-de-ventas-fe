@@ -434,13 +434,21 @@ export const assetLoansAPI = {
 
 export const payrollAPI = {
   getConfig: (userId) => api.get(`/payroll/config/${userId}`, { loaderMessage: "Obteniendo configuración de planilla..." }),
-  setConfig: (userId, configData) => api.post(`/payroll/config/${userId}`, configData, { loaderMessage: "Configurando planilla..." }),
+  setConfig: (userId, configData) => api.put(`/payroll/config/${userId}`, configData, { loaderMessage: "Configurando planilla..." }),
   getAttendance: (params = {}) => api.get("/payroll/attendance", { params, loaderMessage: "Cargando asistencia..." }),
+  getAttendanceById: (id) => api.get(`/payroll/attendance/${id}`, { loaderMessage: "Obteniendo asistencia..." }),
   saveAttendance: (attendanceData) => api.post("/payroll/attendance", attendanceData, { loaderMessage: "Registrando asistencia..." }),
+  updateAttendance: (id, attendanceData) => api.patch(`/payroll/attendance/${id}`, attendanceData, { loaderMessage: "Actualizando asistencia..." }),
+  deleteAttendance: (id) => api.delete(`/payroll/attendance/${id}`, { loaderMessage: "Eliminando asistencia..." }),
+  saveBulkAbsences: (data) => api.post("/payroll/attendance/bulk-absences", data, { loaderMessage: "Registrando faltas..." }),
   getAdvances: (params = {}) => api.get("/payroll/advances", { params, loaderMessage: "Cargando adelantos..." }),
+  getAdvance: (id) => api.get(`/payroll/advances/${id}`, { loaderMessage: "Obteniendo adelanto..." }),
   saveAdvance: (advanceData) => api.post("/payroll/advances", advanceData, { loaderMessage: "Registrando adelanto..." }),
+  updateAdvance: (id, advanceData) => api.patch(`/payroll/advances/${id}`, advanceData, { loaderMessage: "Actualizando adelanto..." }),
+  deleteAdvance: (id) => api.delete(`/payroll/advances/${id}`, { loaderMessage: "Eliminando adelanto..." }),
   calculate: (userId, params) => api.get(`/payroll/calculate/${userId}`, { params, loaderMessage: "Calculando pago..." }),
   pay: (userId, paymentData) => api.post(`/payroll/pay/${userId}`, paymentData, { loaderMessage: "Procesando pago de planilla..." }),
+  getPayments: (params = {}) => api.get("/payroll/payments", { params, loaderMessage: "Cargando pagos de planilla..." }),
 };
 
 export default api;

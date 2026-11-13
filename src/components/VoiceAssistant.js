@@ -39,13 +39,13 @@ const DEEPSEEK_MODEL = "deepseek-v4-flash";
 const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
 const GEOAPIFY_API_KEY = process.env.REACT_APP_GEOAPIFY_API_KEY;
 const SCREEN_FIELD_GUIDE = {
-  Orders: ["cliente (nombre/telefono)", "direccion y referencia", "productos o servicios con cantidad", "motorizado", "fecha/hora opcional", "descuento opcional", "notas"],
+  Orders: ["crear pedido", "editar pedido pendiente", "agendar o quitar agenda", "cliente (nombre/telefono)", "direccion y referencia", "productos o servicios con cantidad", "motorizado", "total", "fecha/hora opcional", "descuento opcional", "notas"],
   Products: ["nombre", "descripcion", "categoria", "precio", "costo", "stock", "stock minimo", "codigo de barras", "imagen"],
   Services: ["nombre", "descripcion", "categoria", "precio", "duracion", "estado", "imagen"],
   Clients: ["nombre", "telefono", "direccion", "detalle de direccion", "coordenadas", "ruta", "tiempo estimado", "distancia aproximada"],
   Expenses: ["descripcion", "importe", "categoria", "fecha", "comprobante", "notas"],
   Purchases: ["proveedor", "fecha", "productos", "cantidades", "costo unitario", "notas"],
-  CashRegisters: ["monto inicial", "efectivo contado al cierre", "reporte de caja (solo lectura)"],
+  CashRegisters: ["abrir caja", "cerrar caja", "reabrir caja cerrada por numero o responsable", "monto inicial", "efectivo contado al cierre", "reporte de caja (solo lectura)"],
   AssetLoans: ["bien", "beneficiario", "cantidad", "fecha prevista de devolucion", "estado de devolucion", "notas"],
   Assets: ["nombre", "descripcion", "tipo", "cantidad total", "cantidad disponible", "precio unitario", "estado"],
   Sales: ["numero de venta/pedido", "cliente", "estado", "forma de pago", "total", "detalle de items"],
@@ -111,6 +111,12 @@ const mergeVoiceData = (previous = {}, incoming = {}) => {
 };
 const getRiderName = (rider) =>
   rider.full_name || `${rider.first_name || ""} ${rider.last_name || ""}`.trim();
+const normalizeOrderItemType = (type) => {
+  const normalized = normalizeText(type);
+  if (normalized.includes("product")) return "product";
+  if (normalized.includes("service")) return "service";
+  return "";
+};
 const BUSINESS_QUERY_TOOL = {
   type: "function",
   function: {
@@ -146,21 +152,24 @@ const BUSINESS_ACTION_TOOL = {
   type: "function",
   function: {
     name: "prepare_business_action",
-    description: "Prepara una operación real de caja, pedido, préstamo/devolución de bienes o compra. Siempre requiere confirmación oral antes de ejecutar. Si falta un dato, pide solo ese dato.",
+    description: "Prepara una operación real de caja, pedido, préstamo/devolución de bienes o compra. Permite reabrir caja y editar o agendar pedidos pendientes. Siempre requiere confirmación oral antes de ejecutar.",
     parameters: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["open_cash", "close_cash", "cash_report", "cancel_order", "charge_order", "lend_asset", "return_asset", "create_purchase"] },
+        action: { type: "string", enum: ["open_cash", "close_cash", "reopen_cash", "cash_report", "cancel_order", "charge_order", "edit_order", "schedule_order", "lend_asset", "return_asset", "create_purchase"] },
         query: { type: ["string", "null"], description: "Número de pedido o nombre de producto, bien o persona." },
-        amount: { type: ["number", "null"], description: "Importe de apertura/cierre/cobro." },
+        amount: { type: ["number", "null"], description: "Importe de apertura, cierre, cobro o nuevo total de un pedido." },
         detail: { type: ["string", "null"], description: "Proveedor, beneficiario o notas." },
         quantity: { type: ["integer", "null"], minimum: 1 },
         date: { type: ["string", "null"], description: "Fecha YYYY-MM-DD; en préstamos puede ser fecha de devolución." },
         payment_method: { type: ["string", "null"], enum: ["cash", "yape", "plin", "card", "transfer", "credit", "discount", "vale", null] },
         status: { type: ["string", "null"], enum: ["returned", "damaged", "lost", null] },
-        items: { type: ["array", "null"], items: { type: "object", properties: { name: { type: "string" }, quantity: { type: "integer", minimum: 1 }, cost: { type: "number", minimum: 0 } }, required: ["name", "quantity", "cost"], additionalProperties: false } },
+        rider_name: { type: ["string", "null"], description: "Nombre del motorizado nuevo al editar un pedido." },
+        scheduled_at: { type: ["string", "null"], description: "Fecha y hora local YYYY-MM-DDTHH:mm para agendar un pedido; null para quitar la agenda." },
+        remove_schedule: { type: ["boolean", "null"], description: "true únicamente cuando la persona pide quitar la fecha programada." },
+        items: { type: ["array", "null"], description: "En compras incluye costo. Al editar pedidos, cada elemento cambia la cantidad indicada; cantidad 0 quita el elemento.", items: { type: "object", properties: { name: { type: "string" }, type: { type: ["string", "null"], enum: ["product", "service", null] }, quantity: { type: "integer", minimum: 0 }, cost: { type: ["number", "null"], minimum: 0 } }, required: ["name", "type", "quantity", "cost"], additionalProperties: false } },
       },
-      required: ["action", "query", "amount", "detail", "quantity", "date", "payment_method", "status", "items"],
+      required: ["action", "query", "amount", "detail", "quantity", "date", "payment_method", "status", "rider_name", "scheduled_at", "remove_schedule", "items"],
       additionalProperties: false,
     },
   },
@@ -561,7 +570,19 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
       Object.assign(args, mergedOperation);
       orderInputDraftRef.current = null;
       expenseInputDraftRef.current = null;
-      const routeFor = { open_cash: "CashRegisters", close_cash: "CashRegisters", cash_report: "CashRegisters", cancel_order: "Orders", charge_order: "Orders", lend_asset: "AssetLoans", return_asset: "AssetLoans", create_purchase: "Purchases" };
+      const routeFor = {
+        open_cash: "CashRegisters",
+        close_cash: "CashRegisters",
+        reopen_cash: "CashRegisters",
+        cash_report: "CashRegisters",
+        cancel_order: "Orders",
+        charge_order: "Orders",
+        edit_order: "Orders",
+        schedule_order: "Orders",
+        lend_asset: "AssetLoans",
+        return_asset: "AssetLoans",
+        create_purchase: "Purchases",
+      };
       const section = args.action;
       if (!pagesRef.current.some((page) => page.component === routeFor[section])) return { ok: false, error: "No tienes acceso a esa pantalla." };
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Lima", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -578,6 +599,34 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
         if (args.amount == null || !Number.isFinite(amount) || amount < 0) return { ok: false, missing: ["monto inicial de la caja"] };
         return draft(section, `Abrir caja con ${formatCurrency(amount, currency)}.`, { initial_amount: amount, currency });
       }
+      if (section === "reopen_cash") {
+        const query = normalizeText(args.query || "").replace(/^#/, "");
+        if (!query) return { ok: false, missing: ["número o responsable de la caja cerrada"] };
+        const closedRegisters = await list(cashRegisterAPI, { status: "closed" });
+        const matches = closedRegisters.filter((register) =>
+          String(register.id) === query ||
+          normalizeText(register.opened_by?.full_name || register.opened_by_name || "").includes(query),
+        );
+        if (matches.length !== 1) {
+          return {
+            ok: false,
+            matches: matches.slice(0, 6).map((register) => ({
+              id: register.id,
+              responsible: register.opened_by?.full_name || register.opened_by_name,
+              closed_at: register.closed_at,
+            })),
+            error: matches.length
+              ? "Hay varias cajas cerradas coincidentes; pide el número exacto."
+              : "No encontré esa caja entre las cajas cerradas.",
+          };
+        }
+        const register = matches[0];
+        return draft(
+          section,
+          `Reabrir caja #${register.id} de ${register.opened_by?.full_name || register.opened_by_name || "su responsable"}.`,
+          { id: register.id },
+        );
+      }
       if (section === "close_cash" || section === "cash_report") {
         const current = unwrapOne(await cashRegisterAPI.getCurrent());
         const register = Array.isArray(current) ? current[0] : current;
@@ -589,6 +638,131 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
         const finalAmount = args.amount != null && Number.isFinite(Number(args.amount)) ? Number(args.amount) : Number(register.total_in_cash ?? register.expected_amount ?? 0);
         if (finalAmount < 0) return { ok: false, error: "El monto final no puede ser negativo." };
         return draft(section, `Cerrar caja de ${register.opened_by?.full_name || "la sesión actual"} reportando ${formatCurrency(finalAmount, register.currency || currency)} como efectivo contado.`, { id: register.id, final_amount: finalAmount });
+      }
+      if (section === "edit_order" || section === "schedule_order") {
+        const query = normalizeText(args.query || "").replace(/^#/, "");
+        if (!query) return { ok: false, missing: ["número de pedido"] };
+        const records = unwrapRows(await salesAPI.getAll({ status: "pending", is_delivery: 1, search: buildSearchKeywords(args.query), per_page: 50 }));
+        const exact = records.filter((sale) =>
+          String(sale.id) === query ||
+          normalizeText(sale.sale_number || "").replace(/^#/, "") === query,
+        );
+        const matches = exact.length ? exact : records.filter((sale) =>
+          normalizeText(sale.sale_number || "").includes(query) ||
+          normalizeText(sale.client?.name || sale.customer_name || "").includes(query),
+        );
+        if (matches.length !== 1) {
+          return {
+            ok: false,
+            matches: matches.slice(0, 5).map((sale) => ({
+              sale_number: sale.sale_number,
+              customer: sale.client?.name || sale.customer_name,
+              total: sale.total_amount,
+              scheduled_at: sale.scheduled_at,
+            })),
+            error: matches.length
+              ? "Hay varios pedidos posibles; pide un número exacto."
+              : "No encontré ese pedido pendiente.",
+          };
+        }
+        const summarySale = matches[0];
+        const detailResponse = await salesAPI.getById(summarySale.id);
+        const sale = detailResponse.data?.data || detailResponse.data || summarySale;
+
+        if (section === "schedule_order") {
+          const scheduledAt = args.scheduled_at;
+          if (scheduledAt == null && args.remove_schedule !== true) {
+            return { ok: false, missing: ["fecha y hora para agendar el pedido"] };
+          }
+          if (scheduledAt != null && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(scheduledAt)) {
+            return { ok: false, error: "La fecha debe incluir día y hora, por ejemplo 2026-11-15T16:30." };
+          }
+          const scheduleLabel = scheduledAt
+            ? `Agendar pedido ${sale.sale_number} para ${String(scheduledAt).replace("T", " a las ")}.`
+            : `Quitar la fecha programada del pedido ${sale.sale_number} para entregarlo cuanto antes.`;
+          return draft(section, scheduleLabel, { id: sale.id, scheduled_at: scheduledAt });
+        }
+
+        const payload = {};
+        const changes = [];
+        if (args.amount != null) {
+          const totalAmount = Number(args.amount);
+          if (!Number.isFinite(totalAmount) || totalAmount < 0) return { ok: false, error: "El nuevo total debe ser mayor o igual a cero." };
+          payload.total_amount = totalAmount;
+          changes.push(`total ${formatCurrency(totalAmount, currency)}`);
+        }
+        if (args.detail != null && String(args.detail).trim()) {
+          payload.notes = String(args.detail).trim();
+          payload.delivery_notes = payload.notes;
+          changes.push("actualizar notas");
+        }
+        if (args.scheduled_at != null) {
+          if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(args.scheduled_at)) {
+            return { ok: false, error: "La fecha debe incluir día y hora, por ejemplo 2026-11-15T16:30." };
+          }
+          payload.scheduled_at = args.scheduled_at;
+          changes.push(`agendar para ${String(args.scheduled_at).replace("T", " a las ")}`);
+        }
+        if (args.rider_name) {
+          const riderQuery = normalizeText(args.rider_name);
+          const riderMatches = (await getRiders(args.rider_name)).filter((rider) => normalizeText(getRiderName(rider)).includes(riderQuery));
+          if (riderMatches.length !== 1) {
+            return {
+              ok: false,
+              matches: riderMatches.slice(0, 6).map((rider) => ({ id: rider.id, name: getRiderName(rider) })),
+              error: riderMatches.length ? "Hay varios motorizados parecidos; precisa el nombre." : "No encontré ese motorizado activo.",
+            };
+          }
+          payload.rider_id = riderMatches[0].id;
+          changes.push(`asignar a ${getRiderName(riderMatches[0])}`);
+        }
+        if (Array.isArray(args.items) && args.items.length) {
+          const finalItems = (sale.items || []).map((item) => ({
+            id: item.item_id ?? item.id,
+            type: normalizeOrderItemType(item.item_type ?? item.type),
+            quantity: Number(item.quantity),
+            name: item.item_name || item.name,
+          }));
+          for (const requested of args.items) {
+            const itemQuery = normalizeText(requested.name || "");
+            if (!itemQuery) return { ok: false, error: "Indica el nombre del producto o servicio que deseas cambiar." };
+            let itemIndex = finalItems.findIndex((item) =>
+              (!requested.type || item.type === requested.type) &&
+              normalizeText(item.name).includes(itemQuery),
+            );
+            if (itemIndex < 0 && Number(requested.quantity) > 0) {
+              const requestedTypes = requested.type ? [requested.type] : ["product", "service"];
+              const catalogMatches = [];
+              for (const itemType of requestedTypes) {
+                const response = itemType === "product"
+                  ? await productsAPI.getAll({ search: buildSearchKeywords(requested.name), per_page: 20 })
+                  : await servicesAPI.getAll({ search: buildSearchKeywords(requested.name), per_page: 20 });
+                unwrapRows(response)
+                  .filter((item) => normalizeText(item.name).includes(itemQuery))
+                  .forEach((item) => catalogMatches.push({ ...item, type: itemType }));
+              }
+              if (catalogMatches.length !== 1) {
+                return {
+                  ok: false,
+                  matches: catalogMatches.slice(0, 6).map((item) => ({ id: item.id, name: item.name, type: item.type })),
+                  error: catalogMatches.length ? `Hay varios artículos parecidos a ${requested.name}; precisa cuál.` : `No encontré ${requested.name}.`,
+                };
+              }
+              finalItems.push({ id: catalogMatches[0].id, type: catalogMatches[0].type, quantity: 0, name: catalogMatches[0].name });
+              itemIndex = finalItems.length - 1;
+            }
+            if (itemIndex < 0) return { ok: false, error: `${requested.name} no está en el pedido.` };
+            const quantity = Number(requested.quantity);
+            if (!Number.isInteger(quantity) || quantity < 0) return { ok: false, error: `La cantidad de ${requested.name} debe ser un número entero.` };
+            if (quantity === 0) finalItems.splice(itemIndex, 1);
+            else finalItems[itemIndex].quantity = quantity;
+          }
+          if (!finalItems.length) return { ok: false, error: "El pedido debe conservar al menos un producto o servicio." };
+          payload.items = finalItems.map(({ id, type, quantity }) => ({ id, type, quantity }));
+          changes.push(`dejar artículos: ${finalItems.map((item) => `${item.quantity} ${item.name}`).join(", ")}`);
+        }
+        if (!changes.length) return { ok: false, missing: ["el cambio que deseas hacer en el pedido"] };
+        return draft("edit_order", `Editar pedido ${sale.sale_number}: ${changes.join("; ")}.`, { id: sale.id, data: payload });
       }
       if (section === "cancel_order" || section === "charge_order") {
         const query = normalizeText(args.query || "");
@@ -642,7 +816,7 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
           const products = unwrapRows(response);
           const name = normalizeText(requested.name || "");
           const matches = products.filter((product) => normalizeText(product.name).includes(name));
-          if (!Number.isInteger(Number(requested.quantity)) || Number(requested.quantity) < 1 || !Number.isFinite(Number(requested.cost)) || Number(requested.cost) < 0) return { ok: false, error: `Revisa cantidad y costo de ${requested.name || "un producto"}.` };
+          if (!Number.isInteger(Number(requested.quantity)) || Number(requested.quantity) < 1 || requested.cost == null || !Number.isFinite(Number(requested.cost)) || Number(requested.cost) < 0) return { ok: false, error: `Revisa cantidad y costo de ${requested.name || "un producto"}.` };
           if (matches.length !== 1) return { ok: false, matches: matches.slice(0, 5).map((product) => ({ name: product.name, id: product.id })), error: matches.length ? `Hay varios productos parecidos a ${requested.name}; especifica cuál.` : `No encontré el producto ${requested.name}.` };
           normalizedItems.push({ id: matches[0].id, name: matches[0].name, quantity: Number(requested.quantity), cost: Number(requested.cost) });
         }
@@ -968,8 +1142,8 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
     ];
     const authorizedSections = querySections.filter(([, components]) => components.some((component) => availableComponents.has(component)));
     const actionComponents = {
-      open_cash: "CashRegisters", close_cash: "CashRegisters", cash_report: "CashRegisters",
-      cancel_order: "Orders", charge_order: "Orders", lend_asset: "AssetLoans",
+      open_cash: "CashRegisters", close_cash: "CashRegisters", reopen_cash: "CashRegisters", cash_report: "CashRegisters",
+      cancel_order: "Orders", charge_order: "Orders", edit_order: "Orders", schedule_order: "Orders", lend_asset: "AssetLoans",
       return_asset: "AssetLoans", create_purchase: "Purchases",
     };
     const availableActions = Object.keys(actionComponents).filter((action) => availableComponents.has(actionComponents[action]));
@@ -1141,8 +1315,12 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
     setMessage("Ejecutando la operación confirmada...");
     try {
       const { operation, payload } = pending;
-      if (operation === "open_cash") await cashRegisterAPI.create(payload);
-      else if (operation === "close_cash") await cashRegisterAPI.close(payload.id, { final_amount: payload.final_amount });
+      let response;
+      if (operation === "open_cash") response = await cashRegisterAPI.create(payload);
+      else if (operation === "close_cash") response = await cashRegisterAPI.close(payload.id, { final_amount: payload.final_amount });
+      else if (operation === "reopen_cash") response = await cashRegisterAPI.reopen(payload.id);
+      else if (operation === "edit_order") response = await salesAPI.updateQuickOrder(payload.id, payload.data);
+      else if (operation === "schedule_order") response = await salesAPI.updateQuickOrder(payload.id, { scheduled_at: payload.scheduled_at });
       else if (operation === "cancel_order") await salesAPI.cancelOrder(payload.id);
       else if (operation === "charge_order") {
         const formData = new FormData();
@@ -1166,14 +1344,18 @@ export const VoiceAssistant = ({ menuModules, navigate, currentPath = "", curren
       }
       pendingOperationRef.current = null;
       operationInputDraftRef.current = null;
-      const reply = "Operación realizada correctamente.";
+      const reply = response?.data?.message || "Operación realizada correctamente.";
       messagesRef.current = [...messagesRef.current, { role: "assistant", content: reply }];
       setMessage(reply);
       speak(reply);
     } catch (error) {
       console.error("Voice operation failed:", error);
       const status = error.response?.status;
-      const reply = status && status < 500 ? error.response?.data?.message || "El servidor rechazó la operación. Revisa los datos e inténtalo de nuevo." : "No pude confirmar el resultado del servidor. Revisa esa pantalla antes de repetir la operación.";
+      const conflictId = error.response?.data?.conflicting_cash_register_id;
+      const serverMessage = error.response?.data?.message;
+      const reply = status && status < 500
+        ? `${serverMessage || "El servidor rechazó la operación. Revisa los datos e inténtalo de nuevo."}${conflictId ? ` La caja abierta que genera el conflicto es la #${conflictId}.` : ""}`
+        : "No pude confirmar el resultado del servidor. Revisa esa pantalla antes de repetir la operación.";
       if (!status || status >= 500) pendingOperationRef.current = null;
       setMessage(reply);
       speak(reply);
@@ -1307,7 +1489,7 @@ PEDIDOS: Si dan nombre o telefono, busca primero el cliente registrado con searc
 
 CONSULTAS: Usa query_business_data para resumen, ventas, pedidos, productos/stock, servicios, clientes, gastos, compras, creditos, prestamos, caja, bienes o personal, segun las secciones autorizadas. Busca con el filtro indicado y resume resultados reales con claridad. Para caja, reporta efectivo esperado/contado, diferencia, ingresos manuales, ventas en efectivo y cantidad de ventas cuando existan. Un reporte es de solo lectura y no requiere confirmacion.
 
-OPERACIONES: Puedes abrir/cerrar caja, cancelar o cobrar pedidos, prestar/devolver bienes y registrar compras con prepare_business_action; preparar gastos con prepare_expense. Verifica datos y permisos con las herramientas. Para gastos valida descripcion, importe positivo, categoria existente y fecha; nunca inventes categorias. Toda escritura se prepara, se resume y espera confirmacion oral explicita antes de ejecutarse. No digas que se completo hasta que el sistema lo confirme. Si una herramienta indica que falta un dato, pregunta por ese dato y continua. Para saludos o preguntas generales responde directamente.` ,
+OPERACIONES: Puedes abrir, cerrar o reabrir una caja; editar o agendar pedidos pendientes; cancelar o cobrar pedidos; prestar/devolver bienes y registrar compras con prepare_business_action; preparar gastos con prepare_expense. Para reabrir una caja pide su numero o responsable. Para editar un pedido pide su numero y el cambio: total, notas, motorizado, fecha o articulos. En articulos, quantity es la cantidad final deseada y cero significa quitarlo; el sistema conserva los demas articulos. Para agendar usa fecha y hora local YYYY-MM-DDTHH:mm. Usa remove_schedule true y scheduled_at null solo cuando la persona pide quitar la agenda; si quiere agendar y falta la fecha, preguntala antes de preparar. Verifica datos y permisos con las herramientas. Para gastos valida descripcion, importe positivo, categoria existente y fecha; nunca inventes categorias. Toda escritura se prepara, se resume y espera confirmacion oral explicita antes de ejecutarse. No digas que se completo hasta que el sistema lo confirme. Si una herramienta indica que falta un dato, pregunta por ese dato y continua. Para saludos o preguntas generales responde directamente.` ,
       }];
     }
     messagesRef.current = [...messagesRef.current, { role: "user", content: spokenText }];

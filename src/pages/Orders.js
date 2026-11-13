@@ -1225,6 +1225,8 @@ export const Orders = () => {
           <OrderMonitor
             orders={pendingOrders}
             riders={riders}
+            products={products}
+            services={services}
             userLocation={userLocation}
             onRefresh={loadPendingOrders}
             currency={currency}

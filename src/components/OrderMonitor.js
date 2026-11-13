@@ -35,6 +35,8 @@ import {
   CircularProgress,
   FormControlLabel,
   Switch,
+  Autocomplete,
+  Avatar,
 } from "@mui/material";
 import {
   Payment as PaymentIcon,
@@ -49,13 +51,12 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   AttachMoney as MoneyIcon,
-  PriceCheck as PriceCheckIcon,
-  CreditCard as CreditCardIcon,
-  AddCard as AddCardIcon,
   Add as AddIcon,
-  Clear as ClearIcon,
+  Remove as RemoveIcon,
   Directions as DirectionsIcon,
   Notes as NotesIcon,
+  Inventory as InventoryIcon,
+  Build as BuildIcon,
 } from "@mui/icons-material";
 import {
   MapContainer,
@@ -74,7 +75,6 @@ import {
 } from "../utils/formatters";
 import { salesAPI } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
-import { compressImage } from "../utils/imageCompression";
 import { PaymentMethodSelector } from "./PaymentMethodSelector";
 import {
   buildPaymentsFormData,
@@ -117,6 +117,13 @@ const getOrderClientCoordinates = (order) => {
 };
 
 const getOrderClientAddress = (order) => order?.client?.address;
+
+const normalizeOrderItemType = (type) => {
+  const normalized = String(type || "").toLowerCase();
+  if (normalized.includes("product")) return "product";
+  if (normalized.includes("service")) return "service";
+  return "";
+};
 
 const MapFitBounds = ({ orders, userLocation, autoFitPausedRef }) => {
   const map = useMap();
@@ -454,6 +461,8 @@ const OrderCard = ({
 export const OrderMonitor = ({
   orders,
   riders,
+  products = [],
+  services = [],
   userLocation,
   onRefresh,
   isRiderView = false,
@@ -559,6 +568,15 @@ export const OrderMonitor = ({
   // States for Edit Order
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [editingOrder, setEditingOrder] = useState(null);
+  const [editItemToAdd, setEditItemToAdd] = useState(null);
+
+  const editableCatalog = useMemo(
+    () => [
+      ...products.map((item) => ({ ...item, type: "product" })),
+      ...services.map((item) => ({ ...item, type: "service" })),
+    ],
+    [products, services],
+  );
 
   // States for Change Rider (keeping for backward compatibility or simple use)
   const [selectedOrderForRider, setSelectedOrderForRider] = useState(null);
@@ -592,9 +610,13 @@ export const OrderMonitor = ({
       total_amount: order.total_amount || 0,
       items: (order.items || []).map((item) => ({
         ...item,
+        id: item.item_id ?? item.id,
+        type: normalizeOrderItemType(item.item_type ?? item.type),
+        name: item.item_name || item.name,
         quantity: String(item.quantity ?? 1),
       })),
     });
+    setEditItemToAdd(null);
     setOpenEditDialog(true);
   };
 
@@ -612,7 +634,49 @@ export const OrderMonitor = ({
     }));
   };
 
+  const handleAddEditItem = () => {
+    if (!editItemToAdd) return;
+    setEditingOrder((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        {
+          id: editItemToAdd.id,
+          type: editItemToAdd.type,
+          name: editItemToAdd.name,
+          item_name: editItemToAdd.name,
+          quantity: "1",
+        },
+      ],
+    }));
+    setEditItemToAdd(null);
+  };
+
+  const handleChangeEditItemQuantity = (itemIndex, change) => {
+    setEditingOrder((prev) => ({
+      ...prev,
+      items: prev.items.map((item, index) => {
+        if (index !== itemIndex) return item;
+        return {
+          ...item,
+          quantity: String(Math.max(1, Number(item.quantity || 1) + change)),
+        };
+      }),
+    }));
+  };
+
+  const handleRemoveEditItem = (itemIndex) => {
+    setEditingOrder((prev) => ({
+      ...prev,
+      items: prev.items.filter((_, index) => index !== itemIndex),
+    }));
+  };
+
   const handleUpdateOrder = async () => {
+    if (!editingOrder.items.length) {
+      notificationSwal("Pedido vacío", "El pedido debe conservar al menos un producto o servicio.", "warning");
+      return;
+    }
     const hasInvalidQuantity = editingOrder.items.some(
       (item) => !Number.isInteger(Number(item.quantity)) || Number(item.quantity) < 1,
     );
@@ -620,17 +684,24 @@ export const OrderMonitor = ({
       notificationSwal("Cantidad no valida", "Cada producto debe tener una cantidad de al menos 1.", "warning");
       return;
     }
+    const totalAmount = Number(editingOrder.total_amount);
+    if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+      notificationSwal("Monto no válido", "El total debe ser un número mayor o igual a cero.", "warning");
+      return;
+    }
     setIsSubmitting(true);
     try {
-      // Enviar tanto delivery_notes como notes para asegurar compatibilidad
       const updateData = {
-        ...editingOrder,
+        rider_id: editingOrder.rider_id,
+        scheduled_at: editingOrder.scheduled_at || null,
+        total_amount: totalAmount,
+        delivery_notes: editingOrder.delivery_notes,
+        notes: editingOrder.delivery_notes,
         items: editingOrder.items.map((item) => ({
-          id: item.item_id ?? item.id,
-          type: item.item_type ?? item.type,
+          id: item.id,
+          type: normalizeOrderItemType(item.type),
           quantity: Number(item.quantity),
         })),
-        notes: editingOrder.delivery_notes, // Copiar para compatibilidad
       };
       await salesAPI.updateQuickOrder(editingOrder.id, updateData);
       notificationSwal("Éxito", "Pedido actualizado.", "success");
@@ -639,7 +710,7 @@ export const OrderMonitor = ({
     } catch (e) {
       notificationSwal(
         "Error",
-        e.response?.data?.message || "No se pudo actualizar.",
+        getApiErrorMessage(e, "No se pudo actualizar."),
         "error",
       );
     } finally {
@@ -975,118 +1046,255 @@ export const OrderMonitor = ({
       <Dialog
         open={openEditDialog}
         onClose={() => setOpenEditDialog(false)}
-        maxWidth="xs"
+        maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            overflow: "hidden",
+            bgcolor: "background.paper",
+            backgroundImage: "none",
+          },
+        }}
       >
-        <DialogTitle sx={{ fontWeight: 700 }}>Editar Pedido</DialogTitle>
-        <DialogContent dividers>
+        <DialogTitle
+          sx={{
+            fontWeight: 800,
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
+          <EditIcon /> Editar pedido
+        </DialogTitle>
+        <DialogContent sx={{ bgcolor: "background.default", py: 2.5 }}>
           {editingOrder && (
-            <Stack spacing={2.5} sx={{ mt: 1 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Motorizado</InputLabel>
-                <Select
-                  name="rider_id"
-                  value={editingOrder.rider_id}
-                  label="Motorizado"
-                  onChange={handleEditChange}
-                >
-                  {riders.map((r) => (
-                    <MenuItem key={r.id} value={r.id}>
-                      {r.full_name || `${r.first_name} ${r.last_name || ""}`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-              <TextField
-                label="Fecha Programada"
-                name="scheduled_at"
-                type="datetime-local"
-                value={editingOrder.scheduled_at}
-                onChange={handleEditChange}
-                fullWidth
-                size="small"
-                InputLabelProps={{ shrink: true }}
-              />
-              {editingOrder.items.length > 0 && (
-                <Stack spacing={1.25}>
-                  <Typography variant="subtitle2" fontWeight={700}>
-                    Productos del pedido
+            <Stack spacing={2.25} sx={{ mt: 1 }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  borderColor: "warning.main",
+                  bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.1 : 0.06),
+                  backgroundImage: "none",
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle2" fontWeight={800} color="warning.main">
+                    <ScheduleIcon sx={{ fontSize: 18, verticalAlign: "middle", mr: 0.75 }} />
+                    ¿Cuándo se entrega?
                   </Typography>
-                  {editingOrder.items.map((item, index) => (
-                    <Grid
-                      container
-                      spacing={1}
-                      alignItems="center"
-                      key={`${item.item_type ?? item.type}-${item.item_id ?? item.id}-${index}`}
-                    >
-                      <Grid item xs={8}>
-                        <Typography variant="body2" fontWeight={600}>
-                          {item.item_name || item.name || `Producto ${index + 1}`}
-                        </Typography>
-                      </Grid>
-                      <Grid item xs={4}>
-                        <TextField
-                          label="Cantidad"
-                          type="number"
-                          inputProps={{ min: 1, step: 1 }}
-                          value={item.quantity}
-                          onChange={(event) =>
-                            handleEditItemQuantity(index, event.target.value)
-                          }
-                          fullWidth
-                          size="small"
-                        />
-                      </Grid>
-                    </Grid>
-                  ))}
-                </Stack>
-              )}
-              <Grid container spacing={2}>
-                <Grid item xs={12}>
                   <TextField
-                    label="Total"
+                    label="Fecha y hora de entrega"
+                    name="scheduled_at"
+                    type="datetime-local"
+                    value={editingOrder.scheduled_at}
+                    onChange={handleEditChange}
+                    fullWidth
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                  />
+                  {editingOrder.scheduled_at && (
+                    <Button
+                      size="small"
+                      color="warning"
+                      onClick={() => setEditingOrder((prev) => ({ ...prev, scheduled_at: "" }))}
+                      sx={{ alignSelf: "flex-start" }}
+                    >
+                      Quitar fecha y entregar cuanto antes
+                    </Button>
+                  )}
+                </Stack>
+              </Paper>
+
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 2, bgcolor: "background.paper", backgroundImage: "none" }}
+              >
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle2" fontWeight={800} color="warning.main">
+                    <LocalShippingIcon sx={{ fontSize: 18, verticalAlign: "middle", mr: 0.75 }} />
+                    ¿Quién lo entrega?
+                  </Typography>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Motorizado</InputLabel>
+                    <Select
+                      name="rider_id"
+                      value={editingOrder.rider_id}
+                      label="Motorizado"
+                      onChange={handleEditChange}
+                    >
+                      {riders.map((r) => (
+                        <MenuItem key={r.id} value={r.id}>
+                          {r.full_name || `${r.first_name} ${r.last_name || ""}`}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Stack>
+              </Paper>
+
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 2,
+                  borderRadius: 2,
+                  borderColor: "info.main",
+                  bgcolor: alpha(theme.palette.info.main, theme.palette.mode === "dark" ? 0.1 : 0.04),
+                  backgroundImage: "none",
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle2" fontWeight={800} color="info.main">
+                    <InventoryIcon sx={{ fontSize: 18, verticalAlign: "middle", mr: 0.75 }} />
+                    ¿Qué lleva el pedido?
+                  </Typography>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                    <Autocomplete
+                      fullWidth
+                      size="small"
+                      value={editItemToAdd}
+                      options={editableCatalog.filter(
+                        (catalogItem) =>
+                          (catalogItem.type !== "product" || Number(catalogItem.stock) > 0) &&
+                          !editingOrder.items.some(
+                            (item) => String(item.id) === String(catalogItem.id) && item.type === catalogItem.type,
+                          ),
+                      )}
+                      getOptionLabel={(option) => `${option.name} · ${option.type === "product" ? "Producto" : "Servicio"}`}
+                      isOptionEqualToValue={(option, value) => option.id === value.id && option.type === value.type}
+                      onChange={(_, value) => setEditItemToAdd(value)}
+                      renderInput={(params) => <TextField {...params} label="Buscar algo para agregar" />}
+                    />
+                    <Button
+                      variant="contained"
+                      color="info"
+                      startIcon={<AddIcon />}
+                      onClick={handleAddEditItem}
+                      disabled={!editItemToAdd}
+                      sx={{ whiteSpace: "nowrap", minHeight: 40 }}
+                    >
+                      Agregar
+                    </Button>
+                  </Stack>
+                  {editingOrder.items.map((item, index) => (
+                    <Paper
+                      key={`${item.type}-${item.id}-${index}`}
+                      elevation={0}
+                      sx={{
+                        p: 1.25,
+                        borderRadius: 2,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        bgcolor: "background.paper",
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        gap: 1,
+                      }}
+                    >
+                      <Avatar sx={{ width: 34, height: 34, bgcolor: item.type === "service" ? "secondary.main" : "primary.main" }}>
+                        {item.type === "service" ? <BuildIcon fontSize="small" /> : <InventoryIcon fontSize="small" />}
+                      </Avatar>
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        sx={{ flex: { xs: "1 0 calc(100% - 44px)", sm: 1 } }}
+                      >
+                        {item.item_name || item.name || `Artículo ${index + 1}`}
+                      </Typography>
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleChangeEditItemQuantity(index, -1)}
+                        disabled={Number(item.quantity) <= 1}
+                        aria-label="Restar uno"
+                      >
+                        <RemoveIcon />
+                      </IconButton>
+                      <TextField
+                        type="number"
+                        inputProps={{ min: 1, step: 1, style: { textAlign: "center" } }}
+                        value={item.quantity}
+                        onChange={(event) => handleEditItemQuantity(index, event.target.value)}
+                        size="small"
+                        sx={{ width: 68 }}
+                      />
+                      <IconButton
+                        color="primary"
+                        onClick={() => handleChangeEditItemQuantity(index, 1)}
+                        aria-label="Sumar uno"
+                      >
+                        <AddIcon />
+                      </IconButton>
+                      <IconButton
+                        color="error"
+                        onClick={() => handleRemoveEditItem(index)}
+                        aria-label={`Quitar ${item.item_name || item.name || "artículo"}`}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Paper>
+                  ))}
+                  {!editingOrder.items.length && (
+                    <Typography variant="body2" color="error.main" fontWeight={700} textAlign="center">
+                      Agrega al menos un producto o servicio para guardar.
+                    </Typography>
+                  )}
+                </Stack>
+              </Paper>
+
+              <Paper
+                variant="outlined"
+                sx={{ p: 2, borderRadius: 2, bgcolor: "background.paper", backgroundImage: "none" }}
+              >
+                <Stack spacing={1.5}>
+                  <Typography variant="subtitle2" fontWeight={800} color="success.main">
+                    <MoneyIcon sx={{ fontSize: 18, verticalAlign: "middle", mr: 0.75 }} />
+                    Total y notas
+                  </Typography>
+                  <TextField
+                    label="Total del pedido"
                     name="total_amount"
                     type="number"
                     value={editingOrder.total_amount}
                     onChange={handleEditChange}
                     fullWidth
                     size="small"
+                    inputProps={{ min: 0, step: "0.01" }}
                     InputProps={{
                       startAdornment: (
-                        <Typography
-                          variant="body2"
-                          sx={{
-                            mr: 1,
-                            fontWeight: 700,
-                            color: "text.secondary",
-                          }}
-                        >
+                        <Typography variant="body2" sx={{ mr: 1, fontWeight: 800, color: "success.main" }}>
                           {currency === "PEN" ? "S/" : "$"}
                         </Typography>
                       ),
                     }}
                   />
-                </Grid>
-              </Grid>
-              <TextField
-                label="Notas / Referencia"
-                name="delivery_notes"
-                value={editingOrder.delivery_notes}
-                onChange={handleEditChange}
-                fullWidth
-                size="small"
-                multiline
-                rows={3}
-              />
+                  <TextField
+                    label="Notas o referencia para llegar"
+                    name="delivery_notes"
+                    value={editingOrder.delivery_notes}
+                    onChange={handleEditChange}
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={3}
+                  />
+                </Stack>
+              </Paper>
             </Stack>
           )}
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ p: 2, bgcolor: "background.paper" }}>
           <Button onClick={() => setOpenEditDialog(false)}>Cancelar</Button>
           <Button
             onClick={handleUpdateOrder}
             variant="contained"
-            disabled={isSubmitting}
+            disabled={isSubmitting || !editingOrder?.items?.length}
+            startIcon={isSubmitting ? <CircularProgress size={18} color="inherit" /> : <EditIcon />}
+            sx={{ borderRadius: 2, px: 3, fontWeight: 800 }}
           >
             {isSubmitting ? "Guardando..." : "Guardar Cambios"}
           </Button>

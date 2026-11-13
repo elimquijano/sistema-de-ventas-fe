@@ -769,7 +769,7 @@ export const BusinessDashboard = () => {
                         <Grid item xs={6}>
                           <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 800, display: 'block', mb: 1, textTransform: 'uppercase' }}>En Caja</Typography>
                           <Typography variant="h6" sx={{ fontWeight: 900, color: theme.palette.primary.main }}>
-                            {formatCurrency(reg.expected_amount, currency)}
+                            {formatCurrency(reg.cash, currency)}
                           </Typography>
                         </Grid>
                       </Grid>

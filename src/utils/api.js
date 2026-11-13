@@ -95,7 +95,7 @@ api.interceptors.response.use(
     }
 
     // Manejo de errores 403 (Forbidden)
-    if (error.response?.status === 403) {
+    if (error.response?.status === 403 && !originalRequest?.suppressForbiddenAlert) {
       Swal.fire({
         title: "Access Denied",
         text: "You do not have permission to perform this action.",
@@ -408,6 +408,10 @@ export const cashRegisterAPI = {
   getCurrent: (params = {}) => api.get("/cash-registers/current", { params, loaderMessage: "Verificando caja abierta..." }),
   create: (data) => api.post("/cash-registers", data, { loaderMessage: "Abriendo caja..." }),
   close: (id, data) => api.post(`/cash-registers/${id}/close`, data, { loaderMessage: "Cerrando caja..." }),
+  reopen: (id) => api.post(`/cash-registers/${id}/reopen`, undefined, {
+    loaderMessage: "Reabriendo caja...",
+    suppressForbiddenAlert: true,
+  }),
   getReport: (id) => api.get(`/cash-registers/${id}/report`, { loaderMessage: "Generando reporte de caja..." }),
   addInflow: (id, data) => api.post(`/cash-registers/${id}/add-inflow`, data, { loaderMessage: "Agregando dinero a caja..." }),
 };

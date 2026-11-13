@@ -41,6 +41,7 @@ import {
   Print as PrintIcon,
   Close as CloseIcon,
   Add as AddIcon,
+  Replay as ReplayIcon,
 } from "@mui/icons-material";
 import {
   formatCurrency,
@@ -48,6 +49,7 @@ import {
   PERU_TIME_ZONE,
 } from "../utils/formatters";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
+import { getApiErrorMessage } from "../utils/apiErrors";
 import { cashRegisterAPI, usersAPI, salesAPI } from "../utils/api";
 import { useAuth } from "../contexts/AuthContext";
 import { CashRegisterReport } from "../components/CashRegisterReport";
@@ -64,6 +66,7 @@ export const CashRegisters = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [reopeningCashRegisterId, setReopeningCashRegisterId] = useState(null);
 
   // Modal Report States
   const [openReportsDialog, setOpenReportsDialog] = useState(false);
@@ -280,6 +283,37 @@ export const CashRegisters = () => {
     }
   };
 
+  const handleReopenCashRegister = async (cashRegister) => {
+    const confirmed = await confirmSwal(
+      "Reabrir Caja",
+      `¿Desea reabrir la caja registradora #${cashRegister.id} de ${cashRegister.opened_by?.full_name || "este usuario"}?`,
+      { confirmButtonText: "Reabrir Caja" },
+    );
+    if (!confirmed) return;
+
+    setReopeningCashRegisterId(cashRegister.id);
+    try {
+      const response = await cashRegisterAPI.reopen(cashRegister.id);
+      await loadCashRegisters();
+      notificationSwal(
+        "Caja Reabierta",
+        response.data?.message || "Caja reabierta correctamente. Ya puede continuar operando.",
+        "success",
+      );
+    } catch (error) {
+      console.error("Error reopening cash register:", error);
+      const message = getApiErrorMessage(error, "No se pudo reabrir la caja registradora.");
+      const conflictingId = error.response?.data?.conflicting_cash_register_id;
+      notificationSwal(
+        "Error",
+        conflictingId ? `${message} Caja abierta: #${conflictingId}.` : message,
+        "error",
+      );
+    } finally {
+      setReopeningCashRegisterId(null);
+    }
+  };
+
   const getStatusLabel = (status) => {
     return status === "open" ? "Abierta" : "Cerrada";
   };
@@ -451,6 +485,20 @@ export const CashRegisters = () => {
                               </IconButton>
                             </>
                           )}
+                        {cr.status === "closed" &&
+                          hasPermission("cajas.create") && (
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleReopenCashRegister(cr)}
+                              disabled={reopeningCashRegisterId !== null}
+                              title="Reabrir Caja"
+                              aria-label={`Reabrir caja ${cr.id}`}
+                            >
+                              <ReplayIcon />
+                            </IconButton>
+                          )}
+
                         <IconButton
                           size="small"
                           onClick={() => handleOpenReports(cr)}

@@ -29,7 +29,6 @@ import {
   TrendingDown,
   ShoppingCart,
   Close as CloseIcon,
-  Store,
   AccountBalanceWallet,
   Assessment,
   Group,
@@ -41,6 +40,10 @@ import {
   Inventory,
   Receipt,
   PointOfSale,
+  CallMade,
+  CallReceived,
+  SwapHoriz,
+  InfoOutlined as InfoIcon,
 } from "@mui/icons-material";
 import {
   BarChart,
@@ -63,7 +66,7 @@ import {
   getCurrentPeruDate,
   PERU_TIME_ZONE,
 } from "../utils/formatters";
-import { businessAPI, cashRegisterAPI, salesAPI, default as api } from "../utils/api";
+import { assetReconciliationAPI, businessAPI, cashRegisterAPI, salesAPI, default as api } from "../utils/api";
 import { notificationSwal, confirmSwal } from "../utils/swal-helpers";
 import { useAuth } from "../contexts/AuthContext";
 import { CashRegisterReport } from "../components/CashRegisterReport";
@@ -246,6 +249,9 @@ export const BusinessDashboard = () => {
   const [openReportsDialog, setOpenReportsDialog] = useState(false);
   const [reportData, setReportData] = useState(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [assetFlowOpen, setAssetFlowOpen] = useState(false);
+  const [assetFlowDetails, setAssetFlowDetails] = useState(null);
+  const [assetFlowLoading, setAssetFlowLoading] = useState(false);
 
   const currency = business?.currency || "PEN";
 
@@ -339,6 +345,22 @@ export const BusinessDashboard = () => {
     }
   };
 
+  const handleOpenAssetFlow = async (item) => {
+    if (!item?.details_url) return;
+    setAssetFlowOpen(true);
+    setAssetFlowDetails(null);
+    setAssetFlowLoading(true);
+    try {
+      const response = await assetReconciliationAPI.getFlowDetails(item.details_url);
+      setAssetFlowDetails(response.data?.data || response.data);
+    } catch (error) {
+      notificationSwal("Error", "No se pudo cargar el detalle de entradas y salidas.", "error");
+      setAssetFlowOpen(false);
+    } finally {
+      setAssetFlowLoading(false);
+    }
+  };
+
   if (loading || !dashboardData) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "80vh" }}>
@@ -347,7 +369,7 @@ export const BusinessDashboard = () => {
     );
   }
 
-  const { financials, stats, charts, top_products, cash_registers_today } = dashboardData;
+  const { financials, stats, charts, top_products, cash_registers_today, asset_flow = null } = dashboardData;
   const safeNum = (val) => isNaN(parseFloat(val)) ? 0 : parseFloat(val);
 
   // Transformaciones de datos para gráficos
@@ -580,15 +602,25 @@ export const BusinessDashboard = () => {
                   </Box>
                 </Stack>
               </Paper>
-              <Paper elevation={0} sx={{ p: 2.5, borderRadius: "20px", bgcolor: alpha(theme.palette.info.main, 0.08), border: "1px solid", borderColor: alpha(theme.palette.info.main, 0.2) }}>
-                <Stack direction="row" spacing={2.5} alignItems="center">
-                  <Avatar sx={{ bgcolor: theme.palette.info.main, width: 50, height: 50, boxShadow: `0 8px 20px ${alpha(theme.palette.info.main, 0.4)}` }}>
-                    <Store />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h4" sx={{ fontWeight: 900, color: theme.palette.info.dark }}>{stats.active_asset_loans}</Typography>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: theme.palette.info.main, textTransform: 'uppercase' }}>Bienes Prestados</Typography>
-                  </Box>
+              <Paper elevation={0} sx={{ p: 2, borderRadius: "20px", bgcolor: alpha(theme.palette.info.main, 0.06), border: "1px solid", borderColor: alpha(theme.palette.info.main, 0.2) }}>
+                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+                  <Avatar sx={{ bgcolor: theme.palette.info.main, width: 42, height: 42 }}><SwapHoriz /></Avatar>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 900, color: theme.palette.info.main, textTransform: "uppercase" }}>Movimiento de bienes</Typography>
+                </Stack>
+                <Stack spacing={1} sx={{ maxHeight: 220, overflowY: "auto" }}>
+                  {(asset_flow?.items || []).map((item) => (
+                    <Paper key={item.asset_id} variant="outlined" sx={{ p: 1.25, borderRadius: "14px", bgcolor: "background.paper" }}>
+                      <Stack direction="row" alignItems="center" spacing={1}>
+                        <Typography variant="body2" fontWeight="800" noWrap sx={{ flex: 1 }}>{item.asset_name}</Typography>
+                        <Stack direction="row" spacing={0.25} alignItems="center" color="error.main"><CallMade fontSize="small" /><Typography fontWeight="900">{item.outgoing}</Typography></Stack>
+                        <Stack direction="row" spacing={0.25} alignItems="center" color="success.main"><CallReceived fontSize="small" /><Typography fontWeight="900">{item.incoming}</Typography></Stack>
+                        <MuiTooltip title="Ver cuándo y quién">
+                          <IconButton size="small" color="info" onClick={() => handleOpenAssetFlow(item)} aria-label={`Ver movimientos de ${item.asset_name}`}><InfoIcon fontSize="small" /></IconButton>
+                        </MuiTooltip>
+                      </Stack>
+                    </Paper>
+                  ))}
+                  {(asset_flow?.items || []).length === 0 && <Typography variant="body2" color="text.secondary">Sin movimientos en este periodo.</Typography>}
                 </Stack>
               </Paper>
               {/* Espaciado extra para asegurar que se vea bien en PC */}
@@ -831,6 +863,60 @@ export const BusinessDashboard = () => {
           </ChartCard>
         </Grid>
       </Grid>
+
+      <Dialog open={assetFlowOpen} onClose={() => setAssetFlowOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <Box>
+            <Typography variant="h6" fontWeight="900">{assetFlowDetails?.asset?.name || "Movimiento del bien"}</Typography>
+            <Typography variant="caption" color="text.secondary">Quién y cuándo lo llevó o devolvió</Typography>
+          </Box>
+          <IconButton onClick={() => setAssetFlowOpen(false)}><CloseIcon /></IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          {assetFlowLoading ? (
+            <Box sx={{ py: 8, textAlign: "center" }}><CircularProgress /></Box>
+          ) : assetFlowDetails ? (
+            <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1.5 }}><CallMade color="error" /><Typography fontWeight="900">Salidas</Typography></Stack>
+                  <Stack spacing={1}>
+                    {(assetFlowDetails.outgoing || []).map((movement) => (
+                      <Paper key={movement.movement_id} variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: alpha(theme.palette.error.main, 0.25) }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="caption" color="text.secondary">Responsable de la salida</Typography>
+                            <Stack direction="row" spacing={0.5} alignItems="center"><Person sx={{ fontSize: 17, color: "error.main" }} /><Typography fontWeight="900" sx={{ overflowWrap: "anywhere" }}>{movement.person || "Sin responsable registrado"}</Typography></Stack>
+                            <Stack direction="row" spacing={0.5} alignItems="center"><Schedule sx={{ fontSize: 15, color: "text.secondary" }} /><Typography variant="caption" color="text.secondary">{formatDate(movement.date, "DD/MM/YYYY HH:mm", PERU_TIME_ZONE)}</Typography></Stack>
+                          </Box>
+                          <Chip color="error" label={`−${movement.quantity}`} />
+                        </Stack>
+                      </Paper>
+                    ))}
+                    {(assetFlowDetails.outgoing || []).length === 0 && <Typography variant="body2" color="text.secondary">Sin salidas.</Typography>}
+                  </Stack>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 1.5 }}><CallReceived color="success" /><Typography fontWeight="900">Entradas</Typography></Stack>
+                  <Stack spacing={1}>
+                    {(assetFlowDetails.incoming || []).map((movement) => (
+                      <Paper key={movement.movement_id} variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: alpha(theme.palette.success.main, 0.25) }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography variant="caption" color="text.secondary">Responsable de la devolución</Typography>
+                            <Stack direction="row" spacing={0.5} alignItems="center"><Person sx={{ fontSize: 17, color: "success.main" }} /><Typography fontWeight="900" sx={{ overflowWrap: "anywhere" }}>{movement.person || "Sin responsable registrado"}</Typography></Stack>
+                            <Stack direction="row" spacing={0.5} alignItems="center"><Schedule sx={{ fontSize: 15, color: "text.secondary" }} /><Typography variant="caption" color="text.secondary">{formatDate(movement.date, "DD/MM/YYYY HH:mm", PERU_TIME_ZONE)}</Typography></Stack>
+                          </Box>
+                          <Chip color="success" label={`+${movement.quantity}`} />
+                        </Stack>
+                      </Paper>
+                    ))}
+                    {(assetFlowDetails.incoming || []).length === 0 && <Typography variant="body2" color="text.secondary">Sin entradas.</Typography>}
+                  </Stack>
+                </Grid>
+              </Grid>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {/* DIALOG REPORTES */}
       <Dialog 

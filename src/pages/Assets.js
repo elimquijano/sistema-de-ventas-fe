@@ -28,6 +28,7 @@ import {
   CircularProgress,
   Tooltip,
   Avatar,
+  Stack,
 } from "@mui/material";
 import {
   Add as AddIcon,
@@ -36,23 +37,27 @@ import {
   Delete as DeleteIcon,
   Inventory as InventoryIcon,
   History as HistoryIcon,
+  Link as LinkIcon,
+  FactCheck as ReconciliationIcon,
 } from "@mui/icons-material";
 import { useAuth } from "../contexts/AuthContext";
 import { formatCurrency } from "../utils/formatters";
 import { confirmSwal, notificationSwal } from "../utils/swal-helpers";
 import { assetsAPI } from "../utils/api";
 import { AuditTimeline } from "../components/AuditTimeline";
+import { AssetProductMappingDialog, AssetReconciliation } from "../components/AssetReconciliation";
 
 export const Assets = () => {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [reconciliationOpen, setReconciliationOpen] = useState(false);
+  const [mappingAsset, setMappingAsset] = useState(null);
 
   // Timeline State
   const [timelineOpen, setTimelineOpen] = useState(false);
@@ -216,27 +221,32 @@ export const Assets = () => {
   const filteredAssets = assets.filter((asset) => {
     const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (asset.description && asset.description.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesType = !typeFilter || asset.type === typeFilter;
     const matchesStatus = !statusFilter || asset.status === statusFilter;
-    return matchesSearch && matchesType && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   return (
     <Box>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+      <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 2, justifyContent: "space-between", alignItems: { sm: "center" }, mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 600 }}>
           Gestión de Activos
         </Typography>
-        {hasPermission("assets.create") && (
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-            sx={{ background: "linear-gradient(135deg, #673ab7 0%, #9c27b0 100%)" }}
-          >
-            Agregar Activo
-          </Button>
-        )}
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+          {user?.business_id && (
+            <Button variant="contained" color="success" startIcon={<ReconciliationIcon />} onClick={() => setReconciliationOpen(true)}>
+              Contar llenos y vacíos
+            </Button>
+          )}
+          {hasPermission("assets.create") && (
+            <Button
+              variant="outlined"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenDialog()}
+            >
+              Agregar activo
+            </Button>
+          )}
+        </Stack>
       </Box>
 
       <Card>
@@ -334,6 +344,11 @@ export const Assets = () => {
                             <HistoryIcon />
                           </IconButton>
                         </Tooltip>
+                        {hasPermission("assets.edit") && (
+                          <Button size="small" startIcon={<LinkIcon />} onClick={() => setMappingAsset(asset)}>
+                            Productos
+                          </Button>
+                        )}
                         {hasPermission("assets.edit") && (
                           <IconButton size="small" onClick={() => handleOpenDialog(asset)}>
                             <EditIcon />
@@ -463,6 +478,21 @@ export const Assets = () => {
           <Button onClick={() => setTimelineOpen(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
+
+      <AssetReconciliation
+        open={reconciliationOpen}
+        onClose={() => setReconciliationOpen(false)}
+        businessId={user?.business_id}
+        onConfigureProducts={(asset) => {
+          setReconciliationOpen(false);
+          setMappingAsset(asset);
+        }}
+      />
+      <AssetProductMappingDialog
+        open={Boolean(mappingAsset)}
+        onClose={() => setMappingAsset(null)}
+        asset={mappingAsset}
+      />
     </Box>
   );
 };

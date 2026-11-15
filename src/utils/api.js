@@ -423,6 +423,17 @@ export const assetsAPI = {
   update: (id, assetData) => api.put(`/assets/${id}`, assetData, { loaderMessage: "Actualizando activo..." }),
   delete: (id) => api.delete(`/assets/${id}`, { loaderMessage: "Eliminando activo..." }),
   getTimeline: (id) => api.get(`/assets/${id}/timeline`, { loaderMessage: "Cargando historial de activo..." }),
+  getReconciliationProducts: (id, params = {}) => api.get(`/assets/${id}/reconciliation-products`, { params, loaderMessage: "Cargando productos relacionados..." }),
+  setReconciliationProducts: (id, products) => api.put(`/assets/${id}/reconciliation-products`, { products }, { loaderMessage: "Guardando productos relacionados..." }),
+};
+
+export const assetReconciliationAPI = {
+  prepare: (businessId, params = {}) => api.get(`/businesses/${businessId}/asset-reconciliation/prepare`, { params, loaderMessage: "Preparando conteo..." }),
+  createSnapshot: (businessId, data) => api.post(`/businesses/${businessId}/asset-reconciliation/snapshots`, data, { loaderMessage: "Guardando conteo..." }),
+  getSnapshots: (businessId, params = {}) => api.get(`/businesses/${businessId}/asset-reconciliation/snapshots`, { params, loaderMessage: "Cargando historial de conteos..." }),
+  getSnapshot: (businessId, snapshotId) => api.get(`/businesses/${businessId}/asset-reconciliation/snapshots/${snapshotId}`, { loaderMessage: "Cargando detalle del conteo..." }),
+  createMovement: (businessId, data) => api.post(`/businesses/${businessId}/asset-reconciliation/movements`, data, { loaderMessage: "Registrando movimiento..." }),
+  getFlowDetails: (detailsUrl) => api.get(String(detailsUrl || "").replace(/^\/api/, ""), { loaderMessage: "Cargando entradas y salidas..." }),
 };
 
 export const assetLoansAPI = {
